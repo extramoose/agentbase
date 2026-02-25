@@ -2292,3 +2292,6 @@ The `notifications` table is in the schema (stub only). No UI, no triggers. Buil
 
 ### L-7: Shared grocery lists
 Current design: grocery list is per-user + agent. Sharing between multiple human users requires a separate sharing model. Ticket when there's demand.
+
+### L-8: Field-level validation on generic update route
+The `PATCH /api/commands/update` route validates table name and protected fields (user_id, actor_id) but doesn't validate field values — Postgres CHECK constraints are the only guard. Future work: add optional per-table validation schemas (e.g. zod) that the generic route checks before writing. Not a v1 concern — CHECK constraints catch bad data at the DB level.
