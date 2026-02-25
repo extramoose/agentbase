@@ -64,6 +64,10 @@ Each semantic action:
 4. Writes a typed event to `activity_log` in the same transaction
 5. Returns `{ success: true, data: {...}, event: {...} }`
 
+**Idempotency:** Agents are Docker containers hitting HTTP endpoints. Network retries will happen. All create commands accept an optional `idempotency_key` field (UUID or string, max 128 chars). The implementation uses an `idempotency_keys` table (see §5): before inserting, check if the key exists — if yes, return the stored response; if no, proceed with the insert and store `(key, response)` in the table. A Postgres cron job or TTL trigger purges entries older than 24 hours. Idempotency keys are optional — browser callers don't need them. Only agents should send them.
+
+**Rate limiting:** All command handlers run behind per-actor rate limiting middleware (see Phase 1 in §10). Limit: 60 requests/minute per `actor_id`. This protects against runaway agents burning Vercel/Supabase quotas.
+
 #### Generic Field Updates
 
 Schema-agnostic patch for any entity. New fields on any entity just work without writing new API code.
@@ -143,6 +147,7 @@ CREATE TABLE activity_log (
   id          uuid DEFAULT gen_random_uuid() PRIMARY KEY,
   entity_type text NOT NULL,
   entity_id   uuid NOT NULL,
+  user_id     uuid NOT NULL REFERENCES auth.users(id),
   actor_id    uuid NOT NULL REFERENCES auth.users(id),
   actor_type  text NOT NULL CHECK (actor_type IN ('human', 'agent', 'platform')),
   event_type  text NOT NULL,
@@ -152,8 +157,11 @@ CREATE TABLE activity_log (
 
 CREATE INDEX idx_activity_log_entity ON activity_log (entity_type, entity_id, created_at DESC);
 CREATE INDEX idx_activity_log_actor  ON activity_log (actor_id, created_at DESC);
+CREATE INDEX idx_activity_log_user   ON activity_log (user_id, created_at DESC);
 CREATE INDEX idx_activity_log_time   ON activity_log (created_at DESC);
 ```
+
+`user_id` is the data owner — the human user whose data this event pertains to. `actor_id` is who performed the action. These can differ: Frank (actor) creates a task for Hunter (owner). The command bus knows the owner at write time, so we denormalize it directly onto the table instead of computing it via subqueries at read time.
 
 **Event types** (extensible, not enum — allows new types without migration):
 - `created`, `updated`, `deleted`
@@ -667,8 +675,6 @@ CREATE TABLE meetings (
   transcript      text,
   proposed_tasks  jsonb DEFAULT '[]'::jsonb,
   tags            text[] NOT NULL DEFAULT '{}',
-  people_ids      uuid[] NOT NULL DEFAULT '{}',
-  company_ids     uuid[] NOT NULL DEFAULT '{}',
   created_at      timestamptz NOT NULL DEFAULT now(),
   updated_at      timestamptz NOT NULL DEFAULT now()
 );
@@ -702,6 +708,42 @@ CREATE POLICY "Meetings owner or agent delete" ON meetings
 CREATE POLICY "Admins read all meetings" ON meetings
   FOR SELECT USING (
     EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'superadmin'))
+  );
+
+-- Join table: meetings ↔ people
+CREATE TABLE meetings_people (
+  meeting_id uuid NOT NULL REFERENCES meetings(id) ON DELETE CASCADE,
+  person_id  uuid NOT NULL REFERENCES people(id) ON DELETE CASCADE,
+  PRIMARY KEY (meeting_id, person_id)
+);
+
+ALTER TABLE meetings_people ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Meetings_people via meeting ownership" ON meetings_people
+  FOR ALL USING (
+    EXISTS (
+      SELECT 1 FROM meetings m
+      WHERE m.id = meeting_id
+      AND m.user_id = auth.uid()
+    )
+  );
+
+-- Join table: meetings ↔ companies
+CREATE TABLE meetings_companies (
+  meeting_id  uuid NOT NULL REFERENCES meetings(id) ON DELETE CASCADE,
+  company_id  uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+  PRIMARY KEY (meeting_id, company_id)
+);
+
+ALTER TABLE meetings_companies ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Meetings_companies via meeting ownership" ON meetings_companies
+  FOR ALL USING (
+    EXISTS (
+      SELECT 1 FROM meetings m
+      WHERE m.id = meeting_id
+      AND m.user_id = auth.uid()
+    )
   );
 ```
 
@@ -1049,6 +1091,7 @@ CREATE TABLE activity_log (
   id          uuid DEFAULT gen_random_uuid() PRIMARY KEY,
   entity_type text NOT NULL,
   entity_id   uuid NOT NULL,
+  user_id     uuid NOT NULL REFERENCES auth.users(id),
   actor_id    uuid NOT NULL REFERENCES auth.users(id),
   actor_type  text NOT NULL CHECK (actor_type IN ('human', 'agent', 'platform')),
   event_type  text NOT NULL,
@@ -1058,6 +1101,7 @@ CREATE TABLE activity_log (
 
 CREATE INDEX idx_activity_log_entity ON activity_log (entity_type, entity_id, created_at DESC);
 CREATE INDEX idx_activity_log_actor  ON activity_log (actor_id, created_at DESC);
+CREATE INDEX idx_activity_log_user   ON activity_log (user_id, created_at DESC);
 CREATE INDEX idx_activity_log_time   ON activity_log (created_at DESC);
 
 -- Composite index for realtime subscription filtering
@@ -1066,36 +1110,11 @@ CREATE INDEX idx_activity_log_entity_pair ON activity_log (entity_type, entity_i
 
 ALTER TABLE activity_log ENABLE ROW LEVEL SECURITY;
 
--- Read: users can read activity for entities they own
--- This requires joining to the entity table, but since entity_type is dynamic,
--- we use a simpler approach: activity_log rows are readable if actor_id matches
--- the user or their agent, OR if the entity belongs to the user.
--- For simplicity and performance, we scope by: the user can read any activity_log
--- entry where actor_id is themselves, their agent, or where entity_id belongs to
--- an entity they own. We implement this via a function:
-
-CREATE OR REPLACE FUNCTION user_owns_entity(p_entity_type text, p_entity_id uuid, p_user_id uuid)
-RETURNS boolean AS $$
-BEGIN
-  RETURN CASE p_entity_type
-    WHEN 'task'         THEN EXISTS (SELECT 1 FROM tasks WHERE id = p_entity_id AND user_id = p_user_id)
-    WHEN 'meeting'      THEN EXISTS (SELECT 1 FROM meetings WHERE id = p_entity_id AND user_id = p_user_id)
-    WHEN 'library_item' THEN EXISTS (SELECT 1 FROM library_items WHERE id = p_entity_id AND user_id = p_user_id)
-    WHEN 'diary_entry'  THEN EXISTS (SELECT 1 FROM diary_entries WHERE id = p_entity_id AND user_id = p_user_id)
-    WHEN 'grocery_item' THEN EXISTS (SELECT 1 FROM grocery_items WHERE id = p_entity_id AND user_id = p_user_id)
-    WHEN 'company'      THEN EXISTS (SELECT 1 FROM companies WHERE id = p_entity_id AND user_id = p_user_id)
-    WHEN 'person'       THEN EXISTS (SELECT 1 FROM people WHERE id = p_entity_id AND user_id = p_user_id)
-    WHEN 'deal'         THEN EXISTS (SELECT 1 FROM deals WHERE id = p_entity_id AND user_id = p_user_id)
-    ELSE false
-  END;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER STABLE;
-
-CREATE POLICY "Users read own activity" ON activity_log
+-- RLS: identical to all other tables — simple user_id check, no subqueries needed
+CREATE POLICY "Activity owner or agent select" ON activity_log
   FOR SELECT USING (
-    user_owns_entity(entity_type, entity_id, auth.uid())
-    OR user_owns_entity(entity_type, entity_id,
-      (SELECT owner_id FROM agent_owners WHERE agent_id = auth.uid()))
+    user_id = auth.uid()
+    OR user_id IN (SELECT owner_id FROM agent_owners WHERE agent_id = auth.uid())
   );
 
 CREATE POLICY "Admins read all activity" ON activity_log
@@ -1129,8 +1148,8 @@ BEGIN
   SELECT al.*
   FROM activity_log al
   WHERE
-    -- Scope to user's data
-    user_owns_entity(al.entity_type, al.entity_id, COALESCE(v_owner_id, v_user_id))
+    -- Scope to user's data (simple user_id check — no entity joins needed)
+    al.user_id = COALESCE(v_owner_id, v_user_id)
     -- Optional filters
     AND (p_entity_type IS NULL OR al.entity_type = p_entity_type)
     AND (p_entity_id   IS NULL OR al.entity_id   = p_entity_id)
@@ -1173,6 +1192,25 @@ CREATE TRIGGER set_deals_updated_at
   BEFORE UPDATE ON deals FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 ```
 
+### Idempotency Keys
+
+```sql
+CREATE TABLE idempotency_keys (
+  key           text PRIMARY KEY,
+  response_body jsonb NOT NULL,
+  created_at    timestamptz NOT NULL DEFAULT now()
+);
+
+-- Purge entries older than 24 hours (run via pg_cron or application-level cleanup)
+-- If pg_cron is available:
+--   SELECT cron.schedule('purge-idempotency-keys', '0 * * * *',
+--     $$DELETE FROM idempotency_keys WHERE created_at < now() - interval '24 hours'$$);
+-- Otherwise: call DELETE FROM idempotency_keys WHERE created_at < now() - interval '24 hours'
+-- from a scheduled Vercel cron or similar.
+```
+
+No RLS needed — this table is only accessed from API route handlers via the service role, not directly by clients.
+
 ### Enable Realtime
 
 ```sql
@@ -1193,7 +1231,7 @@ ALTER PUBLICATION supabase_realtime ADD TABLE activity_log;
 app/api/commands/
 ├── _lib/
 │   ├── auth.ts          # resolveActor() — shared auth resolution
-│   ├── activity.ts      # writeActivity() — shared activity_log writer
+│   ├── activity.ts      # writeActivity() — shared activity_log writer. Accepts user_id (entity owner) + actor_id (who did it). These can differ — e.g. Frank (actor) creates a task for Hunter (owner).
 │   └── validate.ts      # Zod schemas + validation helpers
 ├── create-task/
 │   └── route.ts
@@ -1265,10 +1303,11 @@ export async function POST(request: Request) {
 
     if (error) throw error;
 
-    // Write activity log
+    // Write activity log (user_id = data owner, actor_id = who did it)
     await writeActivity(supabase, {
       entity_type: "task",
       entity_id: task.id,
+      user_id: ownerId,
       actor_id: actorId,
       actor_type: actorType,
       event_type: "created",
@@ -1334,7 +1373,7 @@ const schema = z.object({
 
 export async function POST(request: Request) {
   try {
-    const { supabase, actorId, actorType } = await resolveActor(request);
+    const { supabase, actorId, actorType, ownerId } = await resolveActor(request);
     const body = await request.json();
     const { task_id, status } = schema.parse(body);
 
@@ -1365,6 +1404,7 @@ export async function POST(request: Request) {
     await writeActivity(supabase, {
       entity_type: "task",
       entity_id: task_id,
+      user_id: ownerId,
       actor_id: actorId,
       actor_type: actorType,
       event_type: "status_changed",
@@ -1432,7 +1472,7 @@ const TABLE_TO_ENTITY: Record<string, string> = {
 
 export async function PATCH(request: Request) {
   try {
-    const { supabase, actorId, actorType } = await resolveActor(request);
+    const { supabase, actorId, actorType, ownerId } = await resolveActor(request);
     const body = await request.json();
     const { table, id, fields } = schema.parse(body);
 
@@ -1459,6 +1499,7 @@ export async function PATCH(request: Request) {
     await writeActivity(supabase, {
       entity_type: TABLE_TO_ENTITY[table] ?? table,
       entity_id: id,
+      user_id: ownerId,
       actor_id: actorId,
       actor_type: actorType,
       event_type: "updated",
@@ -1515,7 +1556,9 @@ Authorization: Bearer <session-cookie>
 | people_companies | Via person | Via person | Via person | Via person | — | — |
 | deals_companies | Via deal | Via deal | Via deal | Via deal | — | — |
 | deals_people | Via deal | Via deal | Via deal | Via deal | — | — |
-| activity_log | Via entity ownership | Insert (own actor_id) | Via entity ownership | Insert (own actor_id) | All | — |
+| meetings_people | Via meeting | Via meeting | Via meeting | Via meeting | — | — |
+| meetings_companies | Via meeting | Via meeting | Via meeting | Via meeting | — | — |
+| activity_log | Own (`user_id`) | Insert (own actor_id) | Via owner | Insert (own actor_id) | All | — |
 
 ### The Agent Access Pattern (Used Everywhere)
 
@@ -1531,7 +1574,7 @@ This is a subquery that runs once per policy evaluation. For performance, `agent
 
 ### RLS on Join Tables
 
-Join tables (people_companies, deals_companies, deals_people) don't have `user_id` directly. They inherit access from their parent entity:
+Join tables (people_companies, deals_companies, deals_people, meetings_people, meetings_companies) don't have `user_id` directly. They inherit access from their parent entity:
 
 ```sql
 -- Example: people_companies
@@ -1660,6 +1703,7 @@ type ActivityLogEntry = {
   id: string;
   entity_type: string;
   entity_id: string;
+  user_id: string;
   actor_id: string;
   actor_type: "human" | "agent" | "platform";
   event_type: string;
@@ -2055,6 +2099,7 @@ agentbase/
 - [ ] Create `.env.example` with all required env vars
 - [ ] Create agent users (Lucy, Frank) and generate JWTs via scripts
 - [ ] Ship empty `AppShell` with sidebar nav (all items, no content yet)
+- [ ] Add per-actor rate limiting middleware on `/api/commands/*` — simple in-memory or Supabase-based counter. Limit: 60 requests/minute per `actor_id`. Protects against runaway agents burning Vercel/Supabase quotas.
 - [ ] Verify: user can sign in, see empty shell, sign out
 
 ### Phase 2: Command Bus & Activity System
@@ -2099,6 +2144,7 @@ agentbase/
 - [ ] Build meetings list page
 - [ ] Build meeting detail page with lifecycle states (upcoming → in_meeting → ended → closed)
 - [ ] Build meeting EditShelf content (date, time, notes, transcript, proposed tasks)
+- [ ] Build people/company linking via `meetings_people` and `meetings_companies` join tables (ComboInput for search + select)
 - [ ] Wire up realtime for meeting detail (agent writes during live meeting)
 
 #### 4b: Library
@@ -2149,7 +2195,6 @@ agentbase/
 - [ ] Keyboard shortcuts (Escape to close shelf, Cmd+K for palette)
 - [ ] Accessibility audit (focus management, ARIA labels, color contrast)
 - [ ] SEO basics (metadata, OG tags)
-- [ ] Rate limiting on API routes
 - [ ] Input sanitization audit (XSS prevention in rich text, SQL injection prevention)
 - [ ] Deployment documentation (Vercel setup, Supabase setup, env vars)
 - [ ] README.md
@@ -2220,3 +2265,30 @@ agentbase/
 | **Grocery schema** | `item` (text), `checked` (bool), no user_id | `name`, `quantity`, `unit`, `category`, `is_checked`, `sort_order`, `user_id` | Multi-tenant. Richer data model for better UX (categories, quantities). |
 | **Tags** | Global (one namespace) | Per-user (scoped by `user_id`) | Multi-tenant isolation. |
 | **Migration strategy** | 35+ incremental migrations (organic growth) | Single initial migration with complete schema | Greenfield advantage. Clean start. |
+
+---
+
+## Later / Low Priority
+
+These are real concerns but deliberately out of scope for v1. Ticket them when the core is stable.
+
+### L-1: JWT rotation and revocation strategy
+The 10-year agent JWTs have no revocation mechanism. If a JWT leaks, the only option is rotating the entire `SUPABASE_JWT_SECRET`, which invalidates all tokens. For now: document in onboarding that JWT secret rotation is the emergency revocation path. Future work: design a `revoked_tokens` table that API route auth checks against, or implement a shorter-lived token + refresh flow.
+
+### L-2: Smart event detection on generic update route
+The `PATCH /api/commands/update` route writes `event_type: "updated"` for all field changes. For known semantic fields (status, priority, assignee), it could detect the change and write a richer event (e.g. `status_changed` with old/new values) automatically. Not blocking — semantic action routes handle the important mutations. Add after v1 is stable.
+
+### L-3: Schema migration strategy for self-deployers
+Once others deploy AgentBase, schema updates need a documented path. Future work: document `supabase db push` workflow, add a `schema_version` table, add a `/api/health` endpoint that reports schema version so deployed instances know when they're behind.
+
+### L-4: Webhook / event broadcast system
+The activity_log writes structured events for every mutation. Future work: add a `webhooks` table where users register URLs to receive event payloads. Makes the platform extensible without writing integrations into the core.
+
+### L-5: Rich text format — revisit if needed
+Currently storing Tiptap output as HTML (safe, renderable, DOMPurify sanitized). If markdown export, full-text search on content, or non-Tiptap rendering becomes important — revisit. Not a v1 concern.
+
+### L-6: Push / email notifications
+The `notifications` table is in the schema (stub only). No UI, no triggers. Build when there's a real use case.
+
+### L-7: Shared grocery lists
+Current design: grocery list is per-user + agent. Sharing between multiple human users requires a separate sharing model. Ticket when there's demand.
