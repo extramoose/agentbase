@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { formatDistanceToNow } from 'date-fns'
 import { Send } from 'lucide-react'
+import { formatActivityEvent } from '@/lib/format-activity'
 
 type ActivityEntry = {
   id: string
@@ -21,19 +22,6 @@ type ActivityEntry = {
   body: string | null
   payload: Record<string, unknown> | null
   created_at: string
-}
-
-function eventDescription(entry: ActivityEntry): string {
-  switch (entry.event_type) {
-    case 'created': return 'created this'
-    case 'updated': return 'updated this'
-    case 'commented': return entry.body ?? 'commented'
-    case 'status_changed':
-      return `changed status${entry.old_value ? ` from ${entry.old_value}` : ''} to ${entry.new_value}`
-    case 'priority_changed':
-      return `changed priority to ${entry.new_value}`
-    default: return entry.event_type.replace(/_/g, ' ')
-  }
 }
 
 interface ActivityAndCommentsProps {
@@ -168,7 +156,7 @@ export function ActivityAndComments({ entityType, entityId, currentUserId }: Act
                   </div>
                 ) : (
                   <p className="text-sm text-muted-foreground">
-                    {eventDescription(entry)}
+                    {formatActivityEvent(entry)}
                   </p>
                 )}
                 <p className="text-xs text-muted-foreground mt-1">

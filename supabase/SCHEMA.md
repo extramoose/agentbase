@@ -279,7 +279,7 @@ Single source of truth for all entity events. Written atomically with entity mut
 | entity_type | text | NO | — | Table name: `tasks`, `meetings`, etc. |
 | entity_id | uuid | NO | — | |
 | entity_label | text | YES | — | Display name at time of event |
-| event_type | text | NO | — | `created \| updated \| deleted \| commented \| status_changed` |
+| event_type | text | NO | — | `created \| updated \| deleted \| commented \| status_changed \| priority_changed \| title_changed \| due_date_set \| due_date_cleared \| tags_changed \| field_updated` |
 | actor_id | uuid | NO | — | FK → auth.users |
 | actor_type | text | NO | — | CHECK: `human \| agent` |
 | old_value | text | YES | — | For field-level diffs |
@@ -350,7 +350,7 @@ All mutations go through these functions. They atomically write to the entity ta
 ### Generic update/delete/comment
 | Function | Parameters | Notes |
 |----------|-----------|-------|
-| `rpc_update_entity` | p_table, p_entity_id, p_fields (jsonb), p_actor_id, p_tenant_id | Dynamic SET, type-aware casting. Protected fields: id, tenant_id, actor_id, created_at, ticket_id |
+| `rpc_update_entity` | p_table, p_entity_id, p_fields (jsonb), p_actor_id, p_tenant_id | Dynamic SET, type-aware casting. Emits one activity_log row per changed field with semantic event_type + payload diff. Protected fields: id, tenant_id, actor_id, created_at, ticket_id |
 | `rpc_delete_entity` | p_table, p_entity_id, p_actor_id, p_actor_type, p_tenant_id | Per-table label lookup, then DELETE + activity_log |
 | `rpc_add_comment` | p_entity_type, p_entity_id, p_entity_label, p_body, p_actor_id, p_tenant_id | Inserts `event_type='commented'` into activity_log |
 
@@ -374,6 +374,7 @@ All mutations go through these functions. They atomically write to the entity ta
 | `005_agents_table.sql` | Custom `agents` table, `resolve_agent_by_key` + `admin_update_profile` RPCs, DROP `agent_owners` |
 | `006_rpc_fixes.sql` | `is_admin()`, `is_superadmin()` SECURITY DEFINER helpers; profiles RLS fix |
 | `007_workspace_settings.sql` | `tenants`: add `updated_at`, `openrouter_api_key`, `default_model`; `get_workspace_settings` + `update_workspace_settings` RPCs |
+| `008_rich_activity_diffs.sql` | `rpc_update_entity` captures per-field diffs with semantic event types; emits one `activity_log` row per changed field |
 
 ---
 

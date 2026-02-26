@@ -7,6 +7,7 @@ import { SearchFilterBar } from '@/components/search-filter-bar'
 import { Badge } from '@/components/ui/badge'
 import { formatDistanceToNow } from 'date-fns'
 import { Loader2 } from 'lucide-react'
+import { formatActivityEvent } from '@/lib/format-activity'
 
 type ActivityEntry = {
   id: string
@@ -38,17 +39,6 @@ const ENTITY_TYPES = [
   'tasks', 'meetings', 'library_items', 'diary_entries',
   'grocery_items', 'companies', 'people', 'deals',
 ] as const
-
-function describeEvent(entry: ActivityEntry): string {
-  switch (entry.event_type) {
-    case 'created': return `created ${entry.entity_label ?? entry.entity_type}`
-    case 'updated': return `updated ${entry.entity_label ?? entry.entity_type}`
-    case 'deleted': return `deleted ${entry.entity_label ?? entry.entity_type}`
-    case 'commented': return `commented on ${entry.entity_label ?? entry.entity_type}`
-    case 'status_changed': return `changed status from ${entry.old_value} to ${entry.new_value}`
-    default: return `${entry.event_type} ${entry.entity_label ?? entry.entity_type}`
-  }
-}
 
 function formatEntityType(type: string): string {
   return type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
@@ -197,7 +187,7 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
                     {formatEntityType(entry.entity_type)}
                   </Badge>
                   <span className="text-sm text-foreground">
-                    {describeEvent(entry)}
+                    {formatActivityEvent(entry)}
                   </span>
                 </div>
                 {entry.event_type === 'commented' && entry.body && (
