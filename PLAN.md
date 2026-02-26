@@ -31,7 +31,7 @@ AgentBase is a greenfield "Life OS" — a personal productivity platform where h
 **What changes from HAH Toolbox and why:**
 
 - **Command bus (new):** HAH Toolbox has ad-hoc Supabase client calls scattered across components. AgentBase routes all mutations through Next.js API routes so agents (external HTTP clients) and browsers use the same path.
-- **Real agent auth (new):** HAH Toolbox uses `SET LOCAL app.current_actor` for agent attribution — fragile, service-role-dependent. AgentBase gives agents real Supabase Auth users with hand-signed JWTs.
+- **Real agent auth (new):** HAH Toolbox uses `SET LOCAL app.current_actor` for agent attribution — fragile, service-role-dependent. AgentBase gives agents real Supabase Auth users. `auth.uid()` resolves correctly in all triggers. JWT signing approach TBD per current Supabase signing keys system (legacy hand-signing deprecated — see §3.5).
 - **Multi-tenancy (new):** HAH Toolbox is single-user. AgentBase scopes all data by `tenant_id` (workspace) via RLS from day one.
 - **Componentized edit shelf (new):** HAH Toolbox's task shelf is a monolithic 900+ line component. AgentBase has a universal `<EditShelf>` with a pluggable content slot and a shared `<ActivityAndComments>` section.
 
@@ -56,8 +56,7 @@ DEAL_LABEL                      # Optional label override for "Deals" entity
 
 **Scripts-only env vars** (local `.env.local` only — NOT in Vercel):
 ```
-SUPABASE_SECRET_KEY   # Supabase secret key (formerly "service role key") — admin scripts only: create-agent-users, generate-jwts. NEVER in Vercel runtime.
-SUPABASE_JWT_SECRET         # needed for hand-signing agent JWTs in scripts
+SUPABASE_SECRET_KEY   # Supabase secret key (formerly "service role key") — admin scripts only: create-agent-users. NEVER in Vercel runtime.
 ```
 
 ---
@@ -412,50 +411,42 @@ await supabase.from("tenant_members").insert([
 
 After creating agent users, insert them into `tenant_members` for HunterTenant. Agents' RLS access is now identical to human members — they can read/write all workspace entities. The `agent_owners` table continues to map agent → owning human for delegation tracking.
 
-#### Step 2: Generate long-lived JWTs
+#### Step 2: Generate agent authentication tokens
 
-Hand-sign JWTs using the Supabase JWT secret (HS256). JWTs are signed with 90-day expiry (not 10 years). A refresh script (`scripts/refresh-agent-jwts.ts`) regenerates and re-stores them before expiry. Set a calendar reminder or cron job to run this every 60 days.
+> **⚠️ Architecture Note: Legacy JWT secret is deprecated (as of early 2026)**
+>
+> The original plan called for hand-signing agent JWTs using the Supabase JWT secret (HS256). This approach is **no longer viable** — Supabase's new signing keys system uses asymmetric keys (RSA/EC) whose private components cannot be extracted. The legacy shared secret approach is deprecated and should not be used in new projects.
+>
+> **The viable options for agent service account auth (research needed before Phase 1):**
+>
+> **Option A: Import your own EC/RSA keypair into Supabase signing keys**
+> Generate an EC (ES256) or RSA keypair locally. Import the private key into Supabase's new signing keys system (Dashboard → Auth → Signing Keys). Sign agent JWTs yourself with the private key — Supabase validates them via its JWKS endpoint using the public key. You control expiry, `jti`, rotation. This is the most flexible approach.
+>
+> **Option B: Admin-generated sessions with refresh token storage**
+> Use the secret key to call `supabase.auth.admin.generateLink({ type: 'magic_link', email: 'frank@internal.hah.to' })` once during setup. Exchange the magic link token for a real session (access token + refresh token). Store the refresh token in the agent's config. At runtime, agents call `supabase.auth.refreshSession({ refresh_token })` to get fresh short-lived access tokens without ever needing the secret key. This requires no key management but depends on Supabase's session refresh infrastructure.
+>
+> **Option C: Secret key with explicit actor injection (simplest, loses RLS per-agent)**
+> Agents continue using the secret key (which bypasses RLS). Actor attribution is handled by the command bus passing `actor_id` explicitly. This loses the "agents have RLS-scoped access" benefit but is operationally simple for v1 while the above options are evaluated.
+>
+> **Recommendation for Phase 1:** Research Option A and Option B against current Supabase docs before building Phase 1. Option A gives the most correct architecture (agents have real auth.uid(), RLS applies, tokens are self-managed). Option B is simpler operationally. The Phase 1 research ticket should validate which is currently supported and document the chosen approach before writing any auth code.
 
 ```typescript
-// scripts/generate-agent-jwt.ts
-import * as jose from "jose";
-
-const secret = new TextEncoder().encode(process.env.SUPABASE_JWT_SECRET!);
-
-async function generateAgentJWT(userId: string, email: string) {
-  const jti = crypto.randomUUID(); // Unique JWT ID for revocation tracking
-  const jwt = await new jose.SignJWT({
-    sub: userId,
-    email,
-    role: "authenticated",
-    iss: "supabase",
-    aud: "authenticated",
-    jti, // Store this alongside the token for easy revocation if needed
-  })
-    .setProtectedHeader({ alg: "HS256", typ: "JWT" })
-    .setIssuedAt()
-    .setExpirationTime("90d")
-    .sign(secret);
-
-  console.log(`JWT for ${email} (jti: ${jti}):\n${jwt}\n`);
-  return { jwt, jti };
-}
-
-await generateAgentJWT(LUCY_USER_ID, "lucy@internal.hah.to");
-await generateAgentJWT(FRANK_USER_ID, "frank@internal.hah.to");
+// TODO: Agent JWT generation approach TBD — see §3.5 research note.
+// Options: import EC keypair into Supabase signing keys, OR admin-generated refresh token sessions.
+// Do not use legacy SUPABASE_JWT_SECRET approach.
 ```
 
-Store these JWTs as environment variables in the agent containers:
+Store agent auth tokens as environment variables in the agent containers:
 ```
-LUCY_JWT=eyJhbGci...
-FRANK_JWT=eyJhbGci...
+LUCY_JWT=<token>
+FRANK_JWT=<token>
 ```
 
 #### Token Revocation
 
-**Token revocation:** A `revoked_agent_tokens` table (see §5) stores revoked token JTIs (`jti text PRIMARY KEY, revoked_at timestamptz`). The `resolveActor()` function checks this table on every request for agent JWTs. To revoke a token: insert its `jti` claim. This avoids the nuclear option of rotating `SUPABASE_JWT_SECRET` (which invalidates all tokens including legitimate ones).
+**Token revocation:** A `revoked_agent_tokens` table (see §5) stores revoked token JTIs (`jti text PRIMARY KEY, revoked_at timestamptz`). The `resolveActor()` function checks this table on every request for agent JWTs. To revoke a token: insert its `jti` claim. This avoids the nuclear option of rotating the Supabase signing key (which in the new system can be done with zero downtime via Supabase's key rotation, without signing users out — a significant improvement over the legacy approach).
 
-Hand-sign agent JWTs with a unique `jti` (UUID). Store the `jti` in `openclaw.json` alongside the token for easy reference if revocation is needed.
+Agent JWTs should include a unique `jti` (UUID). Store the `jti` in `openclaw.json` alongside the token for easy reference if revocation is needed.
 
 #### Step 3: RLS policies that work for agents
 
@@ -2124,6 +2115,7 @@ agentbase/
 
 **Goal:** Empty app that boots, authenticates, and has the full DB schema deployed.
 
+- [ ] RESEARCH FIRST: Validate agent service account JWT approach against current Supabase docs (see §3.5). Choose Option A (EC keypair import) or Option B (admin refresh token). Document chosen approach before writing any auth code.
 - [ ] Initialize Next.js 16 with App Router, TypeScript strict, pnpm (`pnpm create next-app@latest` then upgrade to next@16)
 - [ ] Install and configure Tailwind CSS v4 + shadcn/ui
 - [ ] Set up Supabase project (or configure for existing)
@@ -2133,8 +2125,8 @@ agentbase/
 - [ ] Deploy initial migration (`00000000000000_initial.sql`) — all tables, RLS, triggers
 - [ ] Set up Google OAuth in Supabase Auth
 - [ ] Build auth pages (`/auth/login`, `/auth/callback`, `/auth/logout`)
-- [ ] Create `.env.example` with all required env vars (see §2 Environment Variables — runtime vars only, no `SUPABASE_SECRET_KEY` or `SUPABASE_JWT_SECRET`)
-- [ ] Create agent users (Lucy, Frank) and generate JWTs via scripts
+- [ ] Create `.env.example` with all required env vars (see §2 Environment Variables — runtime vars only, no `SUPABASE_SECRET_KEY`)
+- [ ] Create agent users (Lucy, Frank) and generate auth tokens via scripts (approach per §3.5 research)
 - [ ] Ship empty `AppShell` with sidebar nav (all items, no content yet)
 - [ ] Add per-actor rate limiting middleware on `/api/commands/*` — simple in-memory or Supabase-based counter. Limit: 60 requests/minute per `actor_id`. Protects against runaway agents burning Vercel/Supabase quotas.
 - [ ] Verify: user can sign in, see empty shell, sign out
@@ -2269,7 +2261,7 @@ All questions have been resolved. No open questions remain.
 | Area | HAH Toolbox | AgentBase | Why |
 |------|-------------|-----------|-----|
 | **Multi-tenancy** | Single-user. No `user_id` on most tables. | `tenant_id` on rows = workspace. All workspace members see all rows. Attribution in `activity_log`. | Correct separation of visibility vs. attribution. Adding a human to the team = one row insert, no schema change. |
-| **Agent auth** | Service role key + `SET LOCAL app.current_actor` | Real Supabase Auth users with hand-signed JWTs. `auth.uid()` resolves correctly. | Eliminates the fragile `SET LOCAL` pattern. Proper audit trail. RLS works naturally. |
+| **Agent auth** | Service role key + `SET LOCAL app.current_actor` | Real Supabase Auth users with proper `auth.uid()` resolution. JWT signing via current Supabase signing keys system (not legacy shared secret). See §3.5. | Eliminates the fragile `SET LOCAL` pattern. Proper audit trail. RLS works naturally. |
 | **Mutation path** | Direct Supabase client calls from components | All mutations go through API routes (command bus) | Agents (external HTTP clients) need the same endpoints as the browser. Server actions can't be called by Docker containers. |
 | **Activity log** | `author` as text (`"hunter"`, `"frank"`). No tenant scope. | `actor_id` as UUID FK to `auth.users`. `tenant_id` for workspace-scoped visibility. | Multi-tenant safe. Proper FK relationships. Actors resolved client-side. |
 | **Task activity** | Dual-write to `task_activity` AND `activity_log` | Single write to `activity_log` only | One source of truth. No sync issues. `task_activity` was a legacy artifact. |
