@@ -126,7 +126,7 @@ Content-Type: application/json
 ```
 
 - Validates `table` against an allowlist
-- Validates `id` exists and belongs to the requesting user's workspace
+- Validates `id` exists and belongs to the requesting actor's workspace (`tenant_id` match enforced by RLS)
 - Calls `rpc_update_entity(table_name, entity_id, fields jsonb, actor_id uuid, tenant_id uuid)` — a Postgres function that runs `UPDATE {table} SET ... WHERE id = entity_id AND tenant_id = tenant_id` and `INSERT INTO activity_log (...)` in one transaction
 - Returns `{ success: true, data: {...} }`
 
@@ -432,16 +432,14 @@ await supabase.from("tenant_members").insert([
 
 After creating agent users, insert them into `tenant_members` for HunterTenant. Agents' RLS access is now identical to human members — they can read/write all workspace entities. The `agent_owners` table continues to map agent → owning human for delegation tracking.
 
-#### Step 2: Generate agent authentication tokens
+#### Step 2: Bootstrap agent sessions
 
-> **Note: Legacy JWT secret is deprecated.** The old approach of hand-signing HS256 JWTs using a shared secret is no longer the Supabase pattern. AgentBase uses admin-generated refresh token sessions instead — no custom signing required.
+AgentBase uses Supabase-issued access + refresh tokens for agent auth. The Supabase JS client manages token rotation automatically — no manual refresh scripts, no custom JWT signing, no shared secrets.
 
-**Chosen approach: Admin-generated sessions with refresh token storage**
-
-1. Run `scripts/create-agent-users.ts` (uses secret key) — creates `frank@internal.hah.to` and `lucy@internal.hah.to` via `supabase.auth.admin.createUser()`
-2. Run `scripts/generate-agent-sessions.ts` — calls `supabase.auth.admin.generateLink({ type: 'magiclink', email: 'frank@internal.hah.to' })`, exchanges the token for a real session, captures `refresh_token`
-3. Store `refresh_token` in the agent's config (Frank → `openclaw.json`, Lucy → her workspace config)
-4. At runtime, agent initializes: `supabase.auth.setSession({ access_token, refresh_token })` — the Supabase JS client auto-refreshes access tokens from that point. `auth.uid()` resolves to Frank's or Lucy's real user UUID in every DB call, every trigger, every RLS policy. No secret key at runtime. No JWT signing. No custom crypto.
+1. Run `scripts/create-agent-users.ts` — creates agent auth users via `supabase.auth.admin.createUser()`
+2. Run `scripts/generate-agent-sessions.ts` — calls `supabase.auth.admin.generateLink({ type: 'magiclink', email })`, exchanges the link token for a real Supabase session, captures the `refresh_token`
+3. Store `refresh_token` in the agent's config (e.g. Frank → `openclaw.json`)
+4. At runtime, agent calls `supabase.auth.setSession({ access_token, refresh_token })` once — the Supabase JS client auto-refreshes from that point. `auth.uid()` resolves to the agent's real UUID in every DB call, trigger, and RLS policy. No secret key at runtime.
 
 ```typescript
 // Agent sessions: run scripts/create-agent-users.ts + scripts/generate-agent-sessions.ts
@@ -479,7 +477,7 @@ Because agents are real `authenticated` users and members of the workspace, `aut
 |---------|-------------|-----|
 | **Tasks list** | `postgres_changes` on `tasks` filtered by `tenant_id` | Agents frequently create/update tasks. Humans need to see changes immediately. Core workflow surface. |
 | **Task EditShelf → ActivityAndComments** | `postgres_changes` on `activity_log` filtered by `entity_type=task, entity_id=X` | Comments and status changes appear live while shelf is open. |
-| **Meetings detail** | `postgres_changes` on `meetings` filtered by `id=X` | During live meetings, agent writes meeting_summary, proposed_tasks. Must appear without refresh. |
+| **Meetings detail** | `postgres_changes` on `meetings` filtered by `tenant_id=eq.X, id=eq.Y` | During live meetings, agent writes meeting_summary, proposed_tasks. Must appear without refresh. `tenant_id` filter is explicit; RLS is the enforcing layer. |
 | **Meeting EditShelf → ActivityAndComments** | Same as task shelf | Same pattern. |
 | **Global History page** | `postgres_changes` on `activity_log` filtered by `tenant_id` | The "everything" feed. New events stream in live. |
 | **Grocery list** | `postgres_changes` on `grocery_items` filtered by `tenant_id` | Shared between user + agent. Checking items off should sync instantly. |
@@ -496,7 +494,7 @@ Because agents are real `authenticated` users and members of the workspace, `aut
 
 ### Subscription Strategy
 
-**Per-table, user-filtered subscriptions.** NOT one global subscription.
+**Per-table, tenant-filtered subscriptions.** NOT one global subscription.
 
 ```typescript
 // Each page that needs realtime creates a targeted subscription:
