@@ -17,14 +17,34 @@ import {
   Bot,
   Settings,
   LogOut,
+  ChevronsUpDown,
+  Check,
+  Loader2,
 } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { Separator } from '@/components/ui/separator'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import type { UserProfile } from '@/lib/auth'
+import { useState } from 'react'
+
+export type Workspace = {
+  tenant_id: string
+  name: string
+  role: string
+  is_active: boolean
+}
 
 const navItems = [
   { label: 'Tasks', href: '/tools/tasks', icon: CheckSquare },
@@ -43,9 +63,10 @@ const adminItems = [
   { label: 'Settings', href: '/admin/settings', icon: Settings },
 ]
 
-export function AppSidebar({ profile }: { profile: UserProfile | null }) {
+export function AppSidebar({ profile, workspaces }: { profile: UserProfile | null; workspaces: Workspace[] }) {
   const pathname = usePathname()
   const router = useRouter()
+  const [switching, setSwitching] = useState(false)
 
   function isActive(href: string) {
     return pathname === href || pathname.startsWith(href + '/')
@@ -56,6 +77,24 @@ export function AppSidebar({ profile }: { profile: UserProfile | null }) {
     await supabase.auth.signOut()
     router.push('/sign-in')
   }
+
+  async function handleSwitchWorkspace(tenantId: string) {
+    setSwitching(true)
+    try {
+      const res = await fetch('/api/workspace/switch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tenant_id: tenantId }),
+      })
+      if (!res.ok) throw new Error('Failed to switch workspace')
+      router.refresh()
+    } finally {
+      setSwitching(false)
+    }
+  }
+
+  const activeWorkspace = workspaces.find((w) => w.is_active)
+  const hasMultipleWorkspaces = workspaces.length > 1
 
   const isAdmin =
     profile?.role === 'admin' || profile?.role === 'superadmin'
@@ -127,6 +166,55 @@ export function AppSidebar({ profile }: { profile: UserProfile | null }) {
           </>
         )}
       </ScrollArea>
+
+      {workspaces.length > 0 && (
+        <>
+          <Separator />
+          <div className="px-3 py-2">
+            {hasMultipleWorkspaces ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    className="flex w-full items-center justify-between rounded-md px-2 py-1.5 text-sm font-medium text-foreground hover:bg-accent transition-colors"
+                    disabled={switching}
+                  >
+                    <span className="truncate">
+                      {switching ? 'Switching…' : activeWorkspace?.name ?? 'Workspace'}
+                    </span>
+                    {switching ? (
+                      <Loader2 className="h-4 w-4 shrink-0 animate-spin text-muted-foreground" />
+                    ) : (
+                      <ChevronsUpDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    )}
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent side="top" align="start" className="w-56">
+                  <DropdownMenuLabel>Workspaces</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {workspaces.map((ws) => (
+                    <DropdownMenuItem
+                      key={ws.tenant_id}
+                      onClick={() => {
+                        if (!ws.is_active) handleSwitchWorkspace(ws.tenant_id)
+                      }}
+                    >
+                      <Check className={cn('h-4 w-4 shrink-0', ws.is_active ? 'opacity-100' : 'opacity-0')} />
+                      <span className="flex-1 truncate">{ws.name}</span>
+                      <Badge variant="secondary" className="ml-auto text-[10px]">
+                        {ws.role}
+                      </Badge>
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <p className="truncate px-2 py-1.5 text-sm font-medium text-muted-foreground">
+                {activeWorkspace?.name ?? 'Workspace'}
+              </p>
+            )}
+          </div>
+        </>
+      )}
 
       <Separator />
 
