@@ -481,8 +481,6 @@ function MeetingDetail({
   const [suggestingTasks, setSuggestingTasks] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
-  const saveTimeout = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
-
   // Sync from props when meeting changes (realtime or selection change)
   useEffect(() => {
     setTitle(meeting.title)
@@ -495,15 +493,7 @@ function MeetingDetail({
     setProposedTasks(meeting.proposed_tasks ?? [])
   }, [meeting])
 
-  function saveField(fields: Record<string, unknown>) {
-    clearTimeout(saveTimeout.current)
-    saveTimeout.current = setTimeout(() => {
-      onUpdate(meeting.id, fields)
-    }, 500)
-  }
-
   function saveFieldImmediate(fields: Record<string, unknown>) {
-    clearTimeout(saveTimeout.current)
     onUpdate(meeting.id, fields)
   }
 
@@ -617,10 +607,8 @@ function MeetingDetail({
         <div className="flex-1 min-w-0">
           <Input
             value={title}
-            onChange={(e) => {
-              setTitle(e.target.value)
-              saveField({ title: e.target.value })
-            }}
+            onChange={(e) => setTitle(e.target.value)}
+            onBlur={(e) => saveFieldImmediate({ title: e.target.value })}
             className="text-lg font-semibold border-none bg-transparent px-0 focus-visible:ring-0"
           />
         </div>
@@ -711,9 +699,9 @@ function MeetingDetail({
               </label>
               <RichTextEditor
                 value={prepNotes}
-                onChange={(md) => {
+                onBlur={(md) => {
                   setPrepNotes(md)
-                  saveField({ prep_notes: md })
+                  saveFieldImmediate({ prep_notes: md })
                 }}
                 placeholder="Meeting prep notes..."
                 minHeight="150px"
@@ -729,7 +717,6 @@ function MeetingDetail({
               </label>
               <RichTextEditor
                 value={meeting.live_notes ?? ''}
-                onChange={(md) => saveField({ live_notes: md })}
                 onBlur={(md) => saveFieldImmediate({ live_notes: md })}
                 placeholder="Type meeting notes..."
                 minHeight="300px"
@@ -759,10 +746,8 @@ function MeetingDetail({
               {meeting.status === 'ended' ? (
                 <Textarea
                   value={transcript}
-                  onChange={(e) => {
-                    setTranscript(e.target.value)
-                    saveField({ transcript: e.target.value })
-                  }}
+                  onChange={(e) => setTranscript(e.target.value)}
+                  onBlur={(e) => saveFieldImmediate({ transcript: e.target.value })}
                   placeholder="Paste meeting transcript here..."
                   className="min-h-[200px] text-sm resize-y font-mono"
                 />

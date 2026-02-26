@@ -907,7 +907,6 @@ function CompanyEditShelf({
   const [linkedDealIds, setLinkedDealIds] = useState<string[]>([])
 
   const supabase = createClient()
-  const saveTimeout = useRef<ReturnType<typeof setTimeout>>(undefined)
 
   // Sync from prop
   useEffect(() => {
@@ -926,13 +925,7 @@ function CompanyEditShelf({
       .then(({ data }) => setLinkedDealIds((data ?? []).map((r) => r.deal_id)))
   }, [company.id, supabase])
 
-  function saveField(fields: Record<string, unknown>) {
-    clearTimeout(saveTimeout.current)
-    saveTimeout.current = setTimeout(() => onUpdate(company.id, fields), 500)
-  }
-
   function saveFieldImmediate(fields: Record<string, unknown>) {
-    clearTimeout(saveTimeout.current)
     onUpdate(company.id, fields)
   }
 
@@ -1005,7 +998,8 @@ function CompanyEditShelf({
           <label className="text-xs text-muted-foreground font-medium mb-1 block">Name</label>
           <Input
             value={name}
-            onChange={(e) => { setName(e.target.value); saveField({ name: e.target.value }) }}
+            onChange={(e) => setName(e.target.value)}
+            onBlur={(e) => saveFieldImmediate({ name: e.target.value })}
             className="text-base font-medium"
           />
         </div>
@@ -1014,14 +1008,16 @@ function CompanyEditShelf({
           <UnfurlInput
             label="Domain"
             value={domain}
-            onChange={(v) => { setDomain(v); saveField({ domain: v || null }) }}
+            onChange={(v) => setDomain(v)}
+            onBlur={(v) => saveFieldImmediate({ domain: v || null })}
             placeholder="example.com"
           />
           <div>
             <label className="text-xs text-muted-foreground font-medium mb-1 block">Industry</label>
             <Input
               value={industry}
-              onChange={(e) => { setIndustry(e.target.value); saveField({ industry: e.target.value || null }) }}
+              onChange={(e) => setIndustry(e.target.value)}
+              onBlur={(e) => saveFieldImmediate({ industry: e.target.value || null })}
               placeholder="e.g. Technology"
               className="text-sm"
             />
@@ -1032,7 +1028,7 @@ function CompanyEditShelf({
           <label className="text-xs text-muted-foreground font-medium mb-1 block">Notes</label>
           <RichTextEditor
             value={notes}
-            onBlur={(md) => { setNotes(md); saveField({ notes: md || null }) }}
+            onBlur={(md) => { setNotes(md); saveFieldImmediate({ notes: md || null }) }}
             placeholder="Add notes..."
             minHeight="100px"
           />
@@ -1110,7 +1106,6 @@ function PersonEditShelf({
   const [linkedDealIds, setLinkedDealIds] = useState<string[]>([])
 
   const supabase = createClient()
-  const saveTimeout = useRef<ReturnType<typeof setTimeout>>(undefined)
 
   useEffect(() => {
     setName(person.name)
@@ -1128,13 +1123,7 @@ function PersonEditShelf({
       .then(({ data }) => setLinkedDealIds((data ?? []).map((r) => r.deal_id)))
   }, [person.id, supabase])
 
-  function saveField(fields: Record<string, unknown>) {
-    clearTimeout(saveTimeout.current)
-    saveTimeout.current = setTimeout(() => onUpdate(person.id, fields), 500)
-  }
-
   function saveFieldImmediate(fields: Record<string, unknown>) {
-    clearTimeout(saveTimeout.current)
     onUpdate(person.id, fields)
   }
 
@@ -1207,7 +1196,8 @@ function PersonEditShelf({
           <label className="text-xs text-muted-foreground font-medium mb-1 block">Name</label>
           <Input
             value={name}
-            onChange={(e) => { setName(e.target.value); saveField({ name: e.target.value }) }}
+            onChange={(e) => setName(e.target.value)}
+            onBlur={(e) => saveFieldImmediate({ name: e.target.value })}
             className="text-base font-medium"
           />
         </div>
@@ -1217,7 +1207,8 @@ function PersonEditShelf({
             <label className="text-xs text-muted-foreground font-medium mb-1 block">Email</label>
             <Input
               value={email}
-              onChange={(e) => { setEmail(e.target.value); saveField({ email: e.target.value || null }) }}
+              onChange={(e) => setEmail(e.target.value)}
+              onBlur={(e) => saveFieldImmediate({ email: e.target.value || null })}
               placeholder="email@example.com"
               className="text-sm"
               type="email"
@@ -1227,7 +1218,8 @@ function PersonEditShelf({
             <label className="text-xs text-muted-foreground font-medium mb-1 block">Phone</label>
             <Input
               value={phone}
-              onChange={(e) => { setPhone(e.target.value); saveField({ phone: e.target.value || null }) }}
+              onChange={(e) => setPhone(e.target.value)}
+              onBlur={(e) => saveFieldImmediate({ phone: e.target.value || null })}
               placeholder="+1 234 567 890"
               className="text-sm"
             />
@@ -1238,7 +1230,8 @@ function PersonEditShelf({
           <label className="text-xs text-muted-foreground font-medium mb-1 block">Title</label>
           <Input
             value={title}
-            onChange={(e) => { setTitle(e.target.value); saveField({ title: e.target.value || null }) }}
+            onChange={(e) => setTitle(e.target.value)}
+            onBlur={(e) => saveFieldImmediate({ title: e.target.value || null })}
             placeholder="e.g. VP of Engineering"
             className="text-sm"
           />
@@ -1248,7 +1241,7 @@ function PersonEditShelf({
           <label className="text-xs text-muted-foreground font-medium mb-1 block">Notes</label>
           <RichTextEditor
             value={notes}
-            onBlur={(md) => { setNotes(md); saveField({ notes: md || null }) }}
+            onBlur={(md) => { setNotes(md); saveFieldImmediate({ notes: md || null }) }}
             placeholder="Add notes..."
             minHeight="100px"
           />
@@ -1325,7 +1318,6 @@ function DealEditShelf({
   const [linkedPeopleIds, setLinkedPeopleIds] = useState<string[]>([])
 
   const supabase = createClient()
-  const saveTimeout = useRef<ReturnType<typeof setTimeout>>(undefined)
 
   useEffect(() => {
     setTitle(deal.title)
@@ -1342,13 +1334,7 @@ function DealEditShelf({
       .then(({ data }) => setLinkedPeopleIds((data ?? []).map((r) => r.person_id)))
   }, [deal.id, supabase])
 
-  function saveField(fields: Record<string, unknown>) {
-    clearTimeout(saveTimeout.current)
-    saveTimeout.current = setTimeout(() => onUpdate(deal.id, fields), 500)
-  }
-
   function saveFieldImmediate(fields: Record<string, unknown>) {
-    clearTimeout(saveTimeout.current)
     onUpdate(deal.id, fields)
   }
 
@@ -1421,7 +1407,8 @@ function DealEditShelf({
           <label className="text-xs text-muted-foreground font-medium mb-1 block">Title</label>
           <Input
             value={title}
-            onChange={(e) => { setTitle(e.target.value); saveField({ title: e.target.value }) }}
+            onChange={(e) => setTitle(e.target.value)}
+            onBlur={(e) => saveFieldImmediate({ title: e.target.value })}
             className="text-base font-medium"
           />
         </div>
@@ -1449,12 +1436,12 @@ function DealEditShelf({
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">$</span>
               <Input
                 value={value}
-                onChange={(e) => {
+                onChange={(e) => setValue(e.target.value)}
+                onBlur={(e) => {
                   const v = e.target.value
-                  setValue(v)
                   const num = v ? parseFloat(v) : null
                   if (v === '' || (num !== null && !isNaN(num))) {
-                    saveField({ value: num })
+                    saveFieldImmediate({ value: num })
                   }
                 }}
                 placeholder="0.00"
@@ -1470,7 +1457,7 @@ function DealEditShelf({
           <label className="text-xs text-muted-foreground font-medium mb-1 block">Notes</label>
           <RichTextEditor
             value={notes}
-            onBlur={(md) => { setNotes(md); saveField({ notes: md || null }) }}
+            onBlur={(md) => { setNotes(md); saveFieldImmediate({ notes: md || null }) }}
             placeholder="Add notes..."
             minHeight="100px"
           />

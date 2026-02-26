@@ -1077,18 +1077,7 @@ function TaskEditShelf({
     setTags(task.tags)
   }, [task])
 
-  // Debounced field save
-  const saveTimeout = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
-
-  function saveField(fields: Record<string, unknown>) {
-    clearTimeout(saveTimeout.current)
-    saveTimeout.current = setTimeout(() => {
-      onUpdate(task.id, fields)
-    }, 500)
-  }
-
   function saveFieldImmediate(fields: Record<string, unknown>) {
-    clearTimeout(saveTimeout.current)
     onUpdate(task.id, fields)
   }
 
@@ -1124,10 +1113,8 @@ function TaskEditShelf({
           </label>
           <Input
             value={title}
-            onChange={(e) => {
-              setTitle(e.target.value)
-              saveField({ title: e.target.value })
-            }}
+            onChange={(e) => setTitle(e.target.value)}
+            onBlur={(e) => saveFieldImmediate({ title: e.target.value })}
             className="text-base font-medium"
           />
         </div>
@@ -1232,7 +1219,7 @@ function TaskEditShelf({
             value={body}
             onBlur={(md) => {
               setBody(md)
-              saveField({ body: md })
+              saveFieldImmediate({ body: md })
             }}
             placeholder="Add details..."
             minHeight="120px"
