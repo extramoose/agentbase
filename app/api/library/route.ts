@@ -16,6 +16,7 @@ const createSchema = z.object({
   longitude: z.number().optional().nullable(),
   tags: z.array(z.string()).optional().default([]),
   is_public: z.boolean().optional().default(false),
+  idempotency_key: z.string().max(128).optional(),
 })
 
 export async function GET(request: Request) {
@@ -60,6 +61,7 @@ export async function POST(request: Request) {
       p_longitude: input.longitude ?? null,
       p_tags: input.tags,
       p_is_public: input.is_public,
+      p_idempotency_key: input.idempotency_key ?? null,
     })
     if (error) throw error
     return Response.json({ data }, { status: 201 })

@@ -1,0 +1,22 @@
+-- 015_idempotency_wired.sql
+-- Applied via Supabase Management API (RPC replacements cannot be diffed in a migration).
+--
+-- Changes applied:
+--   1. Dropped legacy rpc_create_task overloads (7-param and 9-param)
+--   2. Added p_idempotency_key text DEFAULT NULL to all rpc_create_* functions:
+--      - rpc_create_task
+--      - rpc_create_meeting
+--      - rpc_create_library_item
+--      - rpc_create_company
+--      - rpc_create_person
+--      - rpc_create_deal
+--      - rpc_create_grocery_item
+--      - rpc_create_essay
+--   3. Each RPC now checks idempotency_keys table before inserting:
+--      - If key exists: returns stored response_body (no duplicate insert)
+--      - If key absent:  inserts entity + activity_log + stores (key, response) in same tx
+--   4. rpc_upsert_diary_entry skipped — upsert by date is naturally idempotent
+--   5. NOTIFY pgrst, 'reload schema' issued after all changes
+--
+-- Purge: Vercel cron at /api/cron/purge-idempotency runs hourly, deletes keys older than 24h.
+-- The idempotency_keys table was created in 001_initial_schema.sql.

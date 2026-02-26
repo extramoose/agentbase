@@ -7,6 +7,7 @@ const createSchema = z.object({
   date: z.string().optional(),
   meeting_time: z.string().optional(),
   tags: z.array(z.string()).optional().default([]),
+  idempotency_key: z.string().max(128).optional(),
 })
 
 export async function GET(request: Request) {
@@ -45,6 +46,7 @@ export async function POST(request: Request) {
       p_date: input.date || null,
       p_meeting_time: input.meeting_time || null,
       p_tags: input.tags,
+      p_idempotency_key: input.idempotency_key ?? null,
     })
     if (error) throw error
     return Response.json({ data }, { status: 201 })

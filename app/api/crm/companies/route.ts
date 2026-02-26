@@ -8,6 +8,7 @@ const createSchema = z.object({
   industry: z.string().optional(),
   notes: z.string().optional(),
   tags: z.array(z.string()).optional().default([]),
+  idempotency_key: z.string().max(128).optional(),
 })
 
 export async function GET(request: Request) {
@@ -43,6 +44,7 @@ export async function POST(request: Request) {
       p_industry: input.industry ?? null,
       p_notes: input.notes ?? null,
       p_tags: input.tags,
+      p_idempotency_key: input.idempotency_key ?? null,
     })
     if (error) throw error
     return Response.json({ data }, { status: 201 })

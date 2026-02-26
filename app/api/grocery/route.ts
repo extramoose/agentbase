@@ -6,6 +6,7 @@ const createSchema = z.object({
   name: z.string().min(1).max(500),
   category: z.string().max(200).optional(),
   quantity: z.string().max(100).optional(),
+  idempotency_key: z.string().max(128).optional(),
 })
 
 export async function GET(request: Request) {
@@ -43,6 +44,7 @@ export async function POST(request: Request) {
       p_name: input.name,
       p_category: input.category ?? null,
       p_quantity: input.quantity ?? null,
+      p_idempotency_key: input.idempotency_key ?? null,
     })
     if (error) throw error
     return Response.json({ data }, { status: 201 })
