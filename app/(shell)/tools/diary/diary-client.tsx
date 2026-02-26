@@ -1,10 +1,9 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useEditor, EditorContent } from '@tiptap/react'
-import StarterKit from '@tiptap/starter-kit'
 import { ChevronLeft, ChevronRight, Calendar } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { RichTextEditor } from '@/components/rich-text-editor'
 import { ActivityAndComments } from '@/components/activity-and-comments'
 import { toast } from '@/hooks/use-toast'
 
@@ -43,31 +42,6 @@ export function DiaryClient({
   const [saving, setSaving] = useState(false)
   const dateInputRef = useRef<HTMLInputElement>(null)
   const savingRef = useRef(false)
-
-  const editor = useEditor({
-    immediatelyRender: false,
-    extensions: [StarterKit],
-    content: entry?.content ?? '',
-    onBlur: ({ editor: ed }) => {
-      saveEntry(ed.getHTML())
-    },
-    editorProps: {
-      attributes: {
-        class:
-          'prose prose-invert max-w-none min-h-[300px] focus:outline-none px-1 py-2',
-      },
-    },
-  })
-
-  // Update editor content when entry changes from navigation
-  const entryId = entry?.id
-  const entryContent = entry?.content
-  useEffect(() => {
-    if (editor) {
-      editor.commands.setContent(entryContent ?? '')
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [entryId, editor])
 
   // Fetch entry when date changes
   useEffect(() => {
@@ -191,11 +165,14 @@ export function DiaryClient({
         {formatDisplay(currentDate)}
       </h1>
 
-      {/* Tiptap editor */}
+      {/* Rich text editor */}
       <div className="flex-1 px-2 pb-4">
-        <div className="rounded-lg border border-border bg-muted/20 p-4 min-h-[300px]">
-          <EditorContent editor={editor} />
-        </div>
+        <RichTextEditor
+          value={entry?.content ?? ''}
+          onBlur={(md) => saveEntry(md)}
+          placeholder="Write today's entry..."
+          minHeight="400px"
+        />
       </div>
 
       {/* Activity & Comments — only when we have a saved entry */}

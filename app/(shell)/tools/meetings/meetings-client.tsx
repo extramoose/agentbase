@@ -1,8 +1,6 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useEditor, EditorContent } from '@tiptap/react'
-import StarterKit from '@tiptap/starter-kit'
 import {
   Plus,
   Trash2,
@@ -20,6 +18,7 @@ import { toast } from '@/hooks/use-toast'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
+import { RichTextEditor } from '@/components/rich-text-editor'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 
@@ -708,10 +707,12 @@ function MeetingDetail({
               <label className="text-xs text-muted-foreground font-medium mb-1 block">
                 Live Notes
               </label>
-              <TiptapEditor
-                meetingId={meeting.id}
-                initialContent={meeting.live_notes ?? ''}
-                onUpdate={onUpdate}
+              <RichTextEditor
+                value={meeting.live_notes ?? ''}
+                onChange={(md) => saveField({ live_notes: md })}
+                onBlur={(md) => saveFieldImmediate({ live_notes: md })}
+                placeholder="Type meeting notes..."
+                minHeight="300px"
               />
             </div>
           )}
@@ -723,9 +724,10 @@ function MeetingDetail({
                 <label className="text-xs text-muted-foreground font-medium mb-1 block">
                   Meeting Notes
                 </label>
-                <div
-                  className="prose prose-invert prose-sm max-w-none rounded-md border border-border p-3 bg-muted/20"
-                  dangerouslySetInnerHTML={{ __html: meeting.live_notes }}
+                <RichTextEditor
+                  value={meeting.live_notes}
+                  readOnly
+                  minHeight="100px"
                 />
               </div>
             )}
@@ -881,75 +883,6 @@ function MeetingDetail({
           onCancel={() => setShowDeleteConfirm(false)}
         />
       )}
-    </div>
-  )
-}
-
-// ---------------------------------------------------------------------------
-// Tiptap editor with auto-save
-// ---------------------------------------------------------------------------
-
-function TiptapEditor({
-  meetingId,
-  initialContent,
-  onUpdate,
-}: {
-  meetingId: string
-  initialContent: string
-  onUpdate: (id: string, fields: Record<string, unknown>) => Promise<void>
-}) {
-  const editorRef = useRef<ReturnType<typeof useEditor>>(null)
-  const intervalRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined)
-  const lastSavedRef = useRef(initialContent)
-
-  const editor = useEditor({
-    immediatelyRender: false,
-    extensions: [StarterKit],
-    content: initialContent,
-    editable: true,
-    editorProps: {
-      attributes: {
-        class:
-          'prose prose-invert prose-sm max-w-none min-h-[200px] focus:outline-none p-3',
-      },
-    },
-  })
-
-  // Keep ref in sync
-  useEffect(() => {
-    (editorRef as React.MutableRefObject<typeof editor>).current = editor
-  }, [editor])
-
-  // Auto-save every 5 seconds
-  useEffect(() => {
-    intervalRef.current = setInterval(() => {
-      const ed = editorRef.current
-      if (!ed) return
-      const html = ed.getHTML()
-      if (html !== lastSavedRef.current) {
-        lastSavedRef.current = html
-        onUpdate(meetingId, { live_notes: html })
-      }
-    }, 5000)
-
-    return () => {
-      clearInterval(intervalRef.current)
-      // Save on unmount
-      const ed = editorRef.current
-      if (ed) {
-        const html = ed.getHTML()
-        if (html !== lastSavedRef.current) {
-          onUpdate(meetingId, { live_notes: html })
-        }
-      }
-    }
-  }, [meetingId, onUpdate])
-
-  if (!editor) return null
-
-  return (
-    <div className="rounded-md border border-border bg-muted/20">
-      <EditorContent editor={editor} />
     </div>
   )
 }

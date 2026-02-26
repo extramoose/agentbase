@@ -9,7 +9,7 @@ import { TagCombobox } from '@/components/tag-combobox'
 import { toast } from '@/hooks/use-toast'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
+import { RichTextEditor } from '@/components/rich-text-editor'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 
@@ -1001,11 +1001,11 @@ function CompanyEditShelf({
 
         <div>
           <label className="text-xs text-muted-foreground font-medium mb-1 block">Notes</label>
-          <Textarea
+          <RichTextEditor
             value={notes}
-            onChange={(e) => { setNotes(e.target.value); saveField({ notes: e.target.value || null }) }}
+            onBlur={(md) => { setNotes(md); saveField({ notes: md || null }) }}
             placeholder="Add notes..."
-            className="min-h-[100px] text-sm resize-y"
+            minHeight="100px"
           />
         </div>
 
@@ -1217,11 +1217,11 @@ function PersonEditShelf({
 
         <div>
           <label className="text-xs text-muted-foreground font-medium mb-1 block">Notes</label>
-          <Textarea
+          <RichTextEditor
             value={notes}
-            onChange={(e) => { setNotes(e.target.value); saveField({ notes: e.target.value || null }) }}
+            onBlur={(md) => { setNotes(md); saveField({ notes: md || null }) }}
             placeholder="Add notes..."
-            className="min-h-[100px] text-sm resize-y"
+            minHeight="100px"
           />
         </div>
 
@@ -1439,11 +1439,11 @@ function DealEditShelf({
 
         <div>
           <label className="text-xs text-muted-foreground font-medium mb-1 block">Notes</label>
-          <Textarea
+          <RichTextEditor
             value={notes}
-            onChange={(e) => { setNotes(e.target.value); saveField({ notes: e.target.value || null }) }}
+            onBlur={(md) => { setNotes(md); saveField({ notes: md || null }) }}
             placeholder="Add notes..."
-            className="min-h-[100px] text-sm resize-y"
+            minHeight="100px"
           />
         </div>
 

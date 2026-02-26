@@ -24,7 +24,7 @@ import { TagCombobox } from '@/components/tag-combobox'
 import { toast } from '@/hooks/use-toast'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
+import { RichTextEditor } from '@/components/rich-text-editor'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 
@@ -787,14 +787,14 @@ function TaskEditShelf({
           <label className="text-xs text-muted-foreground font-medium mb-1 block">
             Description
           </label>
-          <Textarea
+          <RichTextEditor
             value={body}
-            onChange={(e) => {
-              setBody(e.target.value)
-              saveField({ body: e.target.value })
+            onBlur={(md) => {
+              setBody(md)
+              saveField({ body: md })
             }}
-            placeholder="Add a description..."
-            className="min-h-[120px] text-sm resize-y"
+            placeholder="Add details..."
+            minHeight="120px"
           />
         </div>
 

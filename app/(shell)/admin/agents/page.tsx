@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { AgentsClient } from './agents-client'
 
 export default async function AdminAgentsPage() {
-  await requireAdmin()
+  const profile = await requireAdmin()
   const supabase = await createClient()
 
   const { data: agentOwners } = await supabase
@@ -36,5 +36,10 @@ export default async function AdminAgentsPage() {
     }
   })
 
-  return <AgentsClient agents={agents} />
+  return (
+    <AgentsClient
+      agents={agents}
+      currentUserName={profile.full_name ?? profile.email}
+    />
+  )
 }

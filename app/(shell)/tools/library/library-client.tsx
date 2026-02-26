@@ -22,6 +22,7 @@ import { toast } from '@/hooks/use-toast'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
+import { RichTextEditor } from '@/components/rich-text-editor'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 
@@ -618,14 +619,14 @@ function LibraryEditShelf({
         {showBody && (
           <div>
             <label className="text-xs text-muted-foreground font-medium mb-1 block">Body</label>
-            <Textarea
+            <RichTextEditor
               value={body}
-              onChange={(e) => {
-                setBody(e.target.value)
-                saveField({ body: e.target.value || null })
+              onBlur={(md) => {
+                setBody(md)
+                saveField({ body: md || null })
               }}
               placeholder="Write your note or idea..."
-              className="min-h-[120px] text-sm resize-y"
+              minHeight="120px"
             />
           </div>
         )}
@@ -849,11 +850,11 @@ function LibraryCreateShelf({
         {showBody && (
           <div>
             <label className="text-xs text-muted-foreground font-medium mb-1 block">Body</label>
-            <Textarea
+            <RichTextEditor
               value={body}
-              onChange={(e) => setBody(e.target.value)}
+              onChange={(md) => setBody(md)}
               placeholder="Write your note or idea..."
-              className="min-h-[120px] text-sm resize-y"
+              minHeight="120px"
             />
           </div>
         )}
