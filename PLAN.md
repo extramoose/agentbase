@@ -354,6 +354,16 @@ CREATE POLICY "Admins read all" ON {table}
 
 ### 3.5 Agent Service Accounts
 
+> **Agents are fully customizable per deployment.** Lucy and Frank are the v1 agents for this installation — they are not hardcoded into the platform. Any deployer can create their own agents with their own names, avatars, and auth credentials. Agent management lives in the **Admin → Agents** settings page (superadmin only). The scripts below describe the underlying mechanics; the admin UI wraps them into a no-code flow.
+>
+> **Agent identity model:**
+> - **Name** — display name shown in activity feeds, comments, and history (e.g. "Frank", "Lucy", "Aria")
+> - **Avatar** — uploaded image or URL; shown as an avatar chip wherever the agent appears in the UI
+> - **API key** — the auth credential the agent uses to call `/api/commands/*`. v1: Supabase refresh token (stored in agent config). Future: API key header, OAuth token, or other protocols as they emerge. The admin UI issues and revokes credentials per agent.
+> - **Owner** — the human user responsible for the agent; recorded in `agent_owners` for delegation tracking
+>
+> The admin creates a new agent in the UI → the platform creates the Supabase Auth user behind the scenes (via a server-side API route using the secret key stored in scripts, not in runtime) → issues a refresh token → displays it once for the operator to copy into their agent's config. Revocation is one click.
+
 Lucy and Frank get real Supabase Auth users. Here's exactly how to set them up.
 
 #### Step 1: Create the auth users
@@ -2204,6 +2214,7 @@ agentbase/
 
 - [ ] Build History page (global ActivityFeed with filters: actor, entity type, date range, search)
 - [ ] Build Admin → Users page (invite users, manage roles)
+- [ ] Build Admin → Agents page (superadmin only: create agent with name + avatar, issue/revoke refresh token, assign owner; agents listed with status chip showing last seen; credentials displayed once on creation for operator to copy into agent config)
 - [ ] Build Admin → Settings page (app configuration)
 - [ ] Build `<CmdK>` command palette (quick nav, quick create)
 - [ ] Add `<ComboInput>` for @ mentions (people, companies) in comment boxes
