@@ -1,19 +1,22 @@
-import { requireAuthApi } from '@/lib/auth'
+import { resolveActorUnified } from '@/lib/api/resolve-actor'
 import { apiError } from '@/lib/api/errors'
-import { createClient } from '@/lib/supabase/server'
 
 export async function DELETE(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    await requireAuthApi()
-
-    const supabase = await createClient()
+    const { supabase, actorId, actorType, tenantId } = await resolveActorUnified(request)
     const { id } = await params
 
-    const { error } = await supabase.from('library_items').delete().eq('id', id)
-    if (error) return Response.json({ error: error.message }, { status: 400 })
+    const { error } = await supabase.rpc('rpc_delete_entity', {
+      p_table: 'library_items',
+      p_entity_id: id,
+      p_actor_id: actorId,
+      p_actor_type: actorType,
+      p_tenant_id: tenantId,
+    })
+    if (error) throw error
 
     return Response.json({ success: true })
   } catch (err) {

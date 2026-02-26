@@ -1,4 +1,5 @@
-import { requireAuthApi, getTenantId } from '@/lib/auth'
+import { resolveActorUnified } from '@/lib/api/resolve-actor'
+import { requireAuthApi } from '@/lib/auth'
 import { apiError } from '@/lib/api/errors'
 import { createClient } from '@/lib/supabase/server'
 import { z } from 'zod'
@@ -27,32 +28,18 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    await requireAuthApi()
-
-    const tenantId = await getTenantId()
-    if (!tenantId)
-      return Response.json({ error: 'No workspace' }, { status: 403 })
-
-    const supabase = await createClient()
-
+    const { supabase, actorId, actorType, tenantId } = await resolveActorUnified(request)
     const body = await request.json()
     const input = upsertSchema.parse(body)
 
-    const { data, error } = await supabase
-      .from('diary_entries')
-      .upsert(
-        {
-          tenant_id: tenantId,
-          date: input.date,
-          content: input.content,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: 'tenant_id,date' }
-      )
-      .select()
-      .single()
-
-    if (error) return Response.json({ error: error.message }, { status: 400 })
+    const { data, error } = await supabase.rpc('rpc_upsert_diary_entry', {
+      p_tenant_id: tenantId,
+      p_actor_id: actorId,
+      p_actor_type: actorType,
+      p_date: input.date,
+      p_content: input.content,
+    })
+    if (error) throw error
     return Response.json({ data })
   } catch (err) {
     return apiError(err)

@@ -1,4 +1,5 @@
-import { requireAuthApi, getTenantId } from '@/lib/auth'
+import { resolveActorUnified } from '@/lib/api/resolve-actor'
+import { requireAuthApi } from '@/lib/auth'
 import { apiError } from '@/lib/api/errors'
 import { createClient } from '@/lib/supabase/server'
 import { z } from 'zod'
@@ -31,24 +32,22 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    await requireAuthApi()
-
-    const tenantId = await getTenantId()
-    if (!tenantId)
-      return Response.json({ error: 'No workspace' }, { status: 403 })
-
-    const supabase = await createClient()
-
+    const { supabase, actorId, actorType, tenantId } = await resolveActorUnified(request)
     const body = await request.json()
     const input = createSchema.parse(body)
 
-    const { data, error } = await supabase
-      .from('people')
-      .insert({ ...input, tenant_id: tenantId })
-      .select()
-      .single()
-
-    if (error) return Response.json({ error: error.message }, { status: 400 })
+    const { data, error } = await supabase.rpc('rpc_create_person', {
+      p_tenant_id: tenantId,
+      p_actor_id: actorId,
+      p_actor_type: actorType,
+      p_name: input.name,
+      p_email: input.email ?? null,
+      p_phone: input.phone ?? null,
+      p_title: input.title ?? null,
+      p_notes: input.notes ?? null,
+      p_tags: input.tags,
+    })
+    if (error) throw error
     return Response.json({ data }, { status: 201 })
   } catch (err) {
     return apiError(err)

@@ -1,4 +1,6 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
+import { createClient as createServerClient } from '@/lib/supabase/server'
+import { getTenantId } from '@/lib/auth'
 import { UnauthorizedError, RateLimitError } from './errors'
 import { checkRateLimit } from './rate-limit'
 
@@ -55,6 +57,40 @@ export async function resolveActor(request: Request): Promise<ResolvedActor> {
     actorId: user.id,
     actorType: agentOwner ? 'agent' : 'human',
     tenantId: membership.tenant_id,
+    ownerId: agentOwner?.owner_id ?? user.id,
+  }
+}
+
+export async function resolveActorUnified(request: Request): Promise<ResolvedActor> {
+  const authHeader = request.headers.get('Authorization')
+
+  // Agent path: Bearer token present
+  if (authHeader?.startsWith('Bearer ')) {
+    return resolveActor(request)
+  }
+
+  // Human path: cookie-based session
+  const supabase = await createServerClient()
+  const { data: { user }, error } = await supabase.auth.getUser()
+  if (error || !user) throw new UnauthorizedError()
+
+  const { allowed, retryAfter } = checkRateLimit(user.id)
+  if (!allowed) throw new RateLimitError(retryAfter)
+
+  const tenantId = await getTenantId()
+  if (!tenantId) throw new UnauthorizedError('No workspace')
+
+  const { data: agentOwner } = await supabase
+    .from('agent_owners')
+    .select('owner_id')
+    .eq('agent_id', user.id)
+    .single()
+
+  return {
+    supabase,
+    actorId: user.id,
+    actorType: agentOwner ? 'agent' : 'human',
+    tenantId,
     ownerId: agentOwner?.owner_id ?? user.id,
   }
 }
