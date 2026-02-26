@@ -353,7 +353,7 @@ All mutations go through these functions. They atomically write to the entity ta
 | Function | Parameters | Notes |
 |----------|-----------|-------|
 | `rpc_update_entity` | p_table, p_entity_id, p_fields (jsonb), p_actor_id, p_tenant_id | Dynamic SET, type-aware casting. Emits one activity_log row per changed field with semantic event_type + payload diff. Protected fields: id, tenant_id, actor_id, created_at, ticket_id |
-| `rpc_delete_entity` | p_table, p_entity_id, p_actor_id, p_actor_type, p_tenant_id | Per-table label lookup, then DELETE + activity_log |
+| `rpc_delete_entity` | p_table, p_entity_id, p_actor_id, p_actor_type, p_tenant_id | DELETE only — activity_log written by route handler (agents blocked at route level) |
 | `rpc_add_comment` | p_entity_type, p_entity_id, p_entity_label, p_body, p_actor_id, p_tenant_id | Inserts `event_type='commented'` into activity_log |
 
 ### Utility
@@ -378,12 +378,13 @@ All mutations go through these functions. They atomically write to the entity ta
 | `007_workspace_settings.sql` | `tenants`: add `updated_at`, `openrouter_api_key`, `default_model`; `get_workspace_settings` + `update_workspace_settings` RPCs |
 | `008_rich_activity_diffs.sql` | `rpc_update_entity` captures per-field diffs with semantic event types; emits one `activity_log` row per changed field |
 | `010_task_assignee.sql` | Add `assignee_id` + `assignee_type` to tasks; update `rpc_create_task` + `rpc_update_entity` (uuid cast for `assignee_id`) |
+| `011_delete_permissions.sql` | `rpc_delete_entity` stripped to DELETE-only — activity_log now written by route handlers; agents blocked 403 at route level |
 
 ---
 
 ## Key Architecture Rules
 
-- **All entity mutations go through SECURITY DEFINER RPCs** — never direct table inserts from route handlers
+- **All entity mutations go through SECURITY DEFINER RPCs** — never direct table inserts from route handlers (exception: `activity_log` for deletes, since the entity label must be captured before RPC execution)
 - **Both humans and agents use the same routes** — `resolveActorUnified()` handles Bearer (agent) vs cookie (human) auth
 - **`SUPABASE_SECRET_KEY` is scripts only** — not in any runtime code (admin routes use SECURITY DEFINER RPCs instead)
 - **`actor_type` CHECK is `human | agent` only** — no `system` or `platform`

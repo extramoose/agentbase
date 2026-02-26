@@ -179,7 +179,8 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
           </p>
         ) : (
           filteredEntries.map(entry => {
-            const isClickable = TABLE_MAP[entry.entity_type] != null && entry.entity_id != null
+            const isDeleted = entry.event_type === 'deleted'
+            const isClickable = TABLE_MAP[entry.entity_type] != null && entry.entity_id != null && !isDeleted
             return (
             <div
               key={entry.id}
@@ -199,7 +200,7 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
                   >
                     {formatEntityType(entry.entity_type)}
                   </Badge>
-                  <span className="text-sm text-foreground">
+                  <span className={`text-sm ${isDeleted ? 'text-red-400' : 'text-foreground'}`}>
                     {formatActivityEvent(entry)}
                   </span>
                 </div>

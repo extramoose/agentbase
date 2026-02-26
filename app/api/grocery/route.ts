@@ -1,7 +1,5 @@
 import { resolveActorUnified } from '@/lib/api/resolve-actor'
-import { requireAuthApi } from '@/lib/auth'
 import { apiError } from '@/lib/api/errors'
-import { createClient } from '@/lib/supabase/server'
 import { z } from 'zod'
 
 const createSchema = z.object({
@@ -55,9 +53,12 @@ export async function POST(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
-    await requireAuthApi()
+    const { supabase, actorId, actorType, tenantId } = await resolveActorUnified(request)
 
-    const supabase = await createClient()
+    if (actorType === 'agent') {
+      return Response.json({ error: 'Agents cannot delete entities' }, { status: 403 })
+    }
+
     const url = new URL(request.url)
     const checked = url.searchParams.get('checked')
 
@@ -68,6 +69,18 @@ export async function DELETE(request: Request) {
         .eq('checked', true)
 
       if (error) return Response.json({ error: error.message }, { status: 400 })
+
+      await supabase.from('activity_log').insert({
+        tenant_id: tenantId,
+        entity_type: 'grocery_items',
+        entity_id: '00000000-0000-0000-0000-000000000000',
+        entity_label: 'checked items',
+        event_type: 'deleted',
+        actor_id: actorId,
+        actor_type: actorType,
+        payload: { label: 'bulk cleared checked items' },
+      })
+
       return Response.json({ success: true })
     }
 

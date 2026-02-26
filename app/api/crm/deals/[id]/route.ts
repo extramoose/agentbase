@@ -7,7 +7,19 @@ export async function DELETE(
 ) {
   try {
     const { supabase, actorId, actorType, tenantId } = await resolveActorUnified(request)
+
+    if (actorType === 'agent') {
+      return Response.json({ error: 'Agents cannot delete entities' }, { status: 403 })
+    }
+
     const { id } = await params
+
+    const { data: entity } = await supabase
+      .from('deals')
+      .select('title')
+      .eq('id', id)
+      .single()
+    const entityLabel = entity?.title ?? id
 
     const { error } = await supabase.rpc('rpc_delete_entity', {
       p_table: 'deals',
@@ -17,6 +29,17 @@ export async function DELETE(
       p_tenant_id: tenantId,
     })
     if (error) throw error
+
+    await supabase.from('activity_log').insert({
+      tenant_id: tenantId,
+      entity_type: 'deals',
+      entity_id: id,
+      entity_label: entityLabel,
+      event_type: 'deleted',
+      actor_id: actorId,
+      actor_type: actorType,
+      payload: { label: entityLabel },
+    })
 
     return Response.json({ success: true })
   } catch (err) {
