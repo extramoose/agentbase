@@ -17,9 +17,11 @@ export default async function ShellLayout({
     redirect('/onboarding')
   }
 
+  const { data: workspaces } = await supabase.rpc('rpc_list_my_workspaces')
+
   return (
     <div className="flex h-screen overflow-hidden">
-      <AppSidebar profile={profile} />
+      <AppSidebar profile={profile} workspaces={workspaces ?? []} />
       <main className="flex-1 overflow-y-auto p-6">
         {children}
       </main>
