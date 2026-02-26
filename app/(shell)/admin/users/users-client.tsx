@@ -193,7 +193,7 @@ export function UsersClient({ currentUserId }: UsersClientProps) {
                     </Badge>
                   </td>
                   <td className="px-4 py-3">
-                    <span className="text-sm text-muted-foreground">
+                    <span suppressHydrationWarning className="text-sm text-muted-foreground">
                       {formatDistanceToNow(new Date(member.joined_at), { addSuffix: true })}
                     </span>
                   </td>

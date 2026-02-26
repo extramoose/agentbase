@@ -331,7 +331,7 @@ export function AgentsClient({ agents: initialAgents, currentUserName, currentUs
                     <span className="text-sm text-muted-foreground">{agent.owner_name}</span>
                   </td>
                   <td className="px-4 py-3">
-                    <span className="text-sm text-muted-foreground">
+                    <span suppressHydrationWarning className="text-sm text-muted-foreground">
                       {formatDistanceToNow(new Date(agent.created_at), { addSuffix: true })}
                     </span>
                     {isRevoked && agent.revoked_at && (

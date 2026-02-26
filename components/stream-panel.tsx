@@ -148,7 +148,7 @@ export function StreamPanel({ entityType, entityId, className }: StreamPanelProp
                   <ActorChip actorId={entry.actor_id} actorType={entry.actor_type} compact />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm break-words">{entry.content}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
+                    <p suppressHydrationWarning className="text-xs text-muted-foreground mt-0.5">
                       {formatDistanceToNow(new Date(entry.created_at), { addSuffix: true })}
                     </p>
                   </div>
