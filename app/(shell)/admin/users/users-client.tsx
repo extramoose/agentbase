@@ -15,7 +15,16 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from '@/hooks/use-toast'
 import { formatDistanceToNow } from 'date-fns'
-import { Check, ChevronDown, Loader2, Pencil, Shield, ShieldAlert, User, X } from 'lucide-react'
+import { Check, ChevronDown, Copy, Link, Loader2, Pencil, Shield, ShieldAlert, Trash2, User, X } from 'lucide-react'
+
+type Invite = {
+  id: string
+  token: string
+  created_at: string
+  accepted_by: string | null
+  accepted_at: string | null
+  revoked_at: string | null
+}
 
 type Member = {
   id: string
@@ -45,6 +54,17 @@ export function UsersClient({ currentUserId }: UsersClientProps) {
   const [avatarDraft, setAvatarDraft] = useState('')
   const [savingAvatar, setSavingAvatar] = useState(false)
 
+  // Invite state
+  const [invites, setInvites] = useState<Invite[]>([])
+  const [generating, setGenerating] = useState(false)
+  const [newInviteUrl, setNewInviteUrl] = useState<string | null>(null)
+
+  const fetchInvites = useCallback(async () => {
+    const res = await fetch('/api/invites/list')
+    const json = await res.json()
+    if (res.ok) setInvites(json.data ?? [])
+  }, [])
+
   useEffect(() => {
     const load = async () => {
       const res = await fetch('/api/admin/users')
@@ -53,7 +73,8 @@ export function UsersClient({ currentUserId }: UsersClientProps) {
       setLoading(false)
     }
     load()
-  }, [])
+    fetchInvites()
+  }, [fetchInvites])
 
   const changeRole = useCallback(async (userId: string, newRole: 'user' | 'admin') => {
     // Optimistic update
@@ -101,6 +122,59 @@ export function UsersClient({ currentUserId }: UsersClientProps) {
       setSavingAvatar(false)
     }
   }, [avatarDraft])
+
+  const handleGenerateInvite = useCallback(async () => {
+    setGenerating(true)
+    setNewInviteUrl(null)
+    try {
+      const res = await fetch('/api/invites/create', { method: 'POST' })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? 'Failed to generate invite')
+      const url = `${window.location.origin}/invite/${json.data.token}`
+      setNewInviteUrl(url)
+      await fetchInvites()
+      toast({ type: 'success', message: 'Invite link generated' })
+    } catch (err) {
+      toast({ type: 'error', message: err instanceof Error ? err.message : 'Failed to generate invite' })
+    } finally {
+      setGenerating(false)
+    }
+  }, [fetchInvites])
+
+  const handleRevokeInvite = useCallback(async (inviteId: string) => {
+    try {
+      const res = await fetch('/api/invites/revoke', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ invite_id: inviteId }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? 'Failed to revoke invite')
+      await fetchInvites()
+      toast({ type: 'success', message: 'Invite revoked' })
+    } catch (err) {
+      toast({ type: 'error', message: err instanceof Error ? err.message : 'Failed to revoke invite' })
+    }
+  }, [fetchInvites])
+
+  const handleRemoveMember = useCallback(async (userId: string) => {
+    try {
+      const res = await fetch('/api/admin/users/remove', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userId }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? 'Failed to remove member')
+      setMembers(prev => prev.filter(m => m.id !== userId))
+      toast({ type: 'success', message: 'Member removed' })
+    } catch (err) {
+      toast({ type: 'error', message: err instanceof Error ? err.message : 'Failed to remove member' })
+    }
+  }, [])
+
+  const pendingInvites = invites.filter(i => !i.accepted_at && !i.revoked_at)
+  const acceptedInvites = invites.filter(i => i.accepted_at)
 
   if (loading) {
     return (
@@ -203,30 +277,40 @@ export function UsersClient({ currentUserId }: UsersClientProps) {
                         {isSelf ? 'You' : '—'}
                       </span>
                     ) : (
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm" className="h-7 text-xs">
-                            Change role
-                            <ChevronDown className="ml-1 h-3 w-3" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            onClick={() => changeRole(member.id, 'user')}
-                            disabled={member.role === 'user'}
-                          >
-                            <User className="mr-2 h-4 w-4" />
-                            User
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => changeRole(member.id, 'admin')}
-                            disabled={member.role === 'admin'}
-                          >
-                            <Shield className="mr-2 h-4 w-4" />
-                            Admin
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                      <div className="flex items-center gap-1">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm" className="h-7 text-xs">
+                              Change role
+                              <ChevronDown className="ml-1 h-3 w-3" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              onClick={() => changeRole(member.id, 'user')}
+                              disabled={member.role === 'user'}
+                            >
+                              <User className="mr-2 h-4 w-4" />
+                              User
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => changeRole(member.id, 'admin')}
+                              disabled={member.role === 'admin'}
+                            >
+                              <Shield className="mr-2 h-4 w-4" />
+                              Admin
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 text-xs text-destructive hover:text-destructive"
+                          onClick={() => handleRemoveMember(member.id)}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
                     )}
                   </td>
                 </tr>
@@ -238,6 +322,83 @@ export function UsersClient({ currentUserId }: UsersClientProps) {
           <p className="text-sm text-muted-foreground text-center py-8">No users found.</p>
         )}
       </div>
+
+      {/* Invite Links */}
+      <h2 className="text-lg font-semibold mt-8">Invite Links</h2>
+
+      <div className="flex items-center gap-3">
+        <Button onClick={handleGenerateInvite} disabled={generating} size="sm">
+          <Link className="mr-2 h-4 w-4" />
+          {generating ? 'Generating...' : 'Generate invite link'}
+        </Button>
+      </div>
+
+      {newInviteUrl && (
+        <div className="flex items-center gap-2">
+          <Input value={newInviteUrl} readOnly className="text-sm font-mono" />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              navigator.clipboard.writeText(newInviteUrl)
+              toast({ type: 'success', message: 'Copied to clipboard' })
+            }}
+          >
+            <Copy className="h-4 w-4" />
+          </Button>
+        </div>
+      )}
+
+      {pendingInvites.length > 0 && (
+        <div>
+          <h3 className="text-sm font-medium text-muted-foreground mb-2">Pending</h3>
+          <div className="rounded-lg border border-border divide-y divide-border">
+            {pendingInvites.map(invite => (
+              <div key={invite.id} className="flex items-center justify-between px-4 py-2">
+                <div className="flex items-center gap-3">
+                  <code className="text-xs bg-muted px-2 py-1 rounded">
+                    {invite.token.slice(0, 8)}...
+                  </code>
+                  <span suppressHydrationWarning className="text-xs text-muted-foreground">
+                    {formatDistanceToNow(new Date(invite.created_at), { addSuffix: true })}
+                  </span>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-xs text-destructive hover:text-destructive"
+                  onClick={() => handleRevokeInvite(invite.id)}
+                >
+                  Revoke
+                </Button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {acceptedInvites.length > 0 && (
+        <div>
+          <h3 className="text-sm font-medium text-muted-foreground mb-2">Accepted</h3>
+          <div className="rounded-lg border border-border divide-y divide-border">
+            {acceptedInvites.map(invite => (
+              <div key={invite.id} className="flex items-center justify-between px-4 py-2">
+                <div className="flex items-center gap-3">
+                  <code className="text-xs bg-muted px-2 py-1 rounded">
+                    {invite.token.slice(0, 8)}...
+                  </code>
+                  <span className="text-xs text-muted-foreground">
+                    accepted by {invite.accepted_by?.slice(0, 8)}...
+                  </span>
+                  <span suppressHydrationWarning className="text-xs text-muted-foreground">
+                    {invite.accepted_at && formatDistanceToNow(new Date(invite.accepted_at), { addSuffix: true })}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
