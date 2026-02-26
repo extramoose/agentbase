@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { resolveActor } from '@/lib/api/resolve-actor'
+import { resolveActorUnified } from '@/lib/api/resolve-actor'
 import { apiError } from '@/lib/api/errors'
 
 const schema = z.object({
@@ -12,7 +12,7 @@ const schema = z.object({
 
 export async function POST(request: Request) {
   try {
-    const { supabase, actorId, tenantId } = await resolveActor(request)
+    const { supabase, actorId, tenantId } = await resolveActorUnified(request)
     const body = await request.json()
     const input = schema.parse(body)
 
