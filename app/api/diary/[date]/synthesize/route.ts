@@ -1,4 +1,3 @@
-// Stub — full implementation in #217
 import { resolveActorUnified } from '@/lib/api/resolve-actor'
 import { apiError } from '@/lib/api/errors'
 import { chatCompletion } from '@/lib/ai'
@@ -69,23 +68,31 @@ export async function POST(
 
     const latestVersion = Array.isArray(latestVersions) ? latestVersions[0] : null
 
-    // 4. Build prompt — placeholder for now, real prompts come in #217
+    // 4. Build prompt based on context_hint
     const streamText = (streamEntries as Array<{ content: string; created_at: string }> ?? [])
-      .map(e => `[${e.created_at}] ${e.content}`)
+      .map(e => `- ${e.content}`)
       .join('\n')
 
-    const previousContent = latestVersion ? (latestVersion as { content: string }).content : ''
+    const currentDoc = latestVersion ? (latestVersion as { content: string }).content : ''
+
+    let systemPrompt = ''
+    let userPrompt = ''
+
+    if (input.context_hint === 'good_morning') {
+      systemPrompt = "You are Frank, Hunter's AI assistant. Write in second person, warm and direct."
+      userPrompt = `It's a new day. Here are Hunter's stream notes:\n${streamText}\n\nExisting doc: ${currentDoc}\n\nWrite a clear, encouraging morning brief — what today looks like, what to focus on.`
+    } else if (input.context_hint === 'update') {
+      systemPrompt = "You are updating Hunter's diary with new stream entries."
+      userPrompt = `Current document:\n${currentDoc}\n\nNew stream entries:\n${streamText}\n\nProduce an updated document incorporating the new inputs naturally.`
+    } else {
+      systemPrompt = "You are writing Hunter's end-of-day diary entry."
+      userPrompt = `Today's stream:\n${streamText}\n\nCurrent doc:\n${currentDoc}\n\nWrite a concise, honest recap of the day — what was done, what carries forward, any reflections.`
+    }
 
     // 5. Call chatCompletion for document content
     const content = await chatCompletion([
-      {
-        role: 'system',
-        content: `You are synthesizing a diary entry for ${date}. Context: ${input.context_hint}. Combine the stream entries into a coherent diary document.`,
-      },
-      {
-        role: 'user',
-        content: `Previous version:\n${previousContent || '(none)'}\n\nStream entries:\n${streamText || '(none)'}`,
-      },
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt },
     ])
 
     // 6. Separate LLM call for change_summary
@@ -96,7 +103,7 @@ export async function POST(
       },
       {
         role: 'user',
-        content: `Previous:\n${previousContent || '(none)'}\n\nNew:\n${content}`,
+        content: `Previous:\n${currentDoc || '(none)'}\n\nNew:\n${content}`,
       },
     ])
 

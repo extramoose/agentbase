@@ -1,11 +1,16 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { ChevronLeft, ChevronRight, Calendar } from 'lucide-react'
+import { useCallback, useMemo, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { RichTextEditor } from '@/components/rich-text-editor'
-import { ActivityAndComments } from '@/components/activity-and-comments'
+import { MarkdownRenderer } from '@/components/markdown-renderer'
+import { StreamPanel } from '@/components/stream-panel'
+import { VersionHistoryDropdown } from '@/components/version-history-dropdown'
+import { SynthesizeButton } from '@/components/synthesize-button'
 import { toast } from '@/hooks/use-toast'
+import type { DocumentVersion } from '@/lib/types/stream'
 
 type DiaryEntry = {
   id: string
@@ -15,11 +20,24 @@ type DiaryEntry = {
   updated_at: string
 }
 
+type Phase = 'future' | 'today' | 'past'
+
+function getDenverToday(): string {
+  return new Date()
+    .toLocaleString('en-CA', { timeZone: 'America/Denver' })
+    .split(',')[0]
+}
+
+function computePhase(dateStr: string): Phase {
+  const today = getDenverToday()
+  if (dateStr === today) return 'today'
+  return dateStr > today ? 'future' : 'past'
+}
+
 function formatDisplay(dateStr: string): string {
   return new Date(dateStr + 'T12:00:00').toLocaleDateString('en-US', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
+    weekday: 'short',
+    month: 'short',
     day: 'numeric',
   })
 }
@@ -30,51 +48,29 @@ function addDays(dateStr: string, n: number): string {
   return d.toISOString().split('T')[0]
 }
 
-export function DiaryClient({
-  initialEntry,
-  initialDate,
-}: {
-  initialEntry: DiaryEntry | null
-  initialDate: string
-}) {
-  const [currentDate, setCurrentDate] = useState(initialDate)
-  const [entry, setEntry] = useState<DiaryEntry | null>(initialEntry)
+interface DiaryClientProps {
+  entry: DiaryEntry | null
+  date: string
+}
+
+export function DiaryClient({ entry, date }: DiaryClientProps) {
+  const router = useRouter()
+  const phase = useMemo<Phase>(() => computePhase(date), [date])
+  const [currentEntry, setCurrentEntry] = useState<DiaryEntry | null>(entry)
+  const [currentContent, setCurrentContent] = useState(entry?.content ?? '')
+  const [viewingVersion, setViewingVersion] = useState<DocumentVersion | null>(
+    null
+  )
   const [saving, setSaving] = useState(false)
-  const dateInputRef = useRef<HTMLInputElement>(null)
   const savingRef = useRef(false)
-
-  // Fetch entry when date changes
-  useEffect(() => {
-    if (currentDate === initialDate && entry === initialEntry) return
-
-    let cancelled = false
-    async function fetchEntry() {
-      try {
-        const res = await fetch(`/api/diary/${currentDate}`)
-        const json = await res.json()
-        if (!cancelled) {
-          setEntry(json.data ?? null)
-        }
-      } catch {
-        if (!cancelled) {
-          setEntry(null)
-        }
-      }
-    }
-    fetchEntry()
-    return () => {
-      cancelled = true
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentDate])
+  const denverToday = useMemo(() => getDenverToday(), [])
+  const isToday = date === denverToday
 
   const saveEntry = useCallback(
     async (content: string) => {
-      // Don't save empty content for a new entry
       const isEmpty =
         !content || content === '<p></p>' || content.trim() === ''
-      if (isEmpty && !entry) return
-
+      if (isEmpty && !currentEntry) return
       if (savingRef.current) return
       savingRef.current = true
       setSaving(true)
@@ -83,11 +79,14 @@ export function DiaryClient({
         const res = await fetch('/api/diary', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ date: currentDate, content }),
+          body: JSON.stringify({ date, content }),
         })
         const json = await res.json()
-        if (!res.ok) throw new Error(json.error ?? 'Save failed')
-        setEntry(json.data)
+        if (!res.ok)
+          throw new Error(
+            (json as { error?: string }).error ?? 'Save failed'
+          )
+        setCurrentEntry(json.data as DiaryEntry)
       } catch (err) {
         toast({
           message:
@@ -99,49 +98,47 @@ export function DiaryClient({
         setSaving(false)
       }
     },
-    [currentDate, entry]
+    [date, currentEntry]
   )
 
-  const goToDate = useCallback((date: string) => {
-    setCurrentDate(date)
-  }, [])
+  function handleSynthesizeComplete(version: DocumentVersion) {
+    setCurrentContent(version.content)
+    setViewingVersion(null)
+  }
 
-  const today = new Date().toISOString().split('T')[0]
-  const isToday = currentDate === today
+  function handleVersionSelect(content: string) {
+    setCurrentContent(content)
+  }
+
+  function navigate(targetDate: string) {
+    router.push(`/tools/diary/${targetDate}`)
+  }
+
+  const displayContent = viewingVersion
+    ? viewingVersion.content
+    : currentContent
+
+  const isEditable = phase !== 'past' && !viewingVersion
 
   return (
     <div className="flex flex-col h-full max-w-3xl mx-auto w-full">
-      {/* Navigation bar */}
+      {/* Calendar day strip nav */}
       <div className="flex items-center justify-between py-4 px-2">
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => goToDate(addDays(currentDate, -1))}
+          onClick={() => navigate(addDays(date, -1))}
         >
           <ChevronLeft className="h-5 w-5" />
         </Button>
 
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => dateInputRef.current?.showPicker()}
-            className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <Calendar className="h-4 w-4" />
-          </button>
-          <input
-            ref={dateInputRef}
-            type="date"
-            value={currentDate}
-            onChange={(e) => {
-              if (e.target.value) goToDate(e.target.value)
-            }}
-            className="sr-only"
-          />
+          <span className="text-lg font-semibold">{formatDisplay(date)}</span>
           {!isToday && (
             <Button
               variant="outline"
               size="sm"
-              onClick={() => goToDate(today)}
+              onClick={() => navigate(denverToday)}
             >
               Today
             </Button>
@@ -154,34 +151,70 @@ export function DiaryClient({
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => goToDate(addDays(currentDate, 1))}
+          onClick={() => navigate(addDays(date, 1))}
         >
           <ChevronRight className="h-5 w-5" />
         </Button>
       </div>
 
-      {/* Date heading */}
-      <h1 className="text-2xl font-bold px-2 pb-4">
-        {formatDisplay(currentDate)}
-      </h1>
+      {/* Toolbar: Version History + Synthesize buttons */}
+      {currentEntry?.id && (
+        <div className="flex items-center gap-2 px-2 pb-4 flex-wrap">
+          <VersionHistoryDropdown
+            entityType="diary"
+            entityId={currentEntry.id}
+            currentContent={currentContent}
+            onVersionSelect={handleVersionSelect}
+          />
+          {phase === 'today' && (
+            <>
+              <SynthesizeButton
+                entityType="diary"
+                entityId={currentEntry.id}
+                contextHint="good_morning"
+                label="Good Morning"
+                onComplete={handleSynthesizeComplete}
+              />
+              <SynthesizeButton
+                entityType="diary"
+                entityId={currentEntry.id}
+                contextHint="update"
+                label="Update"
+                onComplete={handleSynthesizeComplete}
+              />
+              <SynthesizeButton
+                entityType="diary"
+                entityId={currentEntry.id}
+                contextHint="good_night"
+                label="Good Night"
+                onComplete={handleSynthesizeComplete}
+              />
+            </>
+          )}
+        </div>
+      )}
 
-      {/* Rich text editor */}
+      {/* Document area */}
       <div className="flex-1 px-2 pb-4">
-        <RichTextEditor
-          value={entry?.content ?? ''}
-          onBlur={(md) => saveEntry(md)}
-          placeholder="Write today's entry..."
-          minHeight="400px"
-        />
+        {isEditable ? (
+          <RichTextEditor
+            value={displayContent}
+            onChange={(md) => setCurrentContent(md)}
+            onBlur={(md) => saveEntry(md)}
+            placeholder="Write today's entry..."
+            minHeight="400px"
+          />
+        ) : (
+          <div className="min-h-[400px] rounded-md border border-border p-4">
+            <MarkdownRenderer content={displayContent} />
+          </div>
+        )}
       </div>
 
-      {/* Activity & Comments — only when we have a saved entry */}
-      {entry?.id && (
-        <div className="border-t border-border mt-4">
-          <ActivityAndComments
-            entityType="diary_entries"
-            entityId={entry.id}
-          />
+      {/* Stream Panel */}
+      {currentEntry?.id && (
+        <div className="border-t border-border px-2 py-4">
+          <StreamPanel entityType="diary" entityId={currentEntry.id} />
         </div>
       )}
     </div>
