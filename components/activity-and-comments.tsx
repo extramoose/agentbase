@@ -1,29 +1,19 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { ActorChip } from '@/components/actor-chip'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { formatDistanceToNow } from 'date-fns'
-import { Send } from 'lucide-react'
-import { formatActivityEvent } from '@/lib/format-activity'
+import { ChevronRight, Send } from 'lucide-react'
+import {
+  formatActivityEvent,
+  groupActivityItems,
+  getMostSignificantItem,
+  type ActivityLogEntry,
+} from '@/lib/format-activity'
 import { MarkdownRenderer } from '@/components/markdown-renderer'
-
-type ActivityEntry = {
-  id: string
-  entity_type: string
-  entity_id: string
-  entity_label: string | null
-  event_type: string
-  actor_id: string
-  actor_type: 'human' | 'agent'
-  old_value: string | null
-  new_value: string | null
-  body: string | null
-  payload: Record<string, unknown> | null
-  created_at: string
-}
 
 interface ActivityAndCommentsProps {
   entityType: string
@@ -32,12 +22,22 @@ interface ActivityAndCommentsProps {
 }
 
 export function ActivityAndComments({ entityType, entityId, currentUserId }: ActivityAndCommentsProps) {
-  const [entries, setEntries] = useState<ActivityEntry[]>([])
+  const [entries, setEntries] = useState<ActivityLogEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [comment, setComment] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
   const supabase = createClient()
   const bottomRef = useRef<HTMLDivElement>(null)
+
+  function toggleGroup(groupKey: string) {
+    setExpandedGroups(prev => {
+      const next = new Set(prev)
+      if (next.has(groupKey)) next.delete(groupKey)
+      else next.add(groupKey)
+      return next
+    })
+  }
 
   // Initial load
   useEffect(() => {
@@ -47,7 +47,7 @@ export function ActivityAndComments({ entityType, entityId, currentUserId }: Act
         p_entity_id: entityId,
         p_limit: 50,
       })
-      setEntries((data ?? []) as ActivityEntry[])
+      setEntries((data ?? []) as ActivityLogEntry[])
       setLoading(false)
     }
     load()
@@ -66,7 +66,7 @@ export function ActivityAndComments({ entityType, entityId, currentUserId }: Act
           filter: `entity_type=eq.${entityType},entity_id=eq.${entityId}`,
         },
         (payload) => {
-          setEntries(prev => [payload.new as ActivityEntry, ...prev])
+          setEntries(prev => [payload.new as ActivityLogEntry, ...prev])
         }
       )
       .subscribe()
@@ -79,7 +79,7 @@ export function ActivityAndComments({ entityType, entityId, currentUserId }: Act
     setSubmitting(true)
 
     // Optimistic update
-    const optimistic: ActivityEntry = {
+    const optimistic: ActivityLogEntry = {
       id: `temp-${Date.now()}`,
       entity_type: entityType,
       entity_id: entityId,
@@ -105,6 +105,30 @@ export function ActivityAndComments({ entityType, entityId, currentUserId }: Act
     } finally {
       setSubmitting(false)
     }
+  }
+
+  const groups = useMemo(() => groupActivityItems(entries), [entries])
+
+  function renderSingleEntry(entry: ActivityLogEntry) {
+    return (
+      <div key={entry.id} className="flex gap-3">
+        <ActorChip actorId={entry.actor_id} actorType={entry.actor_type} compact />
+        <div className="flex-1 min-w-0">
+          {entry.event_type === 'commented' ? (
+            <div className="rounded-lg bg-muted/40 px-3 py-2 text-sm">
+              <MarkdownRenderer content={entry.body ?? ''} />
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              {formatActivityEvent(entry)}
+            </p>
+          )}
+          <p suppressHydrationWarning className="text-xs text-muted-foreground mt-1">
+            {formatDistanceToNow(new Date(entry.created_at), { addSuffix: true })}
+          </p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -143,29 +167,51 @@ export function ActivityAndComments({ entityType, entityId, currentUserId }: Act
             </div>
           ))}
         </div>
-      ) : entries.length === 0 ? (
+      ) : groups.length === 0 ? (
         <p className="text-sm text-muted-foreground">No activity yet.</p>
       ) : (
         <div className="space-y-4">
-          {entries.map(entry => (
-            <div key={entry.id} className="flex gap-3">
-              <ActorChip actorId={entry.actor_id} actorType={entry.actor_type} compact />
-              <div className="flex-1 min-w-0">
-                {entry.event_type === 'commented' ? (
-                  <div className="rounded-lg bg-muted/40 px-3 py-2 text-sm">
-                    <MarkdownRenderer content={entry.body ?? ''} />
+          {groups.map(group => {
+            // Single-item group — render exactly as before
+            if (group.items.length === 1) {
+              return renderSingleEntry(group.items[0])
+            }
+
+            // Multi-item group — collapsed/expandable row
+            const groupKey = group.firstItem.id
+            const isExpanded = expandedGroups.has(groupKey)
+            const headline = getMostSignificantItem(group.items)
+            const extraCount = group.items.length - 1
+
+            return (
+              <div key={groupKey}>
+                <div
+                  className="flex gap-3 cursor-pointer rounded-lg px-2 py-1.5 -mx-2 hover:bg-muted/40 transition-colors"
+                  onClick={() => toggleGroup(groupKey)}
+                >
+                  <ActorChip actorId={group.firstItem.actor_id} actorType={group.firstItem.actor_type} compact />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-muted-foreground">
+                      {formatActivityEvent(headline)}
+                      <span className="text-xs ml-2">
+                        +{extraCount} more {extraCount === 1 ? 'change' : 'changes'}
+                      </span>
+                    </p>
+                    <p suppressHydrationWarning className="text-xs text-muted-foreground mt-1">
+                      {formatDistanceToNow(new Date(group.latestItem.created_at), { addSuffix: true })}
+                    </p>
                   </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground">
-                    {formatActivityEvent(entry)}
-                  </p>
+                  <ChevronRight className={`h-4 w-4 text-muted-foreground shrink-0 mt-0.5 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+                </div>
+
+                {isExpanded && (
+                  <div className="border-l-2 border-muted ml-5 pl-3 space-y-4 mt-2">
+                    {group.items.map(entry => renderSingleEntry(entry))}
+                  </div>
                 )}
-                <p suppressHydrationWarning className="text-xs text-muted-foreground mt-1">
-                  {formatDistanceToNow(new Date(entry.created_at), { addSuffix: true })}
-                </p>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
       <div ref={bottomRef} />
