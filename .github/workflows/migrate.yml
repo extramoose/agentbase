@@ -24,7 +24,14 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Resolve DB host to IPv4
+        run: |
+          IPV4=$(getent ahostsv4 db.lecsqzctdfjwencberdj.supabase.co | head -1 | awk '{print $1}')
+          echo "PGHOSTADDR=$IPV4" >> $GITHUB_ENV
+          echo "Resolved to $IPV4"
+
       - name: Run migrations
         env:
-          DATABASE_URL: postgresql://postgres:${{ secrets.SUPABASE_DB_PASSWORD }}@db.lecsqzctdfjwencberdj.supabase.co:5432/postgres
+          DATABASE_URL: postgresql://postgres:${{ secrets.SUPABASE_DB_PASSWORD }}@db.lecsqzctdfjwencberdj.supabase.co:5432/postgres?sslmode=require
+          PGSSLMODE: require
         run: python3 scripts/migrate.py
