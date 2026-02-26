@@ -388,10 +388,11 @@ All mutations go through these functions. They atomically write to the entity ta
 | `get_workspace_settings()` | `jsonb` (tenant row) | Returns tenant for current user's workspace. |
 | `update_workspace_settings(p_name, p_openrouter_api_key, p_default_model)` | `void` | Superadmin only. Updates tenant settings via COALESCE. |
 
-### Query helper
+### Query helpers
 | Function | Parameters | Returns |
 |----------|-----------|---------|
 | `get_activity_log(p_limit, p_offset, p_entity_type, p_entity_id, p_actor_id, p_date_from, p_search)` | all optional | `activity_log` rows |
+| `rpc_get_workspace_members(p_tenant_id)` | tenant UUID | jsonb `{ humans, agents }` — all humans + non-revoked agents |
 
 ### Entity creates
 | Function | Key params | Returns |
@@ -452,6 +453,7 @@ All mutations go through these functions. They atomically write to the entity ta
 | `013_stream_versioning.sql` | `stream_entries` + `document_versions` tables, RLS policies, `rpc_list_stream_entries`, `rpc_create_stream_entry`, `rpc_list_document_versions` RPCs |
 | `014_essays.sql` | `essays` table, RLS policy, `rpc_create_essay`, `rpc_list_essays` |
 | `018_synthesize_rpcs.sql` | `rpc_get_essay`, `rpc_get_diary_entry_id`, `rpc_save_document_synthesis` — SECURITY DEFINER RPCs for synthesize endpoints (agent path) |
+| `019_workspace_members_rpc.sql` | `rpc_get_workspace_members` — returns all humans + non-revoked agents for a tenant |
 
 ---
 
