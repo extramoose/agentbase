@@ -98,7 +98,7 @@ export function VersionHistoryDropdown({
               <div className="flex items-center gap-2 w-full">
                 <span className="text-xs font-medium">v{version.version_number}</span>
                 <ActorChip actorId={version.actor_id} actorType={version.actor_type} compact className="size-4" />
-                <span className="text-xs text-muted-foreground ml-auto">
+                <span suppressHydrationWarning className="text-xs text-muted-foreground ml-auto">
                   {formatDistanceToNow(new Date(version.created_at), { addSuffix: true })}
                 </span>
               </div>

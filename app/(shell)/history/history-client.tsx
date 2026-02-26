@@ -211,7 +211,7 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
                   </div>
                 )}
               </div>
-              <span className="text-xs text-muted-foreground whitespace-nowrap shrink-0">
+              <span suppressHydrationWarning className="text-xs text-muted-foreground whitespace-nowrap shrink-0">
                 {formatDistanceToNow(new Date(entry.created_at), { addSuffix: true })}
               </span>
             </div>

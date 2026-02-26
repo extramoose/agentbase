@@ -160,7 +160,7 @@ export function ActivityAndComments({ entityType, entityId, currentUserId }: Act
                     {formatActivityEvent(entry)}
                   </p>
                 )}
-                <p className="text-xs text-muted-foreground mt-1">
+                <p suppressHydrationWarning className="text-xs text-muted-foreground mt-1">
                   {formatDistanceToNow(new Date(entry.created_at), { addSuffix: true })}
                 </p>
               </div>
