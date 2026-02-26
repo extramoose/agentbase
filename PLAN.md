@@ -336,7 +336,7 @@ $$;
 
 **Adding more humans later** = insert a row into `tenant_members`. Their RLS membership check passes immediately. No schema changes. No data migrations. No RLS rewrites.
 
-**All entities including Diary are workspace-scoped.** Diary is one shared journal per workspace per day. Any team member or agent can write to it. Read/write access via tenant membership — same pattern as all other tables.
+**All entities including Diary are workspace-scoped.** Diary is a shared workspace activity log — one entry per day capturing what everyone (humans and agents) did. Not a personal journal. Any team member or agent can contribute to the day's entry. Read/write access via tenant membership — same pattern as all other tables. Future vision: evolve into a calendar UI showing entity activity by day.
 
 **Agent access:** Agents (Lucy, Frank) are real Supabase Auth users and members of the workspace with `role = 'agent'`. Their RLS access is identical to human members — workspace membership is all that's needed. The `agent_owners` table continues to map agent → owning human for delegation tracking.
 
@@ -861,6 +861,8 @@ CREATE POLICY "Admins read all library items" ON library_items
 ```
 
 ### Diary Entries
+
+**Shared workspace log, not a personal journal.** One entry per day for the entire workspace. Humans and agents all contribute to the same day's entry — what got done, what happened, context for the day. Future: calendar UI showing entity activity by day. Do not design or build this as a private per-user feature.
 
 ```sql
 CREATE TABLE diary_entries (
@@ -2304,3 +2306,6 @@ The `PATCH /api/commands/update` route validates table name and protected fields
 
 ### L-9: Artifacts table for OpenClaw tool traces
 OpenClaw agents generate tool outputs — screenshots, DOM dumps, search results, file reads. Currently, `activity_log.payload` can hold small JSON blobs, but large binary or text artifacts would bloat the log. Future work: add an `artifacts` table with object storage pointers (Supabase Storage or S3-compatible), and allow `activity_log.payload` to reference artifact IDs instead of embedding content inline. Design the schema now if agents start generating large outputs.
+
+### L-10: MCP transport layer for the command bus
+The command bus is already a stable, typed HTTP interface (`/api/commands/*`). MCP (Model Context Protocol) is just another transport on top of it. Future work: expose AgentBase commands as MCP tools so any MCP-compatible agent (Claude, OpenClaw, third-party) can call `createTask`, `addComment`, `changeMeetingStatus`, etc. natively without custom skill code or HTTP wiring. The command bus design makes this straightforward — each semantic action maps 1:1 to an MCP tool definition. Worth doing as the ecosystem matures.
