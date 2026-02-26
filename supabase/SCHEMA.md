@@ -420,6 +420,9 @@ All mutations go through these functions. They atomically write to the entity ta
 | `rpc_list_stream_entries` | p_tenant_id, p_entity_type, p_entity_id | `SETOF stream_entries` — last 50, oldest first |
 | `rpc_create_stream_entry` | p_tenant_id, p_entity_type, p_entity_id, p_content, p_actor_id, p_actor_type | `stream_entries` row |
 | `rpc_list_document_versions` | p_tenant_id, p_entity_type, p_entity_id | `SETOF document_versions` — latest first |
+| `rpc_get_essay` | p_tenant_id, p_essay_id | `TABLE (id, title, tags)` — single essay lookup |
+| `rpc_get_diary_entry_id` | p_tenant_id, p_date | `TABLE (id)` — diary entry UUID by date |
+| `rpc_save_document_synthesis` | p_tenant_id, p_entity_type, p_entity_id, p_version_number, p_content, p_change_summary, p_context_hint, p_actor_id, p_actor_type | `SETOF document_versions` — atomic insert + activity_log |
 
 ### Utility
 | Function | Notes |
@@ -448,6 +451,7 @@ All mutations go through these functions. They atomically write to the entity ta
 | `012_task_type.sql` | Add nullable `type` column (`bug \| improvement \| feature`) to tasks; update `rpc_create_task` with `p_type` param |
 | `013_stream_versioning.sql` | `stream_entries` + `document_versions` tables, RLS policies, `rpc_list_stream_entries`, `rpc_create_stream_entry`, `rpc_list_document_versions` RPCs |
 | `014_essays.sql` | `essays` table, RLS policy, `rpc_create_essay`, `rpc_list_essays` |
+| `018_synthesize_rpcs.sql` | `rpc_get_essay`, `rpc_get_diary_entry_id`, `rpc_save_document_synthesis` — SECURITY DEFINER RPCs for synthesize endpoints (agent path) |
 
 ---
 

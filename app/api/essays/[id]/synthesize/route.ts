@@ -55,11 +55,14 @@ export async function POST(
     const latestVersion = Array.isArray(latestVersions) ? latestVersions[0] : null
 
     // 3. Fetch essay for title context
-    const { data: essay } = await supabase
-      .from('essays')
-      .select('title')
-      .eq('id', entityId)
-      .single()
+    let essay: { title: string } | null = null
+    if (actorType === 'agent') {
+      const { data } = await supabase.rpc('rpc_get_essay', { p_tenant_id: tenantId, p_essay_id: entityId })
+      essay = Array.isArray(data) ? data[0] ?? null : null
+    } else {
+      const { data } = await supabase.from('essays').select('title').eq('id', entityId).single()
+      essay = data
+    }
 
     const streamText = (streamEntries as Array<{ content: string; created_at: string }> ?? [])
       .map(e => `[${e.created_at}] ${e.content}`)
@@ -93,34 +96,50 @@ export async function POST(
       ? ((latestVersion as { version_number: number }).version_number + 1)
       : 1
 
-    const { data: version, error: insertError } = await supabase
-      .from('document_versions')
-      .insert({
+    let version: unknown
+    if (actorType === 'agent') {
+      const { data, error: rpcError } = await supabase.rpc('rpc_save_document_synthesis', {
+        p_tenant_id: tenantId,
+        p_entity_type: 'essay',
+        p_entity_id: entityId,
+        p_version_number: nextVersion,
+        p_content: content,
+        p_change_summary: changeSummary,
+        p_context_hint: input.context_hint,
+        p_actor_id: actorId,
+        p_actor_type: actorType,
+      })
+      if (rpcError) throw rpcError
+      version = Array.isArray(data) ? data[0] : data
+    } else {
+      const { data: v, error: insertError } = await supabase
+        .from('document_versions')
+        .insert({
+          tenant_id: tenantId,
+          entity_type: 'essay',
+          entity_id: entityId,
+          version_number: nextVersion,
+          content,
+          change_summary: changeSummary,
+          context_hint: input.context_hint,
+          actor_id: actorId,
+          actor_type: actorType,
+        })
+        .select()
+        .single()
+      if (insertError) throw insertError
+      // log activity for human path
+      await supabase.from('activity_log').insert({
         tenant_id: tenantId,
         entity_type: 'essay',
         entity_id: entityId,
-        version_number: nextVersion,
-        content,
-        change_summary: changeSummary,
-        context_hint: input.context_hint,
+        event_type: 'document_version_published',
         actor_id: actorId,
         actor_type: actorType,
+        payload: { version_number: nextVersion, context_hint: input.context_hint },
       })
-      .select()
-      .single()
-
-    if (insertError) throw insertError
-
-    // 7. Log to activity_log
-    await supabase.from('activity_log').insert({
-      tenant_id: tenantId,
-      entity_type: 'essay',
-      entity_id: entityId,
-      event_type: 'document_version_published',
-      actor_id: actorId,
-      actor_type: actorType,
-      payload: { version_number: nextVersion, context_hint: input.context_hint },
-    })
+      version = v
+    }
 
     return Response.json({ success: true, version })
   } catch (err) {
