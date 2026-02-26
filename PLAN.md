@@ -2321,3 +2321,240 @@ OpenClaw agents generate tool outputs — screenshots, DOM dumps, search results
 
 ### L-10: MCP transport layer for the command bus
 The command bus is already a stable, typed HTTP interface (`/api/commands/*`). MCP (Model Context Protocol) is just another transport on top of it. Future work: expose AgentBase commands as MCP tools so any MCP-compatible agent (Claude, OpenClaw, third-party) can call `createTask`, `addComment`, `changeMeetingStatus`, etc. natively without custom skill code or HTTP wiring. The command bus design makes this straightforward — each semantic action maps 1:1 to an MCP tool definition. Worth doing as the ecosystem matures.
+
+---
+
+## 13. Build Tickets
+
+Each ticket maps to one Claude Code session. Agents receive their ticket scope and use this PLAN.md for reference — **do not modify PLAN.md**. Always check npm/docs for the latest compatible dependency versions before installing. Work only within your assigned scope.
+
+---
+
+### #160 — Phase 1: Project Scaffold
+**Dependencies:** none  
+**Assignee:** Claude Code
+
+**Scope:**
+- Init new Next.js 16 project with pnpm: `pnpm create next-app@latest agentbase --typescript --tailwind --app --no-src-dir --import-alias "@/*"`
+- Configure TypeScript strict mode (`strict: true`, no `any`)
+- Configure Tailwind CSS v4 (CSS-first config in `app/globals.css`, no `tailwind.config.ts`)
+- Install and init shadcn/ui (`npx shadcn init`) — dark mode, CSS variables
+- Establish full folder structure per §9 of PLAN.md
+- Install core deps: `@supabase/supabase-js @supabase/ssr @dnd-kit/core @dnd-kit/sortable @tiptap/react @tiptap/starter-kit @tiptap/extension-placeholder zod lucide-react`
+- `lib/supabase/client.ts` — browser Supabase client (publishable key)
+- `lib/supabase/server.ts` — SSR Supabase client (cookie-based, for server components)
+- `lib/env.ts` — boot-time assertion: throw if `SUPABASE_SECRET_KEY` present in `NODE_ENV === 'production'`
+- `.env.example` with all runtime vars (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_APP_DOMAIN`, `DEAL_LABEL`)
+- AppShell layout (`app/(shell)/layout.tsx`): sidebar nav with 6 items (Tasks, Meetings, Library, Diary, CRM, History) — placeholder links, no logic yet
+- Sign-in page (`app/sign-in/page.tsx`): "Sign in with Google" button, calls `supabase.auth.signInWithOAuth`
+- Dark mode only — no light mode classes anywhere
+
+---
+
+### #161 — Phase 1: Full Database Migration
+**Dependencies:** #160  
+**Assignee:** Claude Code
+
+**Scope:**
+- Write a single migration file `supabase/migrations/001_initial_schema.sql` containing ALL tables, indexes, RLS policies, and functions from §5, §6, §7 of PLAN.md
+- Tables: `profiles`, `tenants`, `tenant_members`, `agent_owners`, `tags`, `tasks`, `meetings`, `meetings_people`, `meetings_companies`, `library_items`, `diary_entries`, `grocery_items`, `companies`, `people`, `people_companies`, `deals`, `deals_companies`, `deals_people`, `activity_log`, `notifications`, `idempotency_keys`
+- All RLS policies from §7 (workspace member access, admin read-all, public read where applicable)
+- SECURITY DEFINER functions: `is_tenant_member(uuid)`, `get_activity_log(...)` with all params from §5
+- Trigger: `on_auth_user_created` — INSERT into `profiles` on new Supabase Auth user
+- Trigger: `set_updated_at` — update `updated_at` on all entity tables
+- `updated_at` trigger applies to: `tasks`, `meetings`, `library_items`, `diary_entries`, `grocery_items`, `companies`, `people`, `deals`
+- Seed script `scripts/seed.ts`: creates HunterTenant row in `tenants`, inserts Hunter's profile with `role = 'superadmin'` — parameterized with Hunter's user UUID
+- Apply migration to the AgentBase Supabase project (`https://lecsqzctdfjwencberdj.supabase.co`) using the Supabase dashboard or `supabase db push`
+
+---
+
+### #162 — Phase 1: Auth + Middleware
+**Dependencies:** #160, #161  
+**Assignee:** Claude Code
+
+**Scope:**
+- Supabase middleware (`middleware.ts`): refresh session on all routes, redirect unauthenticated users to `/sign-in` (exclude `/sign-in`, `/auth/callback`, `/p/*`)
+- Auth callback route (`app/auth/callback/route.ts`): exchange code for session, redirect to `/`
+- `lib/auth.ts`: `getSession()`, `getUserProfile()`, `requireAuth()` (throws if no session), `requireAdmin()` (throws if not admin/superadmin)
+- Wire sign-in page to Google OAuth: `supabase.auth.signInWithOAuth({ provider: 'google', redirectTo: '/auth/callback' })`
+- AppShell layout: fetch user profile server-side, pass to sidebar (display name + avatar)
+- Sidebar nav: show admin-only items (Admin link) only for `role IN ('admin', 'superadmin')`
+- Sign-out button in sidebar footer
+
+---
+
+### #163 — Phase 1: Agent Service Account Scripts
+**Dependencies:** #161, #162  
+**Assignee:** Claude Code
+
+**Scope:**
+- `scripts/create-agent-users.ts`: creates agent auth users via `supabase.auth.admin.createUser()` using `SUPABASE_SECRET_KEY`. Creates two users: `frank@internal.hah.to` (name: Frank) and `lucy@internal.hah.to` (name: Lucy). Inserts rows into `agent_owners` (owner = Hunter's UUID) and `tenant_members` (HunterTenant, role: 'agent'). All UUIDs parameterized via env vars.
+- `scripts/generate-agent-sessions.ts`: for each agent user, calls `supabase.auth.admin.generateLink({ type: 'magiclink', email })`, exchanges the token for a real session, captures and prints `refresh_token` to stdout. Operator copies token into agent config.
+- Both scripts use `SUPABASE_SECRET_KEY` (scripts-only, never runtime)
+- Add `scripts/README.md` explaining run order and what to do with the output tokens
+
+---
+
+### #164 — Phase 2: Command Bus Core
+**Dependencies:** #162  
+**Assignee:** Claude Code
+
+**Scope:**
+- `lib/api/resolve-actor.ts`: reads `Authorization: Bearer <token>` header, calls `supabase.auth.getUser()`, queries `agent_owners` + `tenant_members` to resolve `{ supabase, actorId, actorType, tenantId, ownerId }`. Rejects (401) if no valid session or actor not in any workspace.
+- Rate limiting middleware: in-memory sliding window, 60 req/min per `actorId`. Returns 429 with `Retry-After` header on breach.
+- `PATCH /api/commands/update/route.ts`: generic field update. Validates table against allowlist, validates id exists in actor's workspace (RLS-enforced), calls `rpc_update_entity(table_name, entity_id, fields, actor_id, tenant_id)`. Protected fields (`tenant_id`, `actor_id`) rejected if present in fields payload.
+- Standard response shape: `{ success: true, data: {...} }` / `{ success: false, error: "..." }`
+- Write `rpc_update_entity` Postgres function: `UPDATE {table} SET fields WHERE id=X AND tenant_id=Y` + `INSERT INTO activity_log` in one transaction
+- `lib/api/errors.ts`: typed API error classes
+
+---
+
+### #165 — Phase 2: Shared UI Components
+**Dependencies:** #162  
+**Assignee:** Claude Code
+
+**Scope:**
+- `components/edit-shelf.tsx`: universal slide-over panel. Props: `isOpen`, `onClose`, `title`, `children`, `headerRight?`. Always renders `<ActivityAndComments>` at the bottom when `entityId` is provided. Width: `w-[520px]`.
+- `components/activity-and-comments.tsx`: renders `get_activity_log` RPC results for a given entity. Realtime subscription to `activity_log` INSERT events filtered by `entity_type` + `entity_id`. Comment form at bottom (posts via `POST /api/commands/add-comment`). Optimistic updates on comment submit.
+- `components/toast-provider.tsx` + `hooks/use-toast.ts`: toast stack (max 3 visible), auto-dismiss 4s, undo support. Mount in AppShell layout.
+- `components/search-filter-bar.tsx`: search input left, filter slot right. Props: `search`, `onSearchChange`, `placeholder?`, `children?`.
+- `components/actor-chip.tsx`: avatar + display name for a given `actorId`. Resolves name from profiles. Falls back to email initials.
+- `components/tag-combobox.tsx`: multi-select tag input with create-new. Uses tenant-scoped `tags` table.
+- `components/cmd-k.tsx`: `Cmd+K` overlay shell — empty for now, wired up in #172.
+- `POST /api/commands/add-comment/route.ts` + `rpc_add_comment` Postgres function: inserts `event_type='commented'` into `activity_log`. Works for any entity type.
+
+---
+
+### #166 — Phase 3: Tasks
+**Dependencies:** #164, #165  
+**Assignee:** Claude Code
+
+**Scope:**
+- `/tools/tasks/page.tsx`: task list grouped by priority (urgent / high / medium / low / none). Each group collapsible. Realtime subscription on `tasks` filtered by `tenant_id`. Search bar (`SearchFilterBar`). "New Task" button opens EditShelf.
+- Task card: ticket ID (`#N`), title, status badge, assignee chip, due date. Mobile: card layout. Desktop: grid row layout.
+- `components/task-edit-shelf.tsx`: task detail in `EditShelf`. Fields: title (Tiptap), body (Tiptap), status, priority, assignee, due date, tags, source_meeting_id (read-only if set). Uses `ActivityAndComments` at bottom.
+- Drag-to-reorder between priority groups using `@dnd-kit`. Updates `priority` field on drop via generic update route.
+- `POST /api/commands/create-task/route.ts`: Zod schema + calls `rpc_create_task(title, body, status, priority, assignee, due_date, tags, actor_id, tenant_id, idempotency_key)`.
+- `POST /api/commands/change-task-status/route.ts`: calls `rpc_change_task_status(task_id, new_status, actor_id, tenant_id)`. Writes `status_changed` event to `activity_log`.
+- Toasts: creation ("Task created"), status change ("Status → Done") with undo (calls change-task-status back to previous).
+- URL state: `?task=<ticket_id>` opens EditShelf for that task.
+
+---
+
+### #167 — Phase 4: Meetings
+**Dependencies:** #164, #165, #166 (for add-comment route)  
+**Assignee:** Claude Code
+
+**Scope:**
+- `/tools/meetings/page.tsx`: meeting list, status filter tabs (upcoming / in_meeting / ended / closed). `SearchFilterBar`. "New Meeting" button.
+- `/tools/meetings/[id]/page.tsx`: full-page document layout. Sections: title + meta (date, time, status control), linked people + companies, prep notes (read-only if set), live notes (Tiptap, auto-save on blur), AI summary (read-only, "Regenerate" button), transcript paste area (collapsed), proposed tasks (show at `ended`/`closed` state — accept creates task via `accept-suggested-task` route, dismiss removes from list), `ActivityAndComments` sidebar.
+- Status control: current state label + "Advance" button (upcoming→in_meeting→ended→closed) + dropdown for manual override.
+- `POST /api/commands/create-meeting/route.ts` + `rpc_create_meeting`
+- `POST /api/commands/change-meeting-status/route.ts` + `rpc_change_meeting_status`. On `ended→closed`: triggers AI summary generation (calls `/api/tools/meetings/[id]/summary` async — fire and forget from client after status change).
+- `POST /api/tools/meetings/[id]/summary/route.ts`: reads `live_notes` + `transcript`, calls OpenRouter (model from `tool_settings`), writes `meeting_summary` via generic update route.
+- `POST /api/commands/accept-suggested-task/route.ts` + `rpc_accept_suggested_task`: creates task with `source_meeting_id` set, removes item from `proposed_tasks` array.
+- Realtime on meetings detail: `tenant_id=eq.X, id=eq.Y` filter.
+
+---
+
+### #168 — Phase 4: Library
+**Dependencies:** #164, #165  
+**Assignee:** Claude Code
+
+**Scope:**
+- `/tools/library/page.tsx`: card view + list view toggle. Type filter chips: all / favorite / flag / restaurant / note / idea / article. `SearchFilterBar` with tag filter. "New Item" button opens EditShelf.
+- Card: type icon, title, source badge (for articles), tags, Open link button (articles/favorites with URL).
+- List: compact row layout.
+- HERE Maps integration: map tab showing pins for `restaurant` + `favorite` + `flag` types. Uses `NEXT_PUBLIC_HERE_API_KEY`. CSP headers for HERE Maps in `next.config.ts`.
+- `components/library-edit-shelf.tsx`: type selector, conditional fields per type (url + source + excerpt for articles; lat/lng for map-pinned types; etc.). Tags via `TagCombobox`.
+- `POST /api/commands/create-library-item/route.ts` + `rpc_create_library_item`
+- Generic update route handles edits.
+
+---
+
+### #169 — Phase 4: Diary + Grocery
+**Dependencies:** #164, #165  
+**Assignee:** Claude Code
+
+**Scope:**
+- `/tools/diary/page.tsx`: one-day-at-a-time view. Tiptap editor — editable for today, read-only for past entries. Prev / Next buttons skip to nearest entry with content. Calendar picker with dots on days that have entries; click-outside closes. Save on blur (upsert by date). Falls back: `content ?? summary ?? ""`.
+- `/tools/grocery/page.tsx`: flat list of grocery items. Check to mark done (strikethrough, stays visible briefly). Add item form (name, quantity, unit, category). Delete button. Realtime subscription on `grocery_items` filtered by `tenant_id`.
+- Command routes: `POST /api/commands/create-diary-entry` + `rpc_create_diary_entry`, `POST /api/commands/update-diary-entry` (via generic update), `POST /api/commands/add-grocery-item` + `rpc_add_grocery_item`, `POST /api/commands/check-grocery-item` + `rpc_check_grocery_item` (writes `checked` event to activity_log), `DELETE /api/commands/delete-grocery-item` + rpc.
+
+---
+
+### #170 — Phase 4: CRM
+**Dependencies:** #164, #165  
+**Assignee:** Claude Code
+
+**Scope:**
+- `/tools/crm/companies/page.tsx`, `/tools/crm/people/page.tsx`, `/tools/crm/deals/page.tsx`: each a sortable grid table with `SearchFilterBar`. Tabs or top nav to switch between the three.
+- `components/company-edit-shelf.tsx`: name, domain, description, tags, linked people (via `ComboInput`).
+- `components/person-edit-shelf.tsx`: name, email, role, notes, tags, linked companies (via `ComboInput`).
+- `components/deal-edit-shelf.tsx`: title, status, value, notes, tags, linked company + people.
+- `components/combo-input.tsx`: async search + multi-select for people / companies. Used in deal shelf + meeting detail.
+- Command routes: `POST /api/commands/create-company`, `create-person`, `create-deal` + corresponding `rpc_create_*` functions. Edits via generic update route. Cross-link inserts go through `rpc_link_person_to_company`, `rpc_link_deal_to_person`, etc. (atomic with activity event).
+- `DEAL_LABEL` env var: replace "Deal" with env value throughout CRM UI.
+
+---
+
+### #171 — Phase 5: History + Admin
+**Dependencies:** #165 (ActivityAndComments), all Phase 4 tickets shipped  
+**Assignee:** Claude Code
+
+**Scope:**
+- `/tools/history/page.tsx`: global activity feed. Uses `get_activity_log` RPC. Filters: actor (multi-select), entity type (chips), date range, text search. Infinite scroll (page size 50). Realtime subscription on `activity_log` filtered by `tenant_id`. Each entry shows: actor chip, event description, entity label (clickable — opens entity if URL state supported), timestamp.
+- `/admin/users/page.tsx`: user list with role badges. "Invite user" (creates Supabase auth user + profile). Role change dropdown. Remove user button.
+- `/admin/agents/page.tsx` (superadmin only): agent list with last-seen chip. "New Agent" form: name, avatar upload, owner (human user). On submit: calls server-side route that uses secret key (from scripts pattern, not runtime) to create Supabase Auth user + agent_owners + tenant_members rows, then generates and returns refresh token displayed once. Revoke button calls admin signOut.
+- `/admin/settings/page.tsx`: `DEAL_LABEL` override (stored in `tool_settings` or env), LLM model selector per tool (stored in `tool_settings`).
+
+---
+
+### #172 — Phase 5: CmdK + AppShell Polish
+**Dependencies:** #165, #166 (task nav), all Phase 4 tickets for full entity nav  
+**Assignee:** Claude Code
+
+**Scope:**
+- `components/cmd-k.tsx`: `Cmd+K` / `Ctrl+K` opens overlay. Quick nav: type task `#N` → navigates to `/tools/tasks?task=N`. Entity search: type to search tasks/meetings/people/companies. Quick create: `t ` prefix → new task, `m ` prefix → new meeting. Arrow key navigation. Escape to close.
+- AppShell sidebar: active nav state (highlight current route). Mobile: hamburger menu, slide-out sidebar panel. Collapse sidebar to icon-only on desktop (optional).
+- All EditShelves: `Escape` key closes. Focus trap while open.
+- Keyboard shortcut: `?` opens shortcut reference modal.
+
+---
+
+### #173 — Phase 6: Hardening + Launch Prep
+**Dependencies:** all previous tickets  
+**Assignee:** Claude Code
+
+**Scope:**
+- Mobile responsive pass: every page and shelf tested at 375px, 768px, 1280px. Fix any overflow, truncation, touch target issues.
+- Loading skeletons: every list page shows skeleton rows while fetching. EditShelf shows skeleton while loading entity data.
+- Error boundaries: wrap each page route. Show friendly error state with retry button.
+- Empty states: every entity list has an empty state with icon, message, and CTA ("Create your first task →").
+- Accessibility: focus management on shelf open/close, ARIA labels on icon buttons, color contrast ≥ 4.5:1 on all text.
+- SEO: `metadata` export on public pages (`/sign-in`, `/p/[id]`). OG tags.
+- Input sanitization: Tiptap output sanitization (DOMPurify or equivalent), no raw `innerHTML` without sanitization.
+- `README.md`: project overview, local setup steps, env var reference, deployment to Vercel guide.
+- Final `npx tsc --noEmit` must pass with zero errors.
+
+---
+
+### Ticket Summary
+
+| # | Title | Phase | Deps |
+|---|-------|-------|------|
+| #160 | Project Scaffold | 1 | — |
+| #161 | Full Database Migration | 1 | #160 |
+| #162 | Auth + Middleware | 1 | #160, #161 |
+| #163 | Agent Service Account Scripts | 1 | #161, #162 |
+| #164 | Command Bus Core | 2 | #162 |
+| #165 | Shared UI Components | 2 | #162 |
+| #166 | Tasks | 3 | #164, #165 |
+| #167 | Meetings | 4 | #164, #165, #166 |
+| #168 | Library | 4 | #164, #165 |
+| #169 | Diary + Grocery | 4 | #164, #165 |
+| #170 | CRM | 4 | #164, #165 |
+| #171 | History + Admin | 5 | #165, all Phase 4 |
+| #172 | CmdK + AppShell Polish | 5 | #165, #166, all Phase 4 |
+| #173 | Hardening + Launch Prep | 6 | all previous |
+
