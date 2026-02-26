@@ -25,7 +25,7 @@ AgentBase is a greenfield "Life OS" — a personal productivity platform where h
 | Component library | **shadcn/ui** (used to its full extent) | Copy-paste components, fully customizable, Tailwind-native. No runtime dependency. |
 | Language | **TypeScript strict** | `strict: true` in tsconfig. No `any` escape hatches. |
 | Package manager | **pnpm** | Fast, disk-efficient, workspace-ready. Same as HAH Toolbox. |
-| Rich text | **Tiptap** | Already proven in HAH Toolbox tasks + meetings. Headless, extensible. |
+| Rich text | **Tiptap** with markdown serialization | StarterKit + markdown input rules (type `**bold**` → renders bold). Output: Markdown string stored in `text` columns. Markdown is portable, diffable, renderable outside Tiptap, and friendly to agents writing content programmatically. |
 | Drag & drop | **@dnd-kit** | Used in HAH Toolbox for task reordering. Accessible, composable. |
 
 **What changes from HAH Toolbox and why:**
@@ -191,7 +191,7 @@ CREATE TABLE activity_log (
   entity_id   uuid NOT NULL,
   tenant_id   uuid NOT NULL REFERENCES tenants(id),
   actor_id    uuid NOT NULL REFERENCES auth.users(id),
-  actor_type  text NOT NULL CHECK (actor_type IN ('human', 'agent', 'platform')),
+  actor_type  text NOT NULL CHECK (actor_type IN ('human', 'agent')),
   event_type  text NOT NULL,
   payload     jsonb,
   created_at  timestamptz DEFAULT now() NOT NULL
@@ -202,6 +202,8 @@ CREATE INDEX idx_activity_log_actor  ON activity_log (actor_id, created_at DESC)
 CREATE INDEX idx_activity_log_tenant ON activity_log (tenant_id, created_at DESC);
 CREATE INDEX idx_activity_log_time   ON activity_log (created_at DESC);
 ```
+
+`actor_id` is NOT NULL and REFERENCES `auth.users(id)`. There is no null actor. If a mutation cannot be attributed to a real user (human or agent), the command is rejected at the API layer. DB triggers that fire without an auth context are not used for activity logging — all activity comes through the command bus RPC functions. The valid `actor_type` values are `'human'` and `'agent'` — there is no system/platform actor.
 
 `tenant_id` is the workspace this event belongs to — all workspace members can read it. `actor_id` is who performed the action (attribution). The command bus resolves `tenant_id` from the actor's `tenant_members` row at write time.
 
@@ -293,12 +295,12 @@ Three distinct concepts — do not conflate them:
 - **`actor_id`** in `activity_log` on create/update events = attribution ("who did this")
 - **`assignee`** on tasks = workflow ownership ("who is responsible")
 
-Every entity table (except `diary_entries`) has:
+Every entity table has:
 ```sql
 tenant_id uuid NOT NULL REFERENCES tenants(id)
 ```
 
-Every entity table (except `diary_entries`) has these RLS policies:
+Every entity table has these RLS policies:
 ```sql
 -- Workspace members can read tenant data
 CREATE POLICY "Tenant members read" ON {table}
@@ -335,7 +337,7 @@ $$;
 
 **Adding more humans later** = insert a row into `tenant_members`. Their RLS membership check passes immediately. No schema changes. No data migrations. No RLS rewrites.
 
-**Diary entries are the one exception.** Diary is always private to the author, even within a workspace. The `diary_entries` table is scoped by `user_id = auth.uid()`, not by `tenant_id`. This is intentional and permanent.
+**All entities including Diary are workspace-scoped.** Diary is one shared journal per workspace per day. Any team member or agent can write to it. Read/write access via tenant membership — same pattern as all other tables.
 
 **Agent access:** Agents (Lucy, Frank) are real Supabase Auth users and members of the workspace with `role = 'agent'`. Their RLS access is identical to human members — workspace membership is all that's needed. The `agent_owners` table continues to map agent → owning human for delegation tracking.
 
@@ -482,7 +484,7 @@ Because agents are real `authenticated` users and members of the workspace, `aut
 
 | Surface | Strategy | Why |
 |---------|----------|-----|
-| **Diary** | Fetch on mount. No subscription. | Written once per day by Lucy. User reads it. No collaboration. No urgency. |
+| **Diary** | Fetch on mount. No subscription. | One shared entry per workspace per day. Low-frequency writes. No urgency. |
 | **Library list** | Fetch on mount + optimistic update on own writes. | Low-frequency writes. User adds items manually. Agent enrichment is rare. Not worth a persistent connection. |
 | **CRM lists (Companies, People, Deals)** | Fetch on mount + refetch on shelf close. | Low-frequency. Enrichment by agents happens in background — a page refresh or shelf-close refetch is sufficient. |
 | **CRM EditShelf → ActivityAndComments** | Subscribe only while shelf is open. | Worth it — comments are collaborative. But the list itself doesn't need live updates. |
@@ -690,33 +692,28 @@ $$;
 ```sql
 CREATE TABLE tags (
   id         uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-  name       text NOT NULL UNIQUE,
-  user_id    uuid NOT NULL DEFAULT auth.uid() REFERENCES auth.users(id),
-  created_at timestamptz NOT NULL DEFAULT now()
+  tenant_id  uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  name       text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (tenant_id, name)  -- tags are unique per workspace
 );
 
 ALTER TABLE tags ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Users read own tags" ON tags
-  FOR SELECT USING (
-    user_id = auth.uid()
-    OR user_id IN (SELECT owner_id FROM agent_owners WHERE agent_id = auth.uid())
-  );
-CREATE POLICY "Users insert own tags" ON tags
-  FOR INSERT WITH CHECK (
-    user_id = auth.uid()
-    OR user_id IN (SELECT owner_id FROM agent_owners WHERE agent_id = auth.uid())
-  );
-
--- Unique per user (same tag name can exist for different users)
--- Replace the global UNIQUE with a composite unique
-ALTER TABLE tags DROP CONSTRAINT IF EXISTS tags_name_key;
-CREATE UNIQUE INDEX idx_tags_name_user ON tags (user_id, name);
+CREATE POLICY "Tenant members read tags" ON tags
+  FOR SELECT USING (is_tenant_member(tenant_id));
+CREATE POLICY "Tenant members insert tags" ON tags
+  FOR INSERT WITH CHECK (is_tenant_member(tenant_id));
+CREATE POLICY "Tenant members update tags" ON tags
+  FOR UPDATE USING (is_tenant_member(tenant_id))
+  WITH CHECK (is_tenant_member(tenant_id));
+CREATE POLICY "Tenant members delete tags" ON tags
+  FOR DELETE USING (is_tenant_member(tenant_id));
 ```
 
 ### Entity Tables
 
-> **Scoping note:** All entity types except Diary use `tenant_id` for visibility scoping. All members of the workspace can see all entities. Attribution (who created or changed something) lives in `activity_log`, not on the entity row.
+> **Scoping note:** All entity types use `tenant_id` for visibility scoping. All members of the workspace can see all entities. Attribution (who created or changed something) lives in `activity_log`, not on the entity row.
 
 ### Tasks
 
@@ -727,7 +724,7 @@ CREATE TABLE tasks (
   id                uuid DEFAULT gen_random_uuid() PRIMARY KEY,
   tenant_id         uuid NOT NULL REFERENCES tenants(id),
   title             text NOT NULL,
-  body              text,
+  body              text,                          -- stored as Markdown
   status            text NOT NULL DEFAULT 'todo' CHECK (status IN ('todo', 'in_progress', 'blocked', 'done')),
   priority          text NOT NULL DEFAULT 'medium' CHECK (priority IN ('critical', 'high', 'medium', 'low')),
   assignee          text DEFAULT 'unassigned',
@@ -773,8 +770,8 @@ CREATE TABLE meetings (
   meeting_time    text,
   status          text NOT NULL DEFAULT 'upcoming'
                     CHECK (status IN ('upcoming', 'in_meeting', 'ended', 'closed')),
-  live_notes      text,
-  agent_notes     text,
+  live_notes      text,                            -- stored as Markdown
+  agent_notes     text,                            -- stored as Markdown
   transcript      text,
   proposed_tasks  jsonb DEFAULT '[]'::jsonb,
   tags            text[] NOT NULL DEFAULT '{}',
@@ -847,7 +844,7 @@ CREATE TABLE library_items (
   tenant_id    uuid NOT NULL REFERENCES tenants(id),
   type         text NOT NULL CHECK (type IN ('note', 'idea', 'article', 'restaurant', 'favorite', 'flag')),
   title        text NOT NULL,
-  description  text,
+  description  text,                               -- stored as Markdown
   url          text,
   source       text,
   excerpt      text,
@@ -885,27 +882,29 @@ CREATE POLICY "Admins read all library items" ON library_items
 ```sql
 CREATE TABLE diary_entries (
   id         uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-  user_id    uuid NOT NULL DEFAULT auth.uid() REFERENCES auth.users(id),
+  tenant_id  uuid NOT NULL REFERENCES tenants(id),
   date       date NOT NULL,
   summary    text,
-  content    text,
+  content    text,                               -- stored as Markdown
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE (user_id, date)
+  UNIQUE (tenant_id, date)                       -- one entry per day per workspace
 );
 
-CREATE INDEX idx_diary_user_date ON diary_entries (user_id, date DESC);
+CREATE INDEX idx_diary_tenant_date ON diary_entries (tenant_id, date DESC);
 
 ALTER TABLE diary_entries ENABLE ROW LEVEL SECURITY;
 
--- Diary is the ONE exception: scoped by user_id, not tenant_id. Private to the author.
-CREATE POLICY "Diary author select" ON diary_entries
-  FOR SELECT USING (user_id = auth.uid());
-CREATE POLICY "Diary author insert" ON diary_entries
-  FOR INSERT WITH CHECK (user_id = auth.uid());
-CREATE POLICY "Diary author update" ON diary_entries
-  FOR UPDATE USING (user_id = auth.uid())
-  WITH CHECK (user_id = auth.uid());
+-- Diary is workspace-scoped like all other entities
+CREATE POLICY "Diary tenant members select" ON diary_entries
+  FOR SELECT USING (is_tenant_member(tenant_id));
+CREATE POLICY "Diary tenant members insert" ON diary_entries
+  FOR INSERT WITH CHECK (is_tenant_member(tenant_id));
+CREATE POLICY "Diary tenant members update" ON diary_entries
+  FOR UPDATE USING (is_tenant_member(tenant_id))
+  WITH CHECK (is_tenant_member(tenant_id));
+CREATE POLICY "Diary tenant members delete" ON diary_entries
+  FOR DELETE USING (is_tenant_member(tenant_id));
 CREATE POLICY "Admins read all diary" ON diary_entries
   FOR SELECT USING (
     EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'superadmin'))
@@ -950,7 +949,7 @@ CREATE TABLE companies (
   tenant_id   uuid NOT NULL REFERENCES tenants(id),
   name        text NOT NULL,
   domain      text,
-  description text,
+  description text,                              -- stored as Markdown
   tags        text[] NOT NULL DEFAULT '{}',
   created_at  timestamptz NOT NULL DEFAULT now(),
   updated_at  timestamptz NOT NULL DEFAULT now()
@@ -985,7 +984,7 @@ CREATE TABLE people (
   name       text NOT NULL,
   email      text,
   role       text,
-  notes      text,
+  notes      text,                               -- stored as Markdown
   tags       text[] NOT NULL DEFAULT '{}',
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
@@ -1041,7 +1040,7 @@ CREATE TABLE deals (
   status     text NOT NULL DEFAULT 'lead'
                CHECK (status IN ('lead', 'qualified', 'proposal', 'negotiation', 'won', 'lost')),
   value      numeric,
-  notes      text,
+  notes      text,                               -- stored as Markdown
   tags       text[] NOT NULL DEFAULT '{}',
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
@@ -1113,7 +1112,7 @@ CREATE TABLE activity_log (
   entity_id   uuid NOT NULL,
   tenant_id   uuid NOT NULL REFERENCES tenants(id),
   actor_id    uuid NOT NULL REFERENCES auth.users(id),
-  actor_type  text NOT NULL CHECK (actor_type IN ('human', 'agent', 'platform')),
+  actor_type  text NOT NULL CHECK (actor_type IN ('human', 'agent')),
   event_type  text NOT NULL,
   payload     jsonb,
   created_at  timestamptz NOT NULL DEFAULT now()
@@ -1195,7 +1194,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER STABLE;
 -- rpc_change_meeting_status(meeting_id, new_status, actor_id, tenant_id)
 -- rpc_accept_suggested_task(meeting_id, task_title, task_body, actor_id, tenant_id)
 -- rpc_create_library_item(type, title, description, url, tags, is_public, actor_id, tenant_id, idempotency_key)
--- rpc_upsert_diary_entry(date, summary, content, actor_id, user_id)  -- diary uses user_id (private)
+-- rpc_upsert_diary_entry(date, summary, content, actor_id, tenant_id)  -- diary is workspace-scoped
 -- rpc_add_grocery_item(name, quantity, unit, category, actor_id, tenant_id, idempotency_key)
 -- rpc_check_grocery_item(item_id, is_checked, actor_id, tenant_id)
 -- rpc_create_company(name, domain, description, tags, actor_id, tenant_id, idempotency_key)
@@ -1266,6 +1265,28 @@ CREATE TABLE revoked_agent_tokens (
 );
 -- No RLS needed — only accessible via service role / SECURITY DEFINER function
 ```
+
+### Notifications (stub — no UI, no triggers in v1)
+
+```sql
+CREATE TABLE notifications (
+  id          uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  tenant_id   uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  user_id     uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  type        text NOT NULL,
+  title       text NOT NULL,
+  body        text,
+  entity_type text,
+  entity_id   uuid,
+  read        boolean NOT NULL DEFAULT false,
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "users read own notifications" ON notifications FOR SELECT
+  USING (user_id = auth.uid());
+```
+
+> Notifications are user-specific (routed to a specific person), so `user_id` scoping is correct here. The `tenant_id` is for organizational context. No triggers or UI in v1.
 
 ### Enable Realtime
 
@@ -1556,11 +1577,11 @@ Authorization: Bearer <jwt>
 | tenant_members | Read own tenant | — | — | Superadmin manages membership |
 | profiles | Own row (read/write) | All rows | — | Not tenant-scoped |
 | agent_owners | Own row (agent reads) | All (superadmin) | — | Not tenant-scoped |
-| tags | Read/write own | — | — | Scoped by `user_id` (per-user) |
+| tags | Full CRUD | — | — | `is_tenant_member(tenant_id)` — shared within workspace |
 | tasks | Full CRUD | All | — | `is_tenant_member(tenant_id)` |
 | meetings | Full CRUD | All | — | `is_tenant_member(tenant_id)` |
 | library_items | Full CRUD | All | `is_public=true` | `is_tenant_member(tenant_id)` |
-| diary_entries | Author only | All | — | `user_id = auth.uid()` — exception |
+| diary_entries | Full CRUD | All | — | `is_tenant_member(tenant_id)` |
 | grocery_items | Full CRUD | — | — | `is_tenant_member(tenant_id)` |
 | companies | Full CRUD | All | — | `is_tenant_member(tenant_id)` |
 | people | Full CRUD | All | — | `is_tenant_member(tenant_id)` |
@@ -1578,7 +1599,7 @@ Authorization: Bearer <jwt>
 
 ### The Tenant Membership Pattern (Used Everywhere)
 
-Every entity RLS policy (except diary) uses the `is_tenant_member()` helper:
+Every entity RLS policy uses the `is_tenant_member()` helper:
 ```sql
 USING (is_tenant_member(tenant_id))
 WITH CHECK (is_tenant_member(tenant_id))
@@ -1720,7 +1741,7 @@ type ActivityLogEntry = {
   entity_id: string;
   tenant_id: string;
   actor_id: string;
-  actor_type: "human" | "agent" | "platform";
+  actor_type: "human" | "agent";
   event_type: string;
   payload: Record<string, unknown> | null;
   created_at: string;
@@ -1793,11 +1814,10 @@ interface TagComboboxProps {
   value: string[];
   /** Called when tags change */
   onChange: (tags: string[]) => void;
-  /** User ID for scoped tag autocomplete */
-  userId?: string;
 }
 
 // Wraps <ComboInput> with tag-specific behavior:
+// - Fetches all tags for the current workspace (tenant). Tags created by any member are visible to all members.
 // - Searches the tags table for autocomplete
 // - Creates new tags on the fly
 // - Renders colored chips
@@ -1864,10 +1884,10 @@ interface SearchFilterBarProps {
 // components/shared/rich-text-editor.tsx
 
 interface RichTextEditorProps {
-  /** HTML content */
+  /** Markdown content */
   content: string;
-  /** Called on content change */
-  onChange: (html: string) => void;
+  /** Called on content change (serialized to Markdown) */
+  onChange: (markdown: string) => void;
   /** Placeholder text */
   placeholder?: string;
   /** Whether the editor is read-only */
@@ -1878,6 +1898,8 @@ interface RichTextEditorProps {
 
 // Wraps Tiptap with:
 // - StarterKit (headings, bold, italic, lists, code blocks)
+// - Markdown input rules (type **bold** → renders bold)
+// - Serializes to Markdown on change (not HTML)
 // - Placeholder extension
 // - Consistent styling across all uses
 // - Optional toolbar (hidden in minimal mode)
@@ -2172,8 +2194,8 @@ agentbase/
 
 #### 4c: Diary
 - [ ] Build diary command route (create-diary-entry with upsert)
-- [ ] Build diary page (calendar or date-list view, one entry per day)
-- [ ] Build diary EditShelf content (summary, rich text content)
+- [ ] Build diary page (calendar or date-list view, one shared entry per workspace per day)
+- [ ] Build diary EditShelf content (summary, rich text content). Any team member or agent can write to it.
 - [ ] No realtime (fetch on mount)
 
 #### 4d: Grocery
@@ -2218,45 +2240,27 @@ agentbase/
 
 ---
 
-## 11. Open Questions / Decisions Deferred to Hunter
+## 11. Resolved Questions
 
-1. ~~**Agent user_id in writes**~~ — **RESOLVED.** Entity rows use `tenant_id` (workspace), not creator identity. Attribution lives in `activity_log.actor_id` on the created event. There is no `created_by` column on entity tables. This is the correct separation of visibility vs. attribution.
+All questions have been resolved. No open questions remain.
 
-2. **Task assignee values:** HAH Toolbox uses string assignees (`"hunter"`, `"frank"`, `"lucy"`). Should AgentBase use UUIDs referencing `auth.users` instead? **Tradeoff:** UUIDs are cleaner but require a join to display names. Strings are simpler but don't validate. **Recommendation:** Use UUIDs, resolve display names client-side from a profiles cache.
+1. ~~**Agent user_id in writes**~~ — **RESOLVED.** Entity rows use `tenant_id` (workspace), not creator identity. Attribution lives in `activity_log.actor_id` on the created event. There is no `created_by` column on entity tables.
 
-3. **Rich text storage format:** Tiptap can output HTML or JSON. HAH Toolbox uses plain Markdown (text columns). **Options:**
-   - Store as HTML (easy to render, harder to diff)
-   - Store as Tiptap JSON (lossless, harder to render outside Tiptap)
-   - Store as Markdown (compatible, but lossy round-trip with Tiptap)
-   **Recommendation:** Store as HTML. It's the standard output format, renderable everywhere, and `dangerouslySetInnerHTML` with DOMPurify is safe enough.
+2. ~~**Activity by non-users**~~ — **RESOLVED.** No anonymous/system events. Every activity event must have a real `actor_id` referencing `auth.users` (human or agent). The valid `actor_type` values are `'human' | 'agent'` — no platform/system actor. If a mutation has no authenticated actor, it is rejected at the API layer. DB triggers are not used for activity logging.
 
-4. **Meeting lifecycle — `wrapping_up` vs `ended`:** HAH Toolbox has `upcoming → in_meeting → wrapping_up → complete`. The spec says `upcoming → in_meeting → ended → closed`. Is `ended` the same as `wrapping_up` (post-meeting but not finalized)? **Recommendation:** Yes, treat `ended` as "meeting is over, wrapping up notes/tasks" and `closed` as "fully processed, archived."
+3. ~~**Rich text storage format**~~ — **RESOLVED.** Markdown everywhere. Tiptap configured with markdown input rules, serializes to Markdown on save. All `text` content columns store Markdown. Portable, diffable, agent-friendly.
 
-5. **Grocery list — shared between users?** The spec says "shared between user + agent." But in multi-tenant mode, can two human users share a grocery list? (e.g., Hunter + partner?) **Recommendation:** Not in v1. Keep it single-user + agent. Shared lists would require a separate sharing model.
+4. ~~**Meeting lifecycle**~~ — **RESOLVED.** `ended` = same as `wrapping_up` (post-meeting, notes/tasks being wrapped up). Final state is `closed` (fully processed). Lifecycle: `upcoming → in_meeting → ended → closed`.
 
-6. **Tag scope:** Should tags be global (all users share one tag namespace) or per-user? The plan assumes per-user (each user has their own tags). **Impact:** Changes the tags table unique constraint and autocomplete queries. **Recommendation:** Per-user — multi-tenant isolation is cleaner.
+5. ~~**Grocery and Diary shared workspace resources**~~ — **RESOLVED.** One global grocery list per workspace. One global diary per workspace per day. Both are tenant-scoped like all other entities. Everyone sees the same list and diary entries. No per-user scoping on diary.
 
-7. **Deal statuses:** The spec says `lead | qualified | proposal | negotiation | won | lost`. HAH Toolbox has `lead | qualified | proposal_sent | negotiation | accepted | passed`. Which set? **Recommendation:** Use the spec's set (`won`/`lost` are clearer than `accepted`/`passed`). Can always add more via migration.
+6. ~~**Tag scope**~~ — **RESOLVED.** Tags are shared within a workspace (tenant-scoped). All members see and can reuse each other's tags. `UNIQUE (tenant_id, name)`.
 
-8. **Comments — separate table or activity_log only?** The current design puts comments in `activity_log` with `event_type: "commented"`. HAH Toolbox dual-writes to `task_activity` AND `activity_log`. **Options:**
-   - Comments only in `activity_log` (simpler, single source of truth)
-   - Separate `comments` table + mirror to `activity_log` (more queryable, but two sources)
-   **Recommendation:** Comments only in `activity_log`. The `payload.comment_body` field is sufficient. If we need full-text search on comments, we index `payload` with a GIN index.
+7. ~~**Deal statuses**~~ — **RESOLVED.** Use `lead | qualified | proposal | negotiation | won | lost`.
 
-9. **Notification data model:** The spec says "design data model to support it, no UI now." Should we add a `notifications` table in the initial migration? **Recommendation:** Yes, add the table structure now (empty, no UI, no triggers):
-   ```sql
-   CREATE TABLE notifications (
-     id         uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-     user_id    uuid NOT NULL REFERENCES auth.users(id),
-     type       text NOT NULL,
-     title      text NOT NULL,
-     body       text,
-     entity_type text,
-     entity_id  uuid,
-     read       boolean NOT NULL DEFAULT false,
-     created_at timestamptz NOT NULL DEFAULT now()
-   );
-   ```
+8. ~~**Comments**~~ — **RESOLVED.** Comments live only in `activity_log` with `event_type = 'commented'` and `payload: { comment_body: "..." }`. No separate comments table.
+
+9. ~~**Notifications table**~~ — **RESOLVED.** Notifications table stub included in the initial migration (see §5). No UI, no triggers in v1. Notifications are user-specific (`user_id` scoping) with `tenant_id` for organizational context.
 
 ---
 
@@ -2280,7 +2284,7 @@ agentbase/
 | **Meeting schema** | `contact` (text), `prep_notes`, `meeting_summary`, `notes`, `summary` (legacy) | `title`, `agent_notes` (replaces `meeting_summary`), no legacy fields | Clean schema. No accumulated cruft. |
 | **Library schema** | No `url`, `source`, `excerpt` fields | Added `url`, `source`, `excerpt` for article/bookmark types | Library items need to store web content properly. |
 | **Grocery schema** | `item` (text), `checked` (bool), no scoping | `name`, `quantity`, `unit`, `category`, `is_checked`, `sort_order`, `tenant_id` | Multi-tenant. Richer data model for better UX (categories, quantities). |
-| **Tags** | Global (one namespace) | Per-user (scoped by `user_id`) | Multi-tenant isolation. |
+| **Tags** | Global (one namespace) | Per-workspace (scoped by `tenant_id`) | Multi-tenant isolation. Tags shared within a workspace. |
 | **Migration strategy** | 35+ incremental migrations (organic growth) | Single initial migration with complete schema | Greenfield advantage. Clean start. |
 | **Atomicity** | Two separate Supabase calls (entity update, then activity insert) — can get out of sync | Single Postgres RPC call — entity mutation + activity_log insert in one transaction | Guaranteed consistency. No orphaned events. |
 
@@ -2302,14 +2306,14 @@ Once others deploy AgentBase, schema updates need a documented path. Future work
 ### L-4: Webhook / event broadcast system
 The activity_log writes structured events for every mutation. Future work: add a `webhooks` table where users register URLs to receive event payloads. Makes the platform extensible without writing integrations into the core.
 
-### L-5: Rich text format — revisit if needed
-Currently storing Tiptap output as HTML (safe, renderable, DOMPurify sanitized). If markdown export, full-text search on content, or non-Tiptap rendering becomes important — revisit. Not a v1 concern.
+### L-5: Rich text format — RESOLVED
+Markdown everywhere. Tiptap configured with markdown input rules and serializes to Markdown on save. All `text` content columns store Markdown. Portable, diffable, agent-friendly.
 
 ### L-6: Push / email notifications
 The `notifications` table is in the schema (stub only). No UI, no triggers. Build when there's a real use case.
 
-### L-7: Shared grocery lists
-Current design: grocery list is per-user + agent. Sharing between multiple human users requires a separate sharing model. Ticket when there's demand.
+### L-7: Grocery and Diary sharing — RESOLVED
+Both grocery and diary are workspace-scoped (tenant_id). One shared grocery list and one shared diary per workspace. All tenant members (humans and agents) can read and write.
 
 ### L-8: Field-level validation on generic update route
 The `PATCH /api/commands/update` route validates table name and protected fields (user_id, actor_id) but doesn't validate field values — Postgres CHECK constraints are the only guard. Future work: add optional per-table validation schemas (e.g. zod) that the generic route checks before writing. Not a v1 concern — CHECK constraints catch bad data at the DB level.
