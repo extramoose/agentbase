@@ -65,3 +65,21 @@ GRANT EXECUTE ON FUNCTION admin_update_profile(uuid, text, text, text) TO authen
 
 -- Drop agent_owners — ownership now encoded on agents.owner_id
 DROP TABLE IF EXISTS agent_owners;
+
+-- get_workspace_members: SECURITY DEFINER — avoids recursive RLS on profiles
+-- (direct profiles SELECT from admin routes hits self-referential policy)
+CREATE OR REPLACE FUNCTION get_workspace_members()
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $f$
+DECLARE v_result jsonb;
+BEGIN
+  SELECT jsonb_agg(row_to_json(r)) INTO v_result FROM (
+    SELECT p.id, p.email, p.full_name, p.avatar_url, p.role, tm.joined_at
+    FROM tenant_members tm
+    JOIN profiles p ON p.id = tm.user_id
+    WHERE tm.tenant_id = (SELECT tenant_id FROM tenant_members WHERE user_id = auth.uid() LIMIT 1)
+      AND tm.role != 'agent'
+    ORDER BY tm.joined_at
+  ) r;
+  RETURN COALESCE(v_result, '[]'::jsonb);
+END; $f$;
+GRANT EXECUTE ON FUNCTION get_workspace_members() TO authenticated;
