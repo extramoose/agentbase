@@ -39,6 +39,8 @@ import { cn } from '@/lib/utils'
 type Priority = 'urgent' | 'high' | 'medium' | 'low' | 'none'
 type Status = 'todo' | 'in_progress' | 'done' | 'blocked'
 
+type TaskType = 'bug' | 'improvement' | 'feature'
+
 type Task = {
   id: string
   ticket_id: number
@@ -46,6 +48,7 @@ type Task = {
   body: string | null
   status: Status
   priority: Priority
+  type: TaskType | null
   tags: string[]
   due_date: string | null
   assignee_id: string | null
@@ -90,6 +93,19 @@ const STATUS_TABS: Array<{ value: Status | 'all'; label: string }> = [
   { value: 'in_progress', label: 'In Progress' },
   { value: 'done', label: 'Done' },
   { value: 'blocked', label: 'Blocked' },
+]
+
+const TASK_TYPE_CONFIG: Record<TaskType, { label: string; className: string }> = {
+  bug: { label: 'bug', className: 'bg-red-500/20 text-red-400 border border-red-500/30' },
+  improvement: { label: 'improvement', className: 'bg-blue-500/20 text-blue-400 border border-blue-500/30' },
+  feature: { label: 'feature', className: 'bg-violet-500/20 text-violet-400 border border-violet-500/30' },
+}
+
+const TASK_TYPE_TABS: Array<{ value: TaskType | 'all'; label: string }> = [
+  { value: 'all', label: 'All' },
+  { value: 'bug', label: 'Bug' },
+  { value: 'improvement', label: 'Improvement' },
+  { value: 'feature', label: 'Feature' },
 ]
 
 // ---------------------------------------------------------------------------
@@ -178,6 +194,13 @@ function SortableTaskRow({
       <span className="text-xs text-muted-foreground w-12 shrink-0">
         #{task.ticket_id}
       </span>
+
+      {/* Type badge */}
+      {task.type && (
+        <span className={cn('rounded px-1.5 py-0.5 text-xs font-medium shrink-0', TASK_TYPE_CONFIG[task.type].className)}>
+          {task.type}
+        </span>
+      )}
 
       {/* Priority icon */}
       <span className="shrink-0" title={PRIORITY_CONFIG[task.priority].label}>
@@ -356,6 +379,7 @@ export function TasksClient({
   const [tasks, setTasks] = useState<Task[]>(initialTasks)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<Status | 'all'>('all')
+  const [typeFilter, setTypeFilter] = useState<TaskType | 'all'>('all')
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [addingToPriority, setAddingToPriority] = useState<Priority | null>(null)
   const [mounted, setMounted] = useState(false)
@@ -430,6 +454,11 @@ export function TasksClient({
       result = result.filter((t) => t.status === statusFilter)
     }
 
+    // Type filter
+    if (typeFilter !== 'all') {
+      result = result.filter((t) => t.type === typeFilter)
+    }
+
     // Search filter
     if (search.trim()) {
       const q = search.toLowerCase()
@@ -441,7 +470,7 @@ export function TasksClient({
     }
 
     return result
-  }, [tasks, statusFilter, search])
+  }, [tasks, statusFilter, typeFilter, search])
 
   const grouped = useMemo(() => groupByPriority(filteredTasks), [filteredTasks])
 
@@ -458,6 +487,7 @@ export function TasksClient({
         body: null,
         status: statusFilter !== 'all' ? statusFilter : 'todo',
         priority,
+        type: null,
         tags: [],
         due_date: null,
         assignee_id: null,
@@ -652,6 +682,26 @@ export function TasksClient({
             </button>
           )
         })}
+
+        {/* Type filter chips */}
+        <div className="ml-auto flex gap-1">
+          {TASK_TYPE_TABS.map((tab) => (
+            <button
+              key={tab.value}
+              onClick={() => setTypeFilter(tab.value)}
+              className={cn(
+                'px-2.5 py-1 text-xs rounded-md transition-colors',
+                typeFilter === tab.value
+                  ? tab.value === 'all'
+                    ? 'bg-muted text-foreground font-medium'
+                    : cn('font-medium', TASK_TYPE_CONFIG[tab.value].className)
+                  : 'bg-zinc-800 text-zinc-500'
+              )}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Priority groups */}
@@ -707,6 +757,11 @@ export function TasksClient({
                       >
                         <span className="w-4 shrink-0" />
                         <span className="text-xs text-muted-foreground w-12 shrink-0">#{task.ticket_id}</span>
+                        {task.type && (
+                          <span className={cn('rounded px-1.5 py-0.5 text-xs font-medium shrink-0', TASK_TYPE_CONFIG[task.type].className)}>
+                            {task.type}
+                          </span>
+                        )}
                         <span className="shrink-0" title={PRIORITY_CONFIG[task.priority].label}>
                           <PriorityIcon priority={task.priority} />
                         </span>
@@ -791,6 +846,7 @@ function TaskEditShelf({
   const [body, setBody] = useState(task.body ?? '')
   const [status, setStatus] = useState<Status>(task.status)
   const [priority, setPriority] = useState<Priority>(task.priority)
+  const [taskType, setTaskType] = useState<TaskType | null>(task.type)
   const [dueDate, setDueDate] = useState(task.due_date ?? '')
   const [tags, setTags] = useState<string[]>(task.tags)
 
@@ -800,6 +856,7 @@ function TaskEditShelf({
     setBody(task.body ?? '')
     setStatus(task.status)
     setPriority(task.priority)
+    setTaskType(task.type)
     setDueDate(task.due_date ?? '')
     setTags(task.tags)
   }, [task])
@@ -887,6 +944,37 @@ function TaskEditShelf({
                 </option>
               ))}
             </select>
+          </div>
+        </div>
+
+        {/* Type */}
+        <div>
+          <label className="text-xs text-muted-foreground font-medium mb-1 block">
+            Type
+          </label>
+          <div className="flex gap-1.5">
+            {([null, 'bug', 'improvement', 'feature'] as const).map((t) => {
+              const isSelected = taskType === t
+              return (
+                <button
+                  key={t ?? 'none'}
+                  onClick={() => {
+                    setTaskType(t)
+                    saveFieldImmediate({ type: t })
+                  }}
+                  className={cn(
+                    'rounded px-2.5 py-1.5 text-xs font-medium transition-colors',
+                    isSelected
+                      ? t === null
+                        ? 'bg-zinc-700 text-zinc-200 border border-zinc-600'
+                        : TASK_TYPE_CONFIG[t].className
+                      : 'bg-zinc-800 text-zinc-400 border border-zinc-700'
+                  )}
+                >
+                  {t === null ? 'None' : t.charAt(0).toUpperCase() + t.slice(1)}
+                </button>
+              )
+            })}
           </div>
         </div>
 

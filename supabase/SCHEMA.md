@@ -103,6 +103,7 @@ Workspace-scoped tag registry.
 | due_date | date | YES | — | |
 | tags | text[] | YES | `'{}'` | |
 | source_meeting_id | uuid | YES | — | FK → meetings |
+| type | text | YES | — | CHECK: `bug \| improvement \| feature` |
 | sort_order | int | NO | `0` | |
 | ticket_id | int | NO | — | Sequential, auto from sequence |
 | created_at | timestamptz | NO | `now()` | |
@@ -340,7 +341,7 @@ All mutations go through these functions. They atomically write to the entity ta
 ### Entity creates
 | Function | Key params | Returns |
 |----------|-----------|---------|
-| `rpc_create_task` | tenant_id, actor_id, actor_type, title, priority, status, body, assignee_id, assignee_type | jsonb (task row) |
+| `rpc_create_task` | tenant_id, actor_id, actor_type, title, priority, status, body, assignee_id, assignee_type, type | jsonb (task row) |
 | `rpc_create_meeting` | tenant_id, actor_id, actor_type, title, date, meeting_time, tags | jsonb (meeting row) |
 | `rpc_create_library_item` | tenant_id, actor_id, actor_type, type, title, url, body, source, excerpt, location_name, latitude, longitude, tags, is_public | jsonb |
 | `rpc_upsert_diary_entry` | tenant_id, actor_id, actor_type, date, content | jsonb — logs `created` or `updated` |
@@ -379,6 +380,7 @@ All mutations go through these functions. They atomically write to the entity ta
 | `008_rich_activity_diffs.sql` | `rpc_update_entity` captures per-field diffs with semantic event types; emits one `activity_log` row per changed field |
 | `010_task_assignee.sql` | Add `assignee_id` + `assignee_type` to tasks; update `rpc_create_task` + `rpc_update_entity` (uuid cast for `assignee_id`) |
 | `011_delete_permissions.sql` | `rpc_delete_entity` stripped to DELETE-only — activity_log now written by route handlers; agents blocked 403 at route level |
+| `012_task_type.sql` | Add nullable `type` column (`bug \| improvement \| feature`) to tasks; update `rpc_create_task` with `p_type` param |
 
 ---
 

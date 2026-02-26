@@ -15,6 +15,7 @@ const createSchema = z.object({
   body: z.string().optional(),
   assignee_id: z.string().uuid().optional().nullable(),
   assignee_type: z.enum(['human', 'agent']).optional().nullable(),
+  type: z.enum(['bug', 'improvement', 'feature']).optional().nullable(),
 })
 
 export async function GET(request: Request) {
@@ -56,6 +57,7 @@ export async function POST(request: Request) {
       p_body: input.body ?? null,
       p_assignee_id: input.assignee_id ?? null,
       p_assignee_type: input.assignee_type ?? null,
+      p_type: input.type ?? null,
     })
     if (error) throw error
     return Response.json({ data }, { status: 201 })
