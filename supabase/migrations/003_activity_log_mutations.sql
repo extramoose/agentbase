@@ -154,7 +154,7 @@ BEGIN
   RETURN v_result;
 END; $f$;
 
--- rpc_delete_entity (generic)
+-- rpc_delete_entity (generic, per-table label lookup)
 CREATE OR REPLACE FUNCTION rpc_delete_entity(
   p_table text, p_entity_id uuid,
   p_actor_id uuid, p_actor_type text, p_tenant_id uuid
@@ -167,10 +167,20 @@ BEGIN
   IF NOT (p_table = ANY(v_allowed)) THEN
     RAISE EXCEPTION 'Table % not allowed', p_table;
   END IF;
-  EXECUTE format('SELECT COALESCE(title, name, id::text) FROM %I WHERE id = $1 AND tenant_id = $2', p_table)
-  USING p_entity_id, p_tenant_id INTO v_label;
+  -- Per-table label: each table has different label column (title vs name vs date)
+  v_label := CASE p_table
+    WHEN 'tasks'         THEN (SELECT title FROM tasks         WHERE id = p_entity_id AND tenant_id = p_tenant_id)
+    WHEN 'meetings'      THEN (SELECT title FROM meetings      WHERE id = p_entity_id AND tenant_id = p_tenant_id)
+    WHEN 'library_items' THEN (SELECT title FROM library_items WHERE id = p_entity_id AND tenant_id = p_tenant_id)
+    WHEN 'diary_entries' THEN (SELECT date::text FROM diary_entries WHERE id = p_entity_id AND tenant_id = p_tenant_id)
+    WHEN 'grocery_items' THEN (SELECT name  FROM grocery_items WHERE id = p_entity_id AND tenant_id = p_tenant_id)
+    WHEN 'companies'     THEN (SELECT name  FROM companies     WHERE id = p_entity_id AND tenant_id = p_tenant_id)
+    WHEN 'people'        THEN (SELECT name  FROM people        WHERE id = p_entity_id AND tenant_id = p_tenant_id)
+    WHEN 'deals'         THEN (SELECT title FROM deals         WHERE id = p_entity_id AND tenant_id = p_tenant_id)
+    ELSE p_entity_id::text
+  END;
   EXECUTE format('DELETE FROM %I WHERE id = $1 AND tenant_id = $2', p_table)
   USING p_entity_id, p_tenant_id;
   INSERT INTO activity_log (tenant_id, entity_type, entity_id, entity_label, event_type, actor_id, actor_type)
-  VALUES (p_tenant_id, p_table, p_entity_id, v_label, 'deleted', p_actor_id, p_actor_type);
+  VALUES (p_tenant_id, p_table, p_entity_id, COALESCE(v_label, p_entity_id::text), 'deleted', p_actor_id, p_actor_type);
 END; $f$;
