@@ -1,4 +1,4 @@
-import { requireAuthApi } from '@/lib/auth'
+import { requireAuthApi, getTenantId } from '@/lib/auth'
 import { apiError } from '@/lib/api/errors'
 import { createClient } from '@/lib/supabase/server'
 import { z } from 'zod'
@@ -27,17 +27,13 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const user = await requireAuthApi()
+    await requireAuthApi()
+
+    const tenantId = await getTenantId()
+    if (!tenantId)
+      return Response.json({ error: 'No workspace' }, { status: 403 })
 
     const supabase = await createClient()
-
-    const { data: membership } = await supabase
-      .from('tenant_members')
-      .select('tenant_id')
-      .eq('user_id', user.id)
-      .single()
-    if (!membership)
-      return Response.json({ error: 'No workspace' }, { status: 403 })
 
     const body = await request.json()
     const input = upsertSchema.parse(body)
@@ -46,7 +42,7 @@ export async function POST(request: Request) {
       .from('diary_entries')
       .upsert(
         {
-          tenant_id: membership.tenant_id,
+          tenant_id: tenantId,
           date: input.date,
           content: input.content,
           updated_at: new Date().toISOString(),

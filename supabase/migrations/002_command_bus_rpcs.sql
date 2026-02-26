@@ -149,3 +149,17 @@ SET search_path = public
 STABLE AS $$
   SELECT * FROM profiles WHERE id = auth.uid()
 $$;
+
+-- ---------------------------------------------------------------------------
+-- get_my_tenant_id
+-- Returns the tenant_id for the current authenticated user.
+-- SECURITY DEFINER bypasses RLS on tenant_members.
+-- ---------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION get_my_tenant_id()
+RETURNS uuid
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+STABLE AS $$
+  SELECT tenant_id FROM tenant_members WHERE user_id = auth.uid() LIMIT 1
+$$;

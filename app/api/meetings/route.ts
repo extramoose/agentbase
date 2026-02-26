@@ -1,4 +1,4 @@
-import { requireAuthApi } from '@/lib/auth'
+import { requireAuthApi, getTenantId } from '@/lib/auth'
 import { apiError } from '@/lib/api/errors'
 import { createClient } from '@/lib/supabase/server'
 import { z } from 'zod'
@@ -30,17 +30,13 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const user = await requireAuthApi()
+    await requireAuthApi()
+
+    const tenantId = await getTenantId()
+    if (!tenantId)
+      return Response.json({ error: 'No workspace' }, { status: 403 })
 
     const supabase = await createClient()
-
-    const { data: membership } = await supabase
-      .from('tenant_members')
-      .select('tenant_id')
-      .eq('user_id', user.id)
-      .single()
-    if (!membership)
-      return Response.json({ error: 'No workspace' }, { status: 403 })
 
     const body = await request.json()
     const input = createSchema.parse(body)
@@ -52,7 +48,7 @@ export async function POST(request: Request) {
         date: input.date || null,
         meeting_time: input.meeting_time || null,
         tags: input.tags,
-        tenant_id: membership.tenant_id,
+        tenant_id: tenantId,
       })
       .select()
       .single()

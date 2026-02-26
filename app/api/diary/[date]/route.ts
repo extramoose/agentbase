@@ -1,4 +1,4 @@
-import { requireAuthApi } from '@/lib/auth'
+import { requireAuthApi, getTenantId } from '@/lib/auth'
 import { apiError } from '@/lib/api/errors'
 import { createClient } from '@/lib/supabase/server'
 
@@ -7,23 +7,19 @@ export async function GET(
   { params }: { params: Promise<{ date: string }> }
 ) {
   try {
-    const user = await requireAuthApi()
+    await requireAuthApi()
+
+    const tenantId = await getTenantId()
+    if (!tenantId)
+      return Response.json({ error: 'No workspace' }, { status: 403 })
 
     const supabase = await createClient()
     const { date } = await params
 
-    const { data: membership } = await supabase
-      .from('tenant_members')
-      .select('tenant_id')
-      .eq('user_id', user.id)
-      .single()
-    if (!membership)
-      return Response.json({ error: 'No workspace' }, { status: 403 })
-
     const { data: entry } = await supabase
       .from('diary_entries')
       .select('*')
-      .eq('tenant_id', membership.tenant_id)
+      .eq('tenant_id', tenantId)
       .eq('date', date)
       .single()
 

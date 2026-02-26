@@ -53,6 +53,12 @@ export async function requireAdmin(): Promise<UserProfile> {
 }
 
 /** For API routes — throws UnauthorizedError (caught by apiError) */
+export async function getTenantId(): Promise<string | null> {
+  const supabase = await createClient()
+  const { data } = await supabase.rpc('get_my_tenant_id')
+  return (data as string | null) ?? null
+}
+
 export async function requireAuthApi() {
   const user = await getCurrentUser()
   if (!user) throw new UnauthorizedError()
