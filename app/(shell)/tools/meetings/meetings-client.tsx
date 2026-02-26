@@ -6,11 +6,10 @@ import {
   Plus,
   Trash2,
   ChevronLeft,
-  Sparkles,
-  ListTodo,
-  Check,
+  Users,
+  Calendar,
+  Link2,
   X,
-  Loader2,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { SearchFilterBar } from '@/components/search-filter-bar'
@@ -18,24 +17,20 @@ import { TagCombobox } from '@/components/tag-combobox'
 import { toast } from '@/hooks/use-toast'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
 import { RichTextEditor } from '@/components/rich-text-editor'
 import { MarkdownRenderer } from '@/components/markdown-renderer'
+import { StreamPanel } from '@/components/stream-panel'
+import { VersionHistoryDropdown } from '@/components/version-history-dropdown'
+import { SynthesizeButton } from '@/components/synthesize-button'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
+import type { DocumentVersion } from '@/lib/types/stream'
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
 type MeetingStatus = 'upcoming' | 'in_meeting' | 'ended' | 'closed'
-
-type ProposedTask = {
-  id: string
-  title: string
-  priority: 'urgent' | 'high' | 'medium' | 'low' | 'none'
-  status: 'pending' | 'approved' | 'dismissed'
-}
 
 type Meeting = {
   id: string
@@ -48,9 +43,14 @@ type Meeting = {
   live_notes: string | null
   meeting_summary: string | null
   transcript: string | null
-  proposed_tasks: ProposedTask[]
+  proposed_tasks: unknown[]
   created_at: string
   updated_at: string
+}
+
+type Person = {
+  id: string
+  name: string
 }
 
 type CurrentUser = {
@@ -66,30 +66,22 @@ type CurrentUser = {
 
 const STATUS_CONFIG: Record<
   MeetingStatus,
-  { label: string; next: MeetingStatus | null; nextLabel: string | null; color: string }
+  { label: string; color: string }
 > = {
   upcoming: {
     label: 'Upcoming',
-    next: 'in_meeting',
-    nextLabel: 'Start Meeting',
     color: 'text-blue-400',
   },
   in_meeting: {
     label: 'In Meeting',
-    next: 'ended',
-    nextLabel: 'End Meeting',
     color: 'text-green-400',
   },
   ended: {
-    label: 'Ended',
-    next: 'closed',
-    nextLabel: 'Close Meeting',
-    color: 'text-yellow-400',
+    label: 'Closed',
+    color: 'text-muted-foreground',
   },
   closed: {
     label: 'Closed',
-    next: null,
-    nextLabel: null,
     color: 'text-muted-foreground',
   },
 }
@@ -97,7 +89,7 @@ const STATUS_CONFIG: Record<
 const STATUS_BADGE_CLASS: Record<MeetingStatus, string> = {
   upcoming: 'bg-blue-500/20 text-blue-400',
   in_meeting: 'bg-green-500/20 text-green-400',
-  ended: 'bg-yellow-500/20 text-yellow-400',
+  ended: 'bg-muted text-muted-foreground',
   closed: 'bg-muted text-muted-foreground',
 }
 
@@ -339,7 +331,6 @@ export function MeetingsClient({
     { value: 'all', label: 'All' },
     { value: 'upcoming', label: 'Upcoming' },
     { value: 'in_meeting', label: 'In Meeting' },
-    { value: 'ended', label: 'Ended' },
     { value: 'closed', label: 'Closed' },
   ]
 
@@ -487,19 +478,20 @@ function MeetingDetail({
   onDelete: (id: string) => Promise<void>
   onBack: () => void
 }) {
+  const supabase = createClient()
+
   const [title, setTitle] = useState(meeting.title)
   const [date, setDate] = useState(meeting.date ?? '')
   const [meetingTime, setMeetingTime] = useState(meeting.meeting_time ?? '')
   const [tags, setTags] = useState<string[]>(meeting.tags)
-  const [prepNotes, setPrepNotes] = useState(meeting.prep_notes ?? '')
-  const [transcript, setTranscript] = useState(meeting.transcript ?? '')
-  const [summary, setSummary] = useState(meeting.meeting_summary ?? '')
-  const [proposedTasks, setProposedTasks] = useState<ProposedTask[]>(
-    meeting.proposed_tasks ?? []
-  )
-  const [summarizing, setSummarizing] = useState(false)
-  const [suggestingTasks, setSuggestingTasks] = useState(false)
+  const [docContent, setDocContent] = useState('')
+  const [viewingVersion, setViewingVersion] = useState<DocumentVersion | null>(null)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+
+  // Linked people state
+  const [linkedPeopleIds, setLinkedPeopleIds] = useState<string[]>([])
+  const [allPeople, setAllPeople] = useState<Person[]>([])
+  const [pastMeetings, setPastMeetings] = useState<Array<{ id: string; title: string; scheduled_at: string }>>([])
 
   // Sync from props when meeting changes (realtime or selection change)
   useEffect(() => {
@@ -507,111 +499,151 @@ function MeetingDetail({
     setDate(meeting.date ?? '')
     setMeetingTime(meeting.meeting_time ?? '')
     setTags(meeting.tags)
-    setPrepNotes(meeting.prep_notes ?? '')
-    setTranscript(meeting.transcript ?? '')
-    setSummary(meeting.meeting_summary ?? '')
-    setProposedTasks(meeting.proposed_tasks ?? [])
+    setViewingVersion(null)
+
+    // Set doc content based on phase
+    if (meeting.status === 'upcoming') {
+      setDocContent(meeting.prep_notes ?? '')
+    } else if (meeting.status === 'in_meeting') {
+      setDocContent(meeting.live_notes ?? '')
+    } else {
+      // ended or closed
+      setDocContent(meeting.meeting_summary ?? '')
+    }
   }, [meeting])
+
+  // Fetch linked people and all people for linking
+  useEffect(() => {
+    supabase.from('meetings_people').select('person_id').eq('meeting_id', meeting.id)
+      .then(({ data }) => setLinkedPeopleIds((data ?? []).map((r) => r.person_id as string)))
+
+    supabase.from('people').select('id, name').order('name')
+      .then(({ data }) => setAllPeople((data ?? []) as Person[]))
+  }, [meeting.id, supabase])
+
+  // Fetch past meetings with same people
+  useEffect(() => {
+    if (linkedPeopleIds.length === 0) {
+      setPastMeetings([])
+      return
+    }
+
+    async function fetchPastMeetings() {
+      // Get all meetings that share linked people (via meetings_people)
+      const { data: overlappingLinks } = await supabase
+        .from('meetings_people')
+        .select('meeting_id')
+        .in('person_id', linkedPeopleIds)
+
+      if (!overlappingLinks || overlappingLinks.length === 0) {
+        setPastMeetings([])
+        return
+      }
+
+      const meetingIds = [...new Set(
+        overlappingLinks
+          .map((r) => r.meeting_id as string)
+          .filter((id) => id !== meeting.id)
+      )]
+
+      if (meetingIds.length === 0) {
+        setPastMeetings([])
+        return
+      }
+
+      const { data } = await supabase
+        .from('meetings')
+        .select('id, title, date, status')
+        .in('id', meetingIds)
+        .eq('status', 'closed')
+        .order('date', { ascending: false })
+        .limit(3)
+
+      setPastMeetings(
+        (data ?? []).map((m) => ({
+          id: m.id as string,
+          title: m.title as string,
+          scheduled_at: (m.date as string | null) ?? '',
+        }))
+      )
+    }
+
+    fetchPastMeetings()
+  }, [linkedPeopleIds, meeting.id, supabase])
 
   function saveFieldImmediate(fields: Record<string, unknown>) {
     onUpdate(meeting.id, fields)
   }
 
-  // ----- Status transition -----
+  // ----- People linking -----
 
-  const cfg = STATUS_CONFIG[meeting.status]
-
-  function advanceStatus() {
-    if (!cfg.next) return
-    saveFieldImmediate({ status: cfg.next })
-  }
-
-  // ----- Summarize -----
-
-  async function handleSummarize() {
-    setSummarizing(true)
-    try {
-      const res = await fetch(`/api/meetings/${meeting.id}/summarize`, {
-        method: 'POST',
-      })
-      const json = await res.json()
-      if (!res.ok) throw new Error(json.error ?? 'Summarize failed')
-      setSummary(json.summary)
-      toast({ type: 'success', message: 'Summary generated' })
-    } catch (err) {
-      toast({
-        type: 'error',
-        message: err instanceof Error ? err.message : 'Summarize failed',
-      })
-    } finally {
-      setSummarizing(false)
+  async function linkPerson(personId: string) {
+    setLinkedPeopleIds((prev) => [...prev, personId])
+    const { error } = await supabase.from('meetings_people').insert({ meeting_id: meeting.id, person_id: personId })
+    if (error) {
+      setLinkedPeopleIds((prev) => prev.filter((id) => id !== personId))
+      toast({ type: 'error', message: 'Failed to link person' })
     }
   }
 
-  // ----- Suggest tasks -----
-
-  async function handleSuggestTasks() {
-    setSuggestingTasks(true)
-    try {
-      const res = await fetch(`/api/meetings/${meeting.id}/suggest-tasks`, {
-        method: 'POST',
-      })
-      const json = await res.json()
-      if (!res.ok) throw new Error(json.error ?? 'Suggest tasks failed')
-      setProposedTasks(json.tasks)
-      toast({ type: 'success', message: 'Tasks suggested' })
-    } catch (err) {
-      toast({
-        type: 'error',
-        message: err instanceof Error ? err.message : 'Suggest tasks failed',
-      })
-    } finally {
-      setSuggestingTasks(false)
+  async function unlinkPerson(personId: string) {
+    setLinkedPeopleIds((prev) => prev.filter((id) => id !== personId))
+    const { error } = await supabase.from('meetings_people').delete().eq('meeting_id', meeting.id).eq('person_id', personId)
+    if (error) {
+      setLinkedPeopleIds((prev) => [...prev, personId])
+      toast({ type: 'error', message: 'Failed to unlink person' })
     }
   }
 
-  // ----- Approve / dismiss proposed task -----
+  // ----- Status transitions -----
 
-  async function approveTask(taskId: string) {
-    const task = proposedTasks.find((t) => t.id === taskId)
-    if (!task) return
+  async function startMeeting() {
+    saveFieldImmediate({ status: 'in_meeting' })
+  }
 
-    // Create real task
+  async function closeMeeting() {
+    saveFieldImmediate({ status: 'closed' })
+
+    // Auto-trigger summary synthesis
     try {
-      const res = await fetch('/api/tasks', {
+      const res = await fetch(`/api/meetings/${meeting.id}/synthesize`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: task.title,
-          priority: task.priority,
-          status: 'todo',
-        }),
+        body: JSON.stringify({ context_hint: 'summary' }),
       })
-      const json = await res.json()
-      if (!res.ok) throw new Error(json.error ?? 'Failed to create task')
-
-      // Update proposed_tasks
-      const updated = proposedTasks.map((t) =>
-        t.id === taskId ? { ...t, status: 'approved' as const } : t
-      )
-      setProposedTasks(updated)
-      saveFieldImmediate({ proposed_tasks: updated })
-      toast({ type: 'success', message: 'Task approved and created' })
-    } catch (err) {
-      toast({
-        type: 'error',
-        message: err instanceof Error ? err.message : 'Failed to approve task',
-      })
+      if (res.ok) {
+        const json = await res.json()
+        const version = json.version as DocumentVersion
+        setDocContent(version.content)
+        toast({ type: 'success', message: 'Meeting closed and summary generated' })
+      }
+    } catch {
+      toast({ type: 'error', message: 'Meeting closed but summary generation failed' })
     }
   }
 
-  function dismissTask(taskId: string) {
-    const updated = proposedTasks.map((t) =>
-      t.id === taskId ? { ...t, status: 'dismissed' as const } : t
-    )
-    setProposedTasks(updated)
-    saveFieldImmediate({ proposed_tasks: updated })
+  // ----- Version / Synthesis handlers -----
+
+  function handleSynthesizeComplete(version: DocumentVersion) {
+    setDocContent(version.content)
+    setViewingVersion(null)
   }
+
+  function handleVersionSelect(content: string) {
+    setViewingVersion({ content } as DocumentVersion)
+  }
+
+  const displayContent = viewingVersion ? viewingVersion.content : docContent
+  const isClosed = meeting.status === 'closed' || meeting.status === 'ended'
+
+  const linkedPeopleItems = linkedPeopleIds
+    .map((id) => allPeople.find((p) => p.id === id))
+    .filter(Boolean)
+    .map((p) => ({ id: p!.id, label: p!.name }))
+
+  // Phase-specific config
+  const synthesizeLabel = meeting.status === 'upcoming' ? 'Synthesize Prep Brief' : 'Synthesize Summary'
+  const synthesizeHint = meeting.status === 'upcoming' ? 'prep' : 'summary'
 
   return (
     <div className="flex flex-col h-full">
@@ -625,19 +657,23 @@ function MeetingDetail({
         </button>
 
         <div className="flex-1 min-w-0">
-          <Input
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            onBlur={(e) => saveFieldImmediate({ title: e.target.value })}
-            className="text-lg font-semibold border-none bg-transparent px-0 focus-visible:ring-0"
-          />
+          {isClosed ? (
+            <h2 className="text-lg font-semibold px-0 truncate">{title}</h2>
+          ) : (
+            <Input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              onBlur={(e) => saveFieldImmediate({ title: e.target.value })}
+              className="text-lg font-semibold border-none bg-transparent px-0 focus-visible:ring-0"
+            />
+          )}
         </div>
 
         <Badge
           variant="secondary"
           className={cn('shrink-0', STATUS_BADGE_CLASS[meeting.status])}
         >
-          {cfg.label}
+          {STATUS_CONFIG[meeting.status].label}
         </Badge>
 
         <Button
@@ -650,14 +686,19 @@ function MeetingDetail({
         </Button>
       </div>
 
-      {/* Status bar */}
+      {/* Status bar + transition buttons */}
       <div className="flex items-center gap-3 px-4 py-2 border-b border-border shrink-0 bg-muted/30">
-        <span className={cn('text-sm font-medium', cfg.color)}>
-          {cfg.label}
+        <span className={cn('text-sm font-medium', STATUS_CONFIG[meeting.status].color)}>
+          {STATUS_CONFIG[meeting.status].label}
         </span>
-        {cfg.next && (
-          <Button size="sm" onClick={advanceStatus}>
-            {cfg.nextLabel}
+        {meeting.status === 'upcoming' && (
+          <Button size="sm" onClick={startMeeting}>
+            Start Meeting
+          </Button>
+        )}
+        {meeting.status === 'in_meeting' && (
+          <Button size="sm" onClick={closeMeeting}>
+            Close Meeting
           </Button>
         )}
       </div>
@@ -671,223 +712,206 @@ function MeetingDetail({
               <label className="text-xs text-muted-foreground font-medium mb-1 block">
                 Date
               </label>
-              <Input
-                type="date"
-                value={date}
-                onChange={(e) => {
-                  setDate(e.target.value)
-                  saveFieldImmediate({ date: e.target.value || null })
-                }}
-                className="text-sm"
-              />
+              {isClosed ? (
+                <p className="text-sm">{date ? new Date(date + 'T00:00:00').toLocaleDateString() : 'No date'}</p>
+              ) : (
+                <Input
+                  type="date"
+                  value={date}
+                  onChange={(e) => {
+                    setDate(e.target.value)
+                    saveFieldImmediate({ date: e.target.value || null })
+                  }}
+                  className="text-sm"
+                />
+              )}
             </div>
             <div>
               <label className="text-xs text-muted-foreground font-medium mb-1 block">
                 Time
               </label>
-              <Input
-                type="time"
-                value={meetingTime}
-                onChange={(e) => {
-                  setMeetingTime(e.target.value)
-                  saveFieldImmediate({ meeting_time: e.target.value || null })
-                }}
-                className="text-sm"
-              />
+              {isClosed ? (
+                <p className="text-sm">{meetingTime || 'No time'}</p>
+              ) : (
+                <Input
+                  type="time"
+                  value={meetingTime}
+                  onChange={(e) => {
+                    setMeetingTime(e.target.value)
+                    saveFieldImmediate({ meeting_time: e.target.value || null })
+                  }}
+                  className="text-sm"
+                />
+              )}
             </div>
           </div>
 
           {/* Tags */}
+          {!isClosed && (
+            <div>
+              <label className="text-xs text-muted-foreground font-medium mb-1 block">
+                Tags
+              </label>
+              <TagCombobox
+                selected={tags}
+                onChange={(newTags) => {
+                  setTags(newTags)
+                  saveFieldImmediate({ tags: newTags })
+                }}
+              />
+            </div>
+          )}
+
+          {/* Linked People */}
           <div>
-            <label className="text-xs text-muted-foreground font-medium mb-1 block">
-              Tags
-            </label>
-            <TagCombobox
-              selected={tags}
-              onChange={(newTags) => {
-                setTags(newTags)
-                saveFieldImmediate({ tags: newTags })
-              }}
-            />
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs text-muted-foreground font-medium flex items-center gap-1.5">
+                <Users className="h-3.5 w-3.5" />
+                People
+              </label>
+              {!isClosed && (
+                <LinkPicker
+                  items={allPeople}
+                  linkedIds={new Set(linkedPeopleIds)}
+                  onLink={linkPerson}
+                  placeholder="Link Person"
+                />
+              )}
+            </div>
+            {linkedPeopleItems.length > 0 ? (
+              <div className="space-y-1">
+                {linkedPeopleItems.map((item) => (
+                  <div
+                    key={item.id}
+                    className="flex items-center justify-between px-2 py-1.5 rounded-md bg-muted/30 group"
+                  >
+                    <span className="text-sm truncate">{item.label}</span>
+                    {!isClosed && (
+                      <button
+                        onClick={() => unlinkPerson(item.id)}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">None linked</p>
+            )}
           </div>
 
-          {/* Prep Notes (visible when upcoming) */}
-          {meeting.status === 'upcoming' && (
+          {/* Past meetings with same people */}
+          {pastMeetings.length > 0 && (
             <div>
-              <label className="text-xs text-muted-foreground font-medium mb-1 block">
-                Prep Notes
+              <label className="text-xs text-muted-foreground font-medium mb-2 flex items-center gap-1.5">
+                <Calendar className="h-3.5 w-3.5" />
+                Past Meetings
               </label>
-              <RichTextEditor
-                value={prepNotes}
-                onBlur={(md) => {
-                  setPrepNotes(md)
-                  saveFieldImmediate({ prep_notes: md })
-                }}
-                placeholder="Meeting prep notes..."
-                minHeight="150px"
-              />
-            </div>
-          )}
-
-          {/* Live Notes (visible when in_meeting) */}
-          {meeting.status === 'in_meeting' && (
-            <div>
-              <label className="text-xs text-muted-foreground font-medium mb-1 block">
-                Live Notes
-              </label>
-              <RichTextEditor
-                value={meeting.live_notes ?? ''}
-                onBlur={(md) => saveFieldImmediate({ live_notes: md })}
-                placeholder="Type meeting notes..."
-                minHeight="300px"
-              />
-            </div>
-          )}
-
-          {/* Live Notes read-only (visible when ended or closed) */}
-          {(meeting.status === 'ended' || meeting.status === 'closed') &&
-            meeting.live_notes && (
-              <div>
-                <label className="text-xs text-muted-foreground font-medium mb-1 block">
-                  Meeting Notes
-                </label>
-                <div className="rounded-md border border-border p-3 bg-muted/20">
-                  <MarkdownRenderer content={meeting.live_notes} />
-                </div>
+              <div className="space-y-1">
+                {pastMeetings.map((pm) => (
+                  <div
+                    key={pm.id}
+                    className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-muted/30 text-sm"
+                  >
+                    <span className="truncate flex-1">{pm.title}</span>
+                    {pm.scheduled_at && (
+                      <span className="text-xs text-muted-foreground shrink-0">
+                        {new Date(pm.scheduled_at + 'T00:00:00').toLocaleDateString(undefined, {
+                          month: 'short',
+                          day: 'numeric',
+                        })}
+                      </span>
+                    )}
+                  </div>
+                ))}
               </div>
+            </div>
+          )}
+
+          {/* Version History + Synthesize toolbar */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <VersionHistoryDropdown
+              entityType="meeting"
+              entityId={meeting.id}
+              currentContent={docContent}
+              onVersionSelect={handleVersionSelect}
+            />
+            {!isClosed && (
+              <SynthesizeButton
+                entityType="meetings"
+                entityId={meeting.id}
+                contextHint={synthesizeHint}
+                label={synthesizeLabel}
+                onComplete={handleSynthesizeComplete}
+              />
+            )}
+          </div>
+
+          {/* Document area */}
+          <div>
+            {meeting.status === 'upcoming' && (
+              <>
+                <label className="text-xs text-muted-foreground font-medium mb-1 block">
+                  Prep Brief
+                </label>
+                {viewingVersion ? (
+                  <div className="min-h-[150px] rounded-md border border-border p-4">
+                    <MarkdownRenderer content={displayContent} />
+                  </div>
+                ) : (
+                  <RichTextEditor
+                    value={displayContent}
+                    onChange={(md) => setDocContent(md)}
+                    onBlur={(md) => saveFieldImmediate({ prep_notes: md })}
+                    placeholder="Meeting prep notes..."
+                    minHeight="150px"
+                  />
+                )}
+              </>
             )}
 
-          {/* Transcript (visible when ended or closed) */}
-          {(meeting.status === 'ended' || meeting.status === 'closed') && (
-            <div>
-              <label className="text-xs text-muted-foreground font-medium mb-1 block">
-                Transcript
-              </label>
-              {meeting.status === 'ended' ? (
-                <Textarea
-                  value={transcript}
-                  onChange={(e) => setTranscript(e.target.value)}
-                  onBlur={(e) => saveFieldImmediate({ transcript: e.target.value })}
-                  placeholder="Paste meeting transcript here..."
-                  className="min-h-[200px] text-sm resize-y font-mono"
-                />
-              ) : (
-                <div className="rounded-md border border-border p-3 bg-muted/20 text-sm font-mono whitespace-pre-wrap max-h-64 overflow-y-auto">
-                  {meeting.transcript || 'No transcript'}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Summary (visible when ended or closed) */}
-          {(meeting.status === 'ended' || meeting.status === 'closed') && (
-            <div>
-              <label className="text-xs text-muted-foreground font-medium mb-1 block">
-                Summary
-              </label>
-              {summary ? (
-                <div className="rounded-md border border-border p-3 bg-muted/20">
-                  <MarkdownRenderer content={summary} />
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">No summary generated yet.</p>
-              )}
-              {meeting.status === 'ended' && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="mt-2"
-                  onClick={handleSummarize}
-                  disabled={summarizing}
-                >
-                  {summarizing ? (
-                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                  ) : (
-                    <Sparkles className="h-4 w-4 mr-1" />
-                  )}
-                  Generate Summary
-                </Button>
-              )}
-            </div>
-          )}
-
-          {/* Suggested Tasks (visible when ended or closed) */}
-          {(meeting.status === 'ended' || meeting.status === 'closed') && (
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <label className="text-xs text-muted-foreground font-medium">
-                  Suggested Tasks
+            {meeting.status === 'in_meeting' && (
+              <>
+                <label className="text-xs text-muted-foreground font-medium mb-1 block">
+                  Live Notes
                 </label>
-                {meeting.status === 'ended' && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={handleSuggestTasks}
-                    disabled={suggestingTasks}
-                  >
-                    {suggestingTasks ? (
-                      <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                    ) : (
-                      <ListTodo className="h-3 w-3 mr-1" />
-                    )}
-                    Suggest Tasks
-                  </Button>
+                {viewingVersion ? (
+                  <div className="min-h-[300px] rounded-md border border-border p-4">
+                    <MarkdownRenderer content={displayContent} />
+                  </div>
+                ) : (
+                  <RichTextEditor
+                    value={displayContent}
+                    onChange={(md) => setDocContent(md)}
+                    onBlur={(md) => saveFieldImmediate({ live_notes: md })}
+                    placeholder="Type meeting notes..."
+                    minHeight="300px"
+                  />
                 )}
-              </div>
+              </>
+            )}
 
-              {proposedTasks.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  No suggested tasks yet.
-                </p>
-              ) : (
-                <div className="space-y-2">
-                  {proposedTasks.map((task) => (
-                    <div
-                      key={task.id}
-                      className={cn(
-                        'flex items-center gap-2 rounded-md border border-border px-3 py-2',
-                        task.status === 'approved' && 'opacity-60',
-                        task.status === 'dismissed' && 'opacity-40 line-through'
-                      )}
-                    >
-                      <Badge variant="outline" className="text-xs shrink-0">
-                        {task.priority}
-                      </Badge>
-                      <span className="flex-1 text-sm truncate">{task.title}</span>
-                      {task.status === 'pending' && (
-                        <div className="flex gap-1 shrink-0">
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-7 w-7 text-green-400 hover:text-green-300"
-                            onClick={() => approveTask(task.id)}
-                            title="Approve"
-                          >
-                            <Check className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                            onClick={() => dismissTask(task.id)}
-                            title="Dismiss"
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      )}
-                      {task.status === 'approved' && (
-                        <span className="text-xs text-green-400">Approved</span>
-                      )}
-                      {task.status === 'dismissed' && (
-                        <span className="text-xs text-muted-foreground">Dismissed</span>
-                      )}
-                    </div>
-                  ))}
+            {isClosed && (
+              <>
+                <label className="text-xs text-muted-foreground font-medium mb-1 block">
+                  Summary
+                </label>
+                <div className="min-h-[200px] rounded-md border border-border p-4 bg-muted/20">
+                  <MarkdownRenderer content={displayContent} />
+                  {!displayContent && (
+                    <p className="text-sm text-muted-foreground">No summary generated yet.</p>
+                  )}
                 </div>
-              )}
-            </div>
-          )}
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Stream Panel */}
+        <div className="border-t border-border px-4 py-4">
+          <StreamPanel entityType="meeting" entityId={meeting.id} />
         </div>
 
         {/* Activity + Comments */}
@@ -905,6 +929,70 @@ function MeetingDetail({
           }}
           onCancel={() => setShowDeleteConfirm(false)}
         />
+      )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Link picker (inline — same pattern as CRM)
+// ---------------------------------------------------------------------------
+
+function LinkPicker({
+  items,
+  linkedIds,
+  onLink,
+  placeholder,
+}: {
+  items: Person[]
+  linkedIds: Set<string>
+  onLink: (id: string) => void
+  placeholder: string
+}) {
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
+
+  const available = items.filter(
+    (item) => !linkedIds.has(item.id) && !item.id.startsWith('temp-')
+  )
+  const filtered = available.filter((item) =>
+    item.name.toLowerCase().includes(query.toLowerCase())
+  )
+
+  return (
+    <div className="relative">
+      <Button size="sm" variant="outline" onClick={() => setOpen(!open)} className="text-xs">
+        <Link2 className="h-3 w-3 mr-1" />
+        {placeholder}
+      </Button>
+      {open && (
+        <div className="absolute top-full mt-1 right-0 z-50 w-64 rounded-md border border-border bg-card shadow-lg">
+          <div className="p-2">
+            <Input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search..."
+              className="text-sm h-8"
+              autoFocus
+              onBlur={() => setTimeout(() => setOpen(false), 200)}
+            />
+          </div>
+          <div className="max-h-48 overflow-y-auto">
+            {filtered.length === 0 ? (
+              <p className="px-3 py-2 text-xs text-muted-foreground">No people available</p>
+            ) : (
+              filtered.map((item) => (
+                <button
+                  key={item.id}
+                  className="w-full px-3 py-2 text-sm text-left hover:bg-muted transition-colors"
+                  onMouseDown={() => { onLink(item.id); setOpen(false); setQuery('') }}
+                >
+                  {item.name}
+                </button>
+              ))
+            )}
+          </div>
+        </div>
       )}
     </div>
   )
