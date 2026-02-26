@@ -919,6 +919,7 @@ function TiptapEditor({
   const lastSavedRef = useRef(initialContent)
 
   const editor = useEditor({
+    immediatelyRender: false,
     extensions: [StarterKit],
     content: initialContent,
     editable: true,

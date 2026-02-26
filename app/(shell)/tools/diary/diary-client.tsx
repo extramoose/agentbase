@@ -45,6 +45,7 @@ export function DiaryClient({
   const savingRef = useRef(false)
 
   const editor = useEditor({
+    immediatelyRender: false,
     extensions: [StarterKit],
     content: entry?.content ?? '',
     onBlur: ({ editor: ed }) => {
