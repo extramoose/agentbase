@@ -7,7 +7,7 @@
 
 ## 1. Project Overview
 
-AgentBase is a greenfield "Life OS" — a personal productivity platform where human users and AI agents (Lucy, Frank) collaborate on tasks, meetings, CRM, notes, diary, and grocery lists. Every mutation flows through a typed command bus, every change is recorded in a unified activity log, and every surface is multi-tenant with workspace-based isolation via RLS.
+AgentBase is a greenfield "Life OS" — a personal productivity platform where human users and AI agents (for example Lucy, Frank, or custom agents) collaborate on tasks, meetings, CRM, notes, diary, and grocery lists. Every mutation flows through a typed command bus, every change is recorded in a unified activity log, and every surface is multi-tenant with workspace-based isolation via RLS.
 
 **Domain:** Configurable via `NEXT_PUBLIC_APP_DOMAIN` env var (default: `agentbase.hah.to`).
 **Repo:** `git@github.com:extramoose/agentbase.git`
