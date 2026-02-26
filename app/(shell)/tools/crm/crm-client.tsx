@@ -98,13 +98,6 @@ export function CrmClient({
 
   const supabase = createClient()
 
-  // ----- Auth token for command bus -----
-
-  const getToken = useCallback(async () => {
-    const { data: { session } } = await supabase.auth.getSession()
-    return session?.access_token ?? null
-  }, [supabase])
-
   // ----- Realtime subscriptions -----
 
   useEffect(() => {
@@ -173,13 +166,10 @@ export function CrmClient({
 
   const updateEntity = useCallback(
     async (table: 'companies' | 'people' | 'deals', id: string, fields: Record<string, unknown>) => {
-      const token = await getToken()
-      if (!token) { toast({ type: 'error', message: 'Not authenticated' }); return }
-
       try {
         const res = await fetch('/api/commands/update', {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ table, id, fields }),
         })
         const json = await res.json()
@@ -188,7 +178,7 @@ export function CrmClient({
         toast({ type: 'error', message: err instanceof Error ? err.message : 'Update failed' })
       }
     },
-    [getToken]
+    []
   )
 
   // ----- Delete entity -----

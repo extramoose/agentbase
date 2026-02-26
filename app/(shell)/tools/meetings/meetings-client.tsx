@@ -118,13 +118,6 @@ export function MeetingsClient({
 
   const supabase = createClient()
 
-  const getToken = useCallback(async () => {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession()
-    return session?.access_token ?? null
-  }, [supabase])
-
   // ----- Realtime subscription -----
 
   useEffect(() => {
@@ -253,19 +246,10 @@ export function MeetingsClient({
         )
       )
 
-      const token = await getToken()
-      if (!token) {
-        toast({ type: 'error', message: 'Not authenticated' })
-        return
-      }
-
       try {
         const res = await fetch('/api/commands/update', {
           method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ table: 'meetings', id: meetingId, fields }),
         })
         const json = await res.json()
@@ -277,7 +261,7 @@ export function MeetingsClient({
         })
       }
     },
-    [getToken]
+    []
   )
 
   // ----- Delete meeting -----

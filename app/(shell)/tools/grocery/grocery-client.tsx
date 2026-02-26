@@ -35,13 +35,6 @@ export function GroceryClient({
   const editInputRef = useRef<HTMLInputElement>(null)
   const supabase = createClient()
 
-  const getToken = useCallback(async () => {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession()
-    return session?.access_token ?? null
-  }, [supabase])
-
   // Realtime subscription
   useEffect(() => {
     const channel = supabase
@@ -173,16 +166,10 @@ export function GroceryClient({
         )
       )
 
-      const token = await getToken()
-      if (!token) return
-
       try {
         const res = await fetch('/api/commands/update', {
           method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             table: 'grocery_items',
             id: item.id,
@@ -199,7 +186,7 @@ export function GroceryClient({
         )
       }
     },
-    [getToken]
+    []
   )
 
   const deleteItem = useCallback(
@@ -253,16 +240,10 @@ export function GroceryClient({
         prev.map((i) => (i.id === item.id ? { ...i, name } : i))
       )
 
-      const token = await getToken()
-      if (!token) return
-
       try {
         const res = await fetch('/api/commands/update', {
           method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             table: 'grocery_items',
             id: item.id,
@@ -279,7 +260,7 @@ export function GroceryClient({
         )
       }
     },
-    [editingName, getToken]
+    [editingName]
   )
 
   useEffect(() => {

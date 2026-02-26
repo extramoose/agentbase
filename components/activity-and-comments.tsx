@@ -110,7 +110,7 @@ export function ActivityAndComments({ entityType, entityId, currentUserId }: Act
     try {
       await fetch('/api/commands/add-comment', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}` },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ entity_type: entityType, entity_id: entityId, body: comment }),
       })
     } finally {

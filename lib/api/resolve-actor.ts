@@ -37,13 +37,9 @@ export async function resolveActor(request: Request): Promise<ResolvedActor> {
   const { allowed, retryAfter } = checkRateLimit(user.id)
   if (!allowed) throw new RateLimitError(retryAfter)
 
-  // Resolve workspace membership
-  const { data: membership } = await supabase
-    .from('tenant_members')
-    .select('tenant_id')
-    .eq('user_id', user.id)
-    .single()
-  if (!membership) throw new UnauthorizedError('Actor is not a member of any workspace')
+  // Resolve workspace membership via SECURITY DEFINER RPC (avoids RLS recursion)
+  const { data: tenantId } = await supabase.rpc('get_my_tenant_id')
+  if (!tenantId) throw new UnauthorizedError('Actor is not a member of any workspace')
 
   // Determine actor type (is this an agent account?)
   const { data: agentOwner } = await supabase
@@ -56,7 +52,7 @@ export async function resolveActor(request: Request): Promise<ResolvedActor> {
     supabase,
     actorId: user.id,
     actorType: agentOwner ? 'agent' : 'human',
-    tenantId: membership.tenant_id,
+    tenantId: tenantId as string,
     ownerId: agentOwner?.owner_id ?? user.id,
   }
 }

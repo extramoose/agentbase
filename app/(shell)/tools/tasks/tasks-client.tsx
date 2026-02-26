@@ -342,15 +342,6 @@ export function TasksClient({
 
   const supabase = createClient()
 
-  // ----- Helpers to get auth token for command bus -----
-
-  const getToken = useCallback(async () => {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession()
-    return session?.access_token ?? null
-  }, [supabase])
-
   // ----- Realtime subscription -----
 
   useEffect(() => {
@@ -484,19 +475,10 @@ export function TasksClient({
           : prev
       )
 
-      const token = await getToken()
-      if (!token) {
-        toast({ type: 'error', message: 'Not authenticated' })
-        return
-      }
-
       try {
         const res = await fetch('/api/commands/update', {
           method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ table: 'tasks', id: taskId, fields }),
         })
         const json = await res.json()
@@ -508,7 +490,7 @@ export function TasksClient({
         })
       }
     },
-    [getToken]
+    []
   )
 
   // ----- Delete task -----
