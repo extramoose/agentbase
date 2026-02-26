@@ -4,6 +4,7 @@ import { z } from 'zod'
 
 const createSchema = z.object({
   title: z.string().min(1).max(500),
+  idempotency_key: z.string().max(128).optional(),
 })
 
 export async function GET(request: Request) {
@@ -38,6 +39,7 @@ export async function POST(request: Request) {
       p_actor_id: actorId,
       p_actor_type: actorType,
       p_title: input.title,
+      p_idempotency_key: input.idempotency_key ?? null,
     })
     if (error) throw error
     return Response.json({ data }, { status: 201 })
