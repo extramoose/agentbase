@@ -438,17 +438,17 @@ After creating agent users, insert them into `tenant_members` for HunterTenant. 
 // auth.uid() resolves automatically. No JWT signing needed.
 ```
 
-Store agent auth tokens as environment variables in the agent containers:
+Store agent refresh tokens as environment variables in the agent containers:
 ```
-LUCY_JWT=<token>
-FRANK_JWT=<token>
+LUCY_REFRESH_TOKEN=<refresh_token>
+FRANK_REFRESH_TOKEN=<refresh_token>
 ```
+
+The Supabase JS client automatically handles access token rotation from the refresh token — no manual refresh script needed.
 
 #### Token Revocation
 
-**Token revocation:** A `revoked_agent_tokens` table (see §5) stores revoked token JTIs (`jti text PRIMARY KEY, revoked_at timestamptz`). The `resolveActor()` function checks this table on every request for agent JWTs. To revoke a token: insert its `jti` claim. This avoids the nuclear option of rotating the Supabase signing key (which in the new system can be done with zero downtime via Supabase's key rotation, without signing users out — a significant improvement over the legacy approach).
-
-Agent JWTs should include a unique `jti` (UUID). Store the `jti` in `openclaw.json` alongside the token for easy reference if revocation is needed.
+**Token revocation:** To revoke an agent's access, call `supabase.auth.admin.signOut(agentUserId, { scope: 'global' })` from a script (using the secret key). This invalidates all active sessions for that agent. Then re-run `scripts/generate-agent-sessions.ts` to issue a new refresh token and update the agent's config. There is no `revoked_agent_tokens` table or JTI blocklist — Supabase session management handles revocation natively.
 
 #### Step 3: RLS policies that work for agents
 
@@ -1250,16 +1250,9 @@ CREATE TABLE idempotency_keys (
 
 No RLS needed — this table is only accessed from API route handlers via the secret key, not directly by clients.
 
-### Revoked Agent Tokens
+### Agent Token Revocation
 
-```sql
-CREATE TABLE revoked_agent_tokens (
-  jti        text PRIMARY KEY,  -- JWT ID claim
-  revoked_at timestamptz NOT NULL DEFAULT now(),
-  reason     text
-);
--- No RLS needed — only accessible via secret key (scripts) or SECURITY DEFINER functions
-```
+No `revoked_agent_tokens` table needed. Token revocation is handled natively by Supabase session management: `supabase.auth.admin.signOut(agentUserId, { scope: 'global' })`. This invalidates all active sessions for the agent immediately. Re-issue by re-running `scripts/generate-agent-sessions.ts` and updating the agent's config.
 
 ### Notifications (stub — no UI, no triggers in v1)
 
@@ -2094,8 +2087,7 @@ agentbase/
 │
 ├── scripts/
 │   ├── create-agent-users.ts     # One-time: create Lucy + Frank auth users
-│   ├── generate-agent-jwt.ts     # One-time: generate agent JWTs (90-day expiry, unique jti)
-│   └── refresh-agent-jwts.ts     # Periodic: regenerate agent JWTs before 90-day expiry
+│   └── generate-agent-sessions.ts # One-time: generate agent refresh tokens via admin API; Supabase client handles rotation automatically
 │
 ├── supabase/
 │   ├── migrations/
@@ -2139,7 +2131,7 @@ agentbase/
 
 **Goal:** The full command bus infrastructure is working. Activity log writes and reads work. Toast system works.
 
-- [ ] Build `resolveActor()` — auth resolution for API routes (cookie + JWT)
+- [ ] Build `resolveActor()` — auth resolution for API routes (reads `Authorization: Bearer <token>`, verifies via `supabase.auth.getUser()`, no local secret needed)
 - [ ] Write initial PL/pgSQL RPC functions: `rpc_create_task`, `rpc_change_task_status`, `rpc_add_comment`, `rpc_update_entity` (the first ones needed for Phase 3). Add remaining RPCs in each entity's phase.
 - [ ] Build `PATCH /api/commands/update` (generic update route — calls `rpc_update_entity`)
 - [ ] Build `POST /api/commands/add-comment` (calls `rpc_add_comment`)
@@ -2266,7 +2258,7 @@ All questions have been resolved. No open questions remain.
 | Area | HAH Toolbox | AgentBase | Why |
 |------|-------------|-----------|-----|
 | **Multi-tenancy** | Single-user. No `user_id` on most tables. | `tenant_id` on rows = workspace. All workspace members see all rows. Attribution in `activity_log`. | Correct separation of visibility vs. attribution. Adding a human to the team = one row insert, no schema change. |
-| **Agent auth** | Service role key + `SET LOCAL app.current_actor` | Real Supabase Auth users with proper `auth.uid()` resolution. JWT signing via current Supabase signing keys system (not legacy shared secret). See §3.5. | Eliminates the fragile `SET LOCAL` pattern. Proper audit trail. RLS works naturally. |
+| **Agent auth** | Service role key + `SET LOCAL app.current_actor` | Real Supabase Auth users with refresh token sessions. `auth.uid()` resolves natively in all triggers and RLS policies. No JWT signing, no custom crypto. See §3.5. | Eliminates the fragile `SET LOCAL` pattern. Proper audit trail. RLS works naturally. |
 | **Mutation path** | Direct Supabase client calls from components | All mutations go through API routes (command bus) | Agents (external HTTP clients) need the same endpoints as the browser. Server actions can't be called by Docker containers. |
 | **Activity log** | `author` as text (`"hunter"`, `"frank"`). No tenant scope. | `actor_id` as UUID FK to `auth.users`. `tenant_id` for workspace-scoped visibility. | Multi-tenant safe. Proper FK relationships. Actors resolved client-side. |
 | **Task activity** | Dual-write to `task_activity` AND `activity_log` | Single write to `activity_log` only | One source of truth. No sync issues. `task_activity` was a legacy artifact. |
@@ -2291,8 +2283,8 @@ All questions have been resolved. No open questions remain.
 
 These are real concerns but deliberately out of scope for v1. Ticket them when the core is stable.
 
-### L-1: JWT refresh automation
-Agent JWTs use 90-day expiry with a manual refresh script. Future work: automate the refresh cycle (cron job that regenerates and stores JWTs before expiry, notifies if refresh fails). Also consider: PKCE-based agent auth flow for tighter security.
+### L-1: Agent session health monitoring
+Agents use Supabase refresh token sessions — the Supabase JS client handles access token rotation automatically. Future work: add a lightweight `/api/agent/ping` endpoint that agents call periodically; if the session has expired or been revoked, the ping returns 401 and the agent alerts its operator. The Admin → Agents page could surface a "last seen" timestamp based on this. Also consider: PKCE-based agent auth flow for tighter security without storing long-lived refresh tokens.
 
 ### L-2: Smart event detection on generic update route
 The `PATCH /api/commands/update` route writes `event_type: "updated"` for all field changes. For known semantic fields (status, priority, assignee), it could detect the change and write a richer event (e.g. `status_changed` with old/new values) automatically. Not blocking — semantic action routes handle the important mutations. Add after v1 is stable.
