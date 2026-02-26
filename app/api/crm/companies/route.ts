@@ -1,4 +1,5 @@
-import { getCurrentUser } from '@/lib/auth'
+import { requireAuthApi } from '@/lib/auth'
+import { apiError } from '@/lib/api/errors'
 import { createClient } from '@/lib/supabase/server'
 import { z } from 'zod'
 
@@ -11,47 +12,48 @@ const createSchema = z.object({
 })
 
 export async function GET() {
-  const user = await getCurrentUser()
-  if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 })
+  try {
+    await requireAuthApi()
 
-  const supabase = await createClient()
-  const { data, error } = await supabase
-    .from('companies')
-    .select('*')
-    .order('name')
+    const supabase = await createClient()
+    const { data, error } = await supabase
+      .from('companies')
+      .select('*')
+      .order('name')
 
-  if (error) return Response.json({ error: error.message }, { status: 400 })
-  return Response.json({ data })
+    if (error) return Response.json({ error: error.message }, { status: 400 })
+    return Response.json({ data })
+  } catch (err) {
+    return apiError(err)
+  }
 }
 
 export async function POST(request: Request) {
-  const user = await getCurrentUser()
-  if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 })
-
-  const supabase = await createClient()
-
-  const { data: membership } = await supabase
-    .from('tenant_members')
-    .select('tenant_id')
-    .eq('user_id', user.id)
-    .single()
-  if (!membership)
-    return Response.json({ error: 'No workspace' }, { status: 403 })
-
-  let input: z.infer<typeof createSchema>
   try {
+    const user = await requireAuthApi()
+
+    const supabase = await createClient()
+
+    const { data: membership } = await supabase
+      .from('tenant_members')
+      .select('tenant_id')
+      .eq('user_id', user.id)
+      .single()
+    if (!membership)
+      return Response.json({ error: 'No workspace' }, { status: 403 })
+
     const body = await request.json()
-    input = createSchema.parse(body)
-  } catch {
-    return Response.json({ error: 'Invalid input' }, { status: 400 })
+    const input = createSchema.parse(body)
+
+    const { data, error } = await supabase
+      .from('companies')
+      .insert({ ...input, tenant_id: membership.tenant_id })
+      .select()
+      .single()
+
+    if (error) return Response.json({ error: error.message }, { status: 400 })
+    return Response.json({ data }, { status: 201 })
+  } catch (err) {
+    return apiError(err)
   }
-
-  const { data, error } = await supabase
-    .from('companies')
-    .insert({ ...input, tenant_id: membership.tenant_id })
-    .select()
-    .single()
-
-  if (error) return Response.json({ error: error.message }, { status: 400 })
-  return Response.json({ data }, { status: 201 })
 }

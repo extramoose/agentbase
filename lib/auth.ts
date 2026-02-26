@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import { UnauthorizedError, ForbiddenError } from '@/lib/api/errors'
 
 export type UserProfile = {
   id: string
@@ -51,6 +52,22 @@ export async function requireAdmin(): Promise<UserProfile> {
   const profile = await getUserProfile()
   if (!profile || !['admin', 'superadmin'].includes(profile.role)) {
     redirect('/')
+  }
+  return profile
+}
+
+/** For API routes — throws UnauthorizedError (caught by apiError) */
+export async function requireAuthApi() {
+  const user = await getCurrentUser()
+  if (!user) throw new UnauthorizedError()
+  return user
+}
+
+/** For API routes — throws ForbiddenError (caught by apiError) */
+export async function requireAdminApi(): Promise<UserProfile> {
+  const profile = await getUserProfile()
+  if (!profile || !['admin', 'superadmin'].includes(profile.role)) {
+    throw new ForbiddenError()
   }
   return profile
 }
