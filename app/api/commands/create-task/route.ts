@@ -9,7 +9,7 @@ const schema = z.object({
     .optional()
     .default('medium'),
   status: z
-    .enum(['todo', 'in_progress', 'done', 'blocked'])
+    .enum(['backlog', 'todo', 'in_progress', 'blocked', 'done', 'cancelled'])
     .optional()
     .default('todo'),
   body: z.string().optional(),

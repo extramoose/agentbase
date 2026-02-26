@@ -41,7 +41,7 @@ import { ANON_AVATAR_URL } from '@/lib/constants'
 // ---------------------------------------------------------------------------
 
 type Priority = 'urgent' | 'high' | 'medium' | 'low' | 'none'
-type Status = 'todo' | 'in_progress' | 'done' | 'blocked'
+type Status = 'backlog' | 'todo' | 'in_progress' | 'blocked' | 'done' | 'cancelled'
 
 type TaskType = 'bug' | 'improvement' | 'feature'
 
@@ -81,6 +81,7 @@ type WorkspaceMember = {
 // ---------------------------------------------------------------------------
 
 const PRIORITY_ORDER: Priority[] = ['urgent', 'high', 'medium', 'low', 'none']
+const STATUS_ORDER: Status[] = ['backlog', 'todo', 'in_progress', 'blocked', 'done', 'cancelled']
 
 const PRIORITY_CONFIG: Record<Priority, { label: string; color: string }> = {
   urgent: { label: 'Urgent', color: 'text-red-500' },
@@ -91,18 +92,21 @@ const PRIORITY_CONFIG: Record<Priority, { label: string; color: string }> = {
 }
 
 const STATUS_CONFIG: Record<Status, { label: string; className: string }> = {
+  backlog: { label: 'Backlog', className: 'bg-zinc-500/20 text-zinc-400' },
   todo: { label: 'To Do', className: 'bg-muted text-muted-foreground' },
   in_progress: { label: 'In Progress', className: 'bg-blue-500/20 text-blue-400' },
-  done: { label: 'Done', className: 'bg-green-500/20 text-green-400' },
   blocked: { label: 'Blocked', className: 'bg-red-500/20 text-red-400' },
+  done: { label: 'Done', className: 'bg-green-500/20 text-green-400' },
+  cancelled: { label: 'Cancelled', className: 'bg-red-500/10 text-red-300/60' },
 }
 
 const STATUS_TABS: Array<{ value: Status | 'all'; label: string }> = [
   { value: 'all', label: 'All' },
+  { value: 'backlog', label: 'Backlog' },
   { value: 'todo', label: 'To Do' },
   { value: 'in_progress', label: 'In Progress' },
-  { value: 'done', label: 'Done' },
   { value: 'blocked', label: 'Blocked' },
+  { value: 'done', label: 'Done' },
 ]
 
 const TASK_TYPE_CONFIG: Record<TaskType, { label: string; className: string }> = {
@@ -236,7 +240,7 @@ function SortableTaskRow({
       </span>
 
       {/* Title */}
-      <span className="flex-1 text-sm font-medium truncate">{task.title}</span>
+      <span className={cn('flex-1 text-sm font-medium truncate', task.status === 'cancelled' && 'line-through text-muted-foreground/60')}>{task.title}</span>
 
       {/* Status badge */}
       <Badge
@@ -420,7 +424,7 @@ export function TasksClient({
   const [statusFilter, setStatusFilter] = useState<Status | 'all'>(
     () => {
       const s = searchParams.get('status')
-      const valid: Array<Status | 'all'> = ['todo', 'in_progress', 'done', 'blocked', 'all']
+      const valid: Array<Status | 'all'> = ['backlog', 'todo', 'in_progress', 'blocked', 'done', 'cancelled', 'all']
       return valid.includes(s as Status | 'all') ? (s as Status | 'all') : 'all'
     }
   )
@@ -438,6 +442,7 @@ export function TasksClient({
   const [activeDragId, setActiveDragId] = useState<string | null>(null)
   const [assigneeFilter, setAssigneeFilter] = useState<string | null>('me')
   const [workspaceMembers, setWorkspaceMembers] = useState<WorkspaceMember[]>([])
+  const [showCancelled, setShowCancelled] = useState(false)
 
   const supabase = createClient()
   const initialHandled = useRef(false)
@@ -558,6 +563,11 @@ export function TasksClient({
   const filteredTasks = useMemo(() => {
     let result = tasks
 
+    // Hide cancelled unless explicitly toggled or filtered to cancelled
+    if (!showCancelled && statusFilter !== 'cancelled') {
+      result = result.filter((t) => t.status !== 'cancelled')
+    }
+
     // Status filter
     if (statusFilter !== 'all') {
       result = result.filter((t) => t.status === statusFilter)
@@ -586,7 +596,7 @@ export function TasksClient({
     }
 
     return result
-  }, [tasks, statusFilter, typeFilter, search, assigneeFilter, currentUser])
+  }, [tasks, statusFilter, typeFilter, search, assigneeFilter, currentUser, showCancelled])
 
   const grouped = useMemo(() => groupByPriority(filteredTasks), [filteredTasks])
 
@@ -1071,7 +1081,7 @@ export function TasksClient({
                         <span className="shrink-0" title={PRIORITY_CONFIG[task.priority].label}>
                           <PriorityIcon priority={task.priority} />
                         </span>
-                        <span className="flex-1 text-sm font-medium truncate">{task.title}</span>
+                        <span className={cn('flex-1 text-sm font-medium truncate', task.status === 'cancelled' && 'line-through text-muted-foreground/60')}>{task.title}</span>
                         <Badge variant="secondary" className={cn('text-xs shrink-0', statusCfg.className)}>
                           {statusCfg.label}
                         </Badge>
@@ -1103,6 +1113,20 @@ export function TasksClient({
             )
           })
         )}
+
+        {/* Show cancelled toggle */}
+        {statusFilter !== 'cancelled' && (() => {
+          const cancelledCount = tasks.filter((t) => t.status === 'cancelled').length
+          if (cancelledCount === 0) return null
+          return (
+            <button
+              onClick={() => setShowCancelled((prev) => !prev)}
+              className="mt-2 mb-1 px-3 py-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              {showCancelled ? 'Hide' : 'Show'} cancelled ({cancelledCount})
+            </button>
+          )
+        })()}
 
         {filteredTasks.length === 0 && !addingToPriority && (
           <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
@@ -1138,7 +1162,7 @@ export function TasksClient({
             className="h-8 rounded-md border border-zinc-600 bg-zinc-700 px-2 text-sm text-zinc-200"
           >
             <option value="" disabled>Status</option>
-            {(Object.keys(STATUS_CONFIG) as Status[]).map((s) => (
+            {STATUS_ORDER.map((s) => (
               <option key={s} value={s}>{STATUS_CONFIG[s].label}</option>
             ))}
           </select>
@@ -1296,7 +1320,7 @@ function TaskEditShelf({
               }}
               className="w-full h-9 rounded-md border border-input bg-transparent px-3 text-sm focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] outline-none"
             >
-              {(Object.keys(STATUS_CONFIG) as Status[]).map((s) => (
+              {STATUS_ORDER.map((s) => (
                 <option key={s} value={s}>
                   {STATUS_CONFIG[s].label}
                 </option>
