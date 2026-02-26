@@ -5,13 +5,19 @@ Applies new SQL migration files in supabase/migrations/ to the target Supabase p
 Tracks applied migrations in a _schema_migrations table so nothing runs twice.
 
 Connects via direct Postgres (psql) — bypasses Cloudflare which blocks the HTTP Management API.
+Uses PG* env vars (not DATABASE_URL) so PGHOSTADDR is respected for IPv4 forcing.
 
 Usage:
   python3 scripts/migrate.py
 
 Environment variables required:
-  DATABASE_URL  - Full postgres connection string
-                  e.g. postgresql://postgres:<password>@db.lecsqzctdfjwencberdj.supabase.co:5432/postgres
+  PGHOST      - Supabase DB hostname
+  PGPASSWORD  - Postgres password
+  PGUSER      - postgres
+  PGDATABASE  - postgres
+  PGPORT      - 5432
+  PGSSLMODE   - require
+  PGHOSTADDR  - (optional) IPv4 address to force IPv4 connection
 """
 
 import os
@@ -20,25 +26,20 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-DATABASE_URL = os.environ.get("DATABASE_URL")
 MIGRATIONS_DIR = Path(__file__).parent.parent / "supabase" / "migrations"
 
 
-def run_sql(sql: str) -> list[dict]:
-    """Execute SQL via psql and return rows as list of dicts."""
-    if not DATABASE_URL:
-        raise RuntimeError("DATABASE_URL environment variable is not set")
-
+def run_sql(sql: str) -> str:
+    """Execute SQL via psql using PG* env vars. Returns stdout."""
     with tempfile.NamedTemporaryFile(mode="w", suffix=".sql", delete=False) as f:
-        # Output as CSV for easy parsing
-        f.write("\\pset format csv\n")
+        f.write("\\pset format unaligned\n")
         f.write("\\pset tuples_only on\n")
         f.write(sql)
         tmp_path = f.name
 
     try:
         result = subprocess.run(
-            ["psql", DATABASE_URL, "-f", tmp_path, "--no-psqlrc", "-q"],
+            ["psql", "--no-psqlrc", "-q", "-f", tmp_path],
             capture_output=True,
             text=True,
         )
@@ -52,14 +53,13 @@ def run_sql(sql: str) -> list[dict]:
 def run_sql_file(path: Path):
     """Execute a SQL file directly via psql."""
     result = subprocess.run(
-        ["psql", DATABASE_URL, "-f", str(path), "--no-psqlrc", "-q"],
+        ["psql", "--no-psqlrc", "-q", "-f", str(path)],
         capture_output=True,
         text=True,
     )
     if result.returncode != 0:
         raise RuntimeError(f"psql error: {result.stderr.strip()}")
     if result.stderr.strip():
-        # psql prints notices to stderr — only fail on actual errors
         for line in result.stderr.strip().splitlines():
             if "ERROR" in line:
                 raise RuntimeError(f"SQL error: {result.stderr.strip()}")
@@ -110,8 +110,8 @@ def seed_prior_migrations(migration_files: list):
 def main():
     print("AgentBase migration runner")
 
-    if not DATABASE_URL:
-        print("ERROR: DATABASE_URL not set.", file=sys.stderr)
+    if not os.environ.get("PGPASSWORD"):
+        print("ERROR: PGPASSWORD not set. Set PG* environment variables.", file=sys.stderr)
         sys.exit(1)
 
     # Check psql is available
