@@ -507,17 +507,7 @@ function LibraryEditShelf({
     setIsPublic(item.is_public)
   }, [item])
 
-  const saveTimeout = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
-
-  function saveField(fields: Record<string, unknown>) {
-    clearTimeout(saveTimeout.current)
-    saveTimeout.current = setTimeout(() => {
-      onUpdate(item.id, fields)
-    }, 500)
-  }
-
   function saveFieldImmediate(fields: Record<string, unknown>) {
-    clearTimeout(saveTimeout.current)
     onUpdate(item.id, fields)
   }
 
@@ -552,10 +542,8 @@ function LibraryEditShelf({
           <label className="text-xs text-muted-foreground font-medium mb-1 block">Title</label>
           <Input
             value={title}
-            onChange={(e) => {
-              setTitle(e.target.value)
-              saveField({ title: e.target.value })
-            }}
+            onChange={(e) => setTitle(e.target.value)}
+            onBlur={(e) => saveFieldImmediate({ title: e.target.value })}
             className="text-base font-medium"
           />
         </div>
@@ -585,10 +573,8 @@ function LibraryEditShelf({
           <UnfurlInput
             label="URL"
             value={url}
-            onChange={(v) => {
-              setUrl(v)
-              saveField({ url: v || null })
-            }}
+            onChange={(v) => setUrl(v)}
+            onBlur={(v) => saveFieldImmediate({ url: v || null })}
             placeholder="https://..."
           />
         )}
@@ -599,10 +585,8 @@ function LibraryEditShelf({
             <label className="text-xs text-muted-foreground font-medium mb-1 block">Source</label>
             <Input
               value={source}
-              onChange={(e) => {
-                setSource(e.target.value)
-                saveField({ source: e.target.value || null })
-              }}
+              onChange={(e) => setSource(e.target.value)}
+              onBlur={(e) => saveFieldImmediate({ source: e.target.value || null })}
               placeholder="e.g. NY Times, Hacker News"
               className="text-sm"
             />
@@ -615,10 +599,8 @@ function LibraryEditShelf({
             <label className="text-xs text-muted-foreground font-medium mb-1 block">Excerpt</label>
             <Textarea
               value={excerpt}
-              onChange={(e) => {
-                setExcerpt(e.target.value)
-                saveField({ excerpt: e.target.value || null })
-              }}
+              onChange={(e) => setExcerpt(e.target.value)}
+              onBlur={(e) => saveFieldImmediate({ excerpt: e.target.value || null })}
               placeholder="Short description or teaser..."
               className="min-h-[80px] text-sm resize-y"
             />
@@ -633,7 +615,7 @@ function LibraryEditShelf({
               value={body}
               onBlur={(md) => {
                 setBody(md)
-                saveField({ body: md || null })
+                saveFieldImmediate({ body: md || null })
               }}
               placeholder="Write your note or idea..."
               minHeight="120px"
@@ -647,10 +629,8 @@ function LibraryEditShelf({
             <label className="text-xs text-muted-foreground font-medium mb-1 block">Location</label>
             <Input
               value={locationName}
-              onChange={(e) => {
-                setLocationName(e.target.value)
-                saveField({ location_name: e.target.value || null })
-              }}
+              onChange={(e) => setLocationName(e.target.value)}
+              onBlur={(e) => saveFieldImmediate({ location_name: e.target.value || null })}
               placeholder="Location name..."
               className="text-sm"
             />
@@ -666,10 +646,8 @@ function LibraryEditShelf({
                 type="number"
                 step="any"
                 value={latitude}
-                onChange={(e) => {
-                  setLatitude(e.target.value)
-                  saveField({ latitude: e.target.value ? parseFloat(e.target.value) : null })
-                }}
+                onChange={(e) => setLatitude(e.target.value)}
+                onBlur={(e) => saveFieldImmediate({ latitude: e.target.value ? parseFloat(e.target.value) : null })}
                 placeholder="0.000000"
                 className="text-sm"
               />
@@ -680,10 +658,8 @@ function LibraryEditShelf({
                 type="number"
                 step="any"
                 value={longitude}
-                onChange={(e) => {
-                  setLongitude(e.target.value)
-                  saveField({ longitude: e.target.value ? parseFloat(e.target.value) : null })
-                }}
+                onChange={(e) => setLongitude(e.target.value)}
+                onBlur={(e) => saveFieldImmediate({ longitude: e.target.value ? parseFloat(e.target.value) : null })}
                 placeholder="0.000000"
                 className="text-sm"
               />

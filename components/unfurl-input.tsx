@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils'
 interface UnfurlInputProps {
   value: string
   onChange: (value: string) => void
+  onBlur?: (value: string) => void
   placeholder?: string
   className?: string
   label?: string
@@ -17,7 +18,7 @@ function isUrl(value: string): boolean {
   return value.startsWith('http://') || value.startsWith('https://')
 }
 
-export function UnfurlInput({ value, onChange, placeholder, className, label }: UnfurlInputProps) {
+export function UnfurlInput({ value, onChange, onBlur, placeholder, className, label }: UnfurlInputProps) {
   const [debouncedUrl, setDebouncedUrl] = useState<string | null>(null)
   const [dismissed, setDismissed] = useState(false)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -55,6 +56,7 @@ export function UnfurlInput({ value, onChange, placeholder, className, label }: 
         type="url"
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        onBlur={onBlur ? (e) => onBlur(e.target.value) : undefined}
         placeholder={placeholder}
         className={cn('text-sm', className)}
       />
