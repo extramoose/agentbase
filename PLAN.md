@@ -68,6 +68,10 @@ Each semantic action:
 
 **Rate limiting:** All command handlers run behind per-actor rate limiting middleware (see Phase 1 in §10). Limit: 60 requests/minute per `actor_id`. This protects against runaway agents burning Vercel/Supabase quotas.
 
+**Atomicity via Postgres RPC.** Every semantic command handler does two things: (1) resolve the actor, (2) call a Postgres RPC function. The RPC function does the entity mutation AND the activity_log INSERT inside a single PL/pgSQL function — one network round-trip, one database transaction, guaranteed atomicity. If the entity update fails, no activity event is written. If the activity insert fails, the entity update is rolled back. There is no failure mode where these get out of sync.
+
+This is also what makes the platform transparent to agents. An agent calls `POST /api/commands/change-task-status` with a task ID and new status. It gets back a result. It never knows activity_log exists. The platform captures all context — who, what, when, old value, new value — automatically.
+
 #### Generic Field Updates
 
 Schema-agnostic patch for any entity. New fields on any entity just work without writing new API code.
@@ -86,8 +90,7 @@ Content-Type: application/json
 
 - Validates `table` against an allowlist
 - Validates `id` exists and belongs to the requesting user
-- Applies the update
-- Writes `event_type: "updated"` to `activity_log` with `payload: { fields: [...changed field names] }`
+- Calls `rpc_update_entity(table_name, entity_id, fields jsonb, actor_id uuid, user_id uuid)` — a Postgres function that runs `UPDATE {table} SET ... WHERE id = entity_id AND user_id = user_id` and `INSERT INTO activity_log (...)` in one transaction
 - Returns `{ success: true, data: {...} }`
 
 #### Auth Resolution in API Routes
@@ -366,7 +369,7 @@ await supabase.from("agent_owners").insert([
 
 #### Step 2: Generate long-lived JWTs
 
-Hand-sign JWTs using the Supabase JWT secret (HS256). These are long-lived (10 years) since agents are internal services.
+Hand-sign JWTs using the Supabase JWT secret (HS256). JWTs are signed with 90-day expiry (not 10 years). A refresh script (`scripts/refresh-agent-jwts.ts`) regenerates and re-stores them before expiry. Set a calendar reminder or cron job to run this every 60 days.
 
 ```typescript
 // scripts/generate-agent-jwt.ts
@@ -375,21 +378,22 @@ import * as jose from "jose";
 const secret = new TextEncoder().encode(process.env.SUPABASE_JWT_SECRET!);
 
 async function generateAgentJWT(userId: string, email: string) {
+  const jti = crypto.randomUUID(); // Unique JWT ID for revocation tracking
   const jwt = await new jose.SignJWT({
     sub: userId,
     email,
     role: "authenticated",
     iss: "supabase",
-    // Standard Supabase JWT claims
     aud: "authenticated",
+    jti, // Store this alongside the token for easy revocation if needed
   })
     .setProtectedHeader({ alg: "HS256", typ: "JWT" })
     .setIssuedAt()
-    .setExpirationTime("10y")
+    .setExpirationTime("90d")
     .sign(secret);
 
-  console.log(`JWT for ${email}:\n${jwt}\n`);
-  return jwt;
+  console.log(`JWT for ${email} (jti: ${jti}):\n${jwt}\n`);
+  return { jwt, jti };
 }
 
 await generateAgentJWT(LUCY_USER_ID, "lucy@internal.hah.to");
@@ -401,6 +405,12 @@ Store these JWTs as environment variables in the agent containers:
 LUCY_JWT=eyJhbGci...
 FRANK_JWT=eyJhbGci...
 ```
+
+#### Token Revocation
+
+**Token revocation:** A `revoked_agent_tokens` table (see §5) stores revoked token JTIs (`jti text PRIMARY KEY, revoked_at timestamptz`). The `resolveActor()` function checks this table on every request for agent JWTs. To revoke a token: insert its `jti` claim. This avoids the nuclear option of rotating `SUPABASE_JWT_SECRET` (which invalidates all tokens including legitimate ones).
+
+Hand-sign agent JWTs with a unique `jti` (UUID). Store the `jti` in `openclaw.json` alongside the token for easy reference if revocation is needed.
 
 #### Step 3: RLS policies that work for agents
 
@@ -1163,6 +1173,29 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER STABLE;
 ```
 
+### Command RPC Functions
+
+```sql
+-- Semantic command RPCs (each does entity mutation + activity_log INSERT atomically)
+-- rpc_create_task(title, body, status, priority, assignee, due_date, tags, actor_id, user_id, idempotency_key)
+-- rpc_change_task_status(task_id, new_status, actor_id, user_id)
+-- rpc_create_meeting(title, date, meeting_time, tags, actor_id, user_id, idempotency_key)
+-- rpc_change_meeting_status(meeting_id, new_status, actor_id, user_id)
+-- rpc_accept_suggested_task(meeting_id, task_title, task_body, actor_id, user_id)
+-- rpc_create_library_item(type, title, description, url, tags, is_public, actor_id, user_id, idempotency_key)
+-- rpc_upsert_diary_entry(date, summary, content, actor_id, user_id)
+-- rpc_add_grocery_item(name, quantity, unit, category, actor_id, user_id, idempotency_key)
+-- rpc_check_grocery_item(item_id, is_checked, actor_id, user_id)
+-- rpc_create_company(name, domain, description, tags, actor_id, user_id, idempotency_key)
+-- rpc_create_person(name, email, role, notes, tags, actor_id, user_id, idempotency_key)
+-- rpc_create_deal(title, status, value, notes, tags, actor_id, user_id, idempotency_key)
+-- rpc_change_deal_status(deal_id, new_status, actor_id, user_id)
+-- rpc_add_comment(entity_type, entity_id, entity_label, comment_body, actor_id, user_id)
+-- rpc_update_entity(table_name, entity_id, fields jsonb, actor_id, user_id)  -- generic
+```
+
+These RPCs are defined in the initial migration. Each is a SECURITY DEFINER function so it can bypass RLS internally while still running in the caller's transaction context. The API route validates identity before calling — the RPC trusts the actor_id it receives.
+
 ### Triggers — Updated At
 
 ```sql
@@ -1211,6 +1244,17 @@ CREATE TABLE idempotency_keys (
 
 No RLS needed — this table is only accessed from API route handlers via the service role, not directly by clients.
 
+### Revoked Agent Tokens
+
+```sql
+CREATE TABLE revoked_agent_tokens (
+  jti        text PRIMARY KEY,  -- JWT ID claim
+  revoked_at timestamptz NOT NULL DEFAULT now(),
+  reason     text
+);
+-- No RLS needed — only accessible via service role / SECURITY DEFINER function
+```
+
 ### Enable Realtime
 
 ```sql
@@ -1231,7 +1275,6 @@ ALTER PUBLICATION supabase_realtime ADD TABLE activity_log;
 app/api/commands/
 ├── _lib/
 │   ├── auth.ts          # resolveActor() — shared auth resolution
-│   ├── activity.ts      # writeActivity() — shared activity_log writer. Accepts user_id (entity owner) + actor_id (who did it). These can differ — e.g. Frank (actor) creates a task for Hunter (owner).
 │   └── validate.ts      # Zod schemas + validation helpers
 ├── create-task/
 │   └── route.ts
@@ -1265,6 +1308,8 @@ app/api/commands/
     └── route.ts         # Generic field update
 ```
 
+All semantic commands correspond to a named Postgres RPC function. The API route is thin: auth resolution + RPC call + response shaping.
+
 ### Example 1: `POST /api/commands/create-task`
 
 ```typescript
@@ -1272,7 +1317,6 @@ app/api/commands/
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { resolveActor } from "../_lib/auth";
-import { writeActivity } from "../_lib/activity";
 
 const schema = z.object({
   title: z.string().min(1).max(500),
@@ -1283,6 +1327,7 @@ const schema = z.object({
   due_date: z.string().date().optional(),
   tags: z.array(z.string()).default([]),
   source_meeting_id: z.string().uuid().optional(),
+  idempotency_key: z.string().max(128).optional(),
 });
 
 export async function POST(request: Request) {
@@ -1291,28 +1336,21 @@ export async function POST(request: Request) {
     const body = await request.json();
     const input = schema.parse(body);
 
-    // Insert the task (user_id = owner, not the agent)
-    const { data: task, error } = await supabase
-      .from("tasks")
-      .insert({
-        ...input,
-        user_id: ownerId, // resolveActor resolves this for agents
-      })
-      .select()
-      .single();
+    // Single atomic RPC — creates task + writes activity_log in one transaction
+    const { data: task, error } = await supabase.rpc("rpc_create_task", {
+      p_title: input.title,
+      p_body: input.body ?? null,
+      p_status: input.status,
+      p_priority: input.priority,
+      p_assignee: input.assignee ?? null,
+      p_due_date: input.due_date ?? null,
+      p_tags: input.tags,
+      p_actor_id: actorId,
+      p_user_id: ownerId,
+      p_idempotency_key: input.idempotency_key ?? null,
+    });
 
     if (error) throw error;
-
-    // Write activity log (user_id = data owner, actor_id = who did it)
-    await writeActivity(supabase, {
-      entity_type: "task",
-      entity_id: task.id,
-      user_id: ownerId,
-      actor_id: actorId,
-      actor_type: actorType,
-      event_type: "created",
-      payload: { title: task.title },
-    });
 
     return NextResponse.json({ success: true, data: task });
   } catch (err) {
@@ -1364,7 +1402,6 @@ Content-Type: application/json
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { resolveActor } from "../_lib/auth";
-import { writeActivity } from "../_lib/activity";
 
 const schema = z.object({
   task_id: z.string().uuid(),
@@ -1377,39 +1414,15 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { task_id, status } = schema.parse(body);
 
-    // Fetch current status for the activity log
-    const { data: current } = await supabase
-      .from("tasks")
-      .select("status")
-      .eq("id", task_id)
-      .single();
-
-    if (!current) {
-      return NextResponse.json({ success: false, error: "Task not found" }, { status: 404 });
-    }
-
-    const oldStatus = current.status;
-
-    // Update
-    const { data: task, error } = await supabase
-      .from("tasks")
-      .update({ status })
-      .eq("id", task_id)
-      .select()
-      .single();
+    // Single atomic RPC — updates status + writes activity_log (with old/new values) in one transaction
+    const { data: task, error } = await supabase.rpc("rpc_change_task_status", {
+      p_task_id: task_id,
+      p_new_status: status,
+      p_actor_id: actorId,
+      p_user_id: ownerId,
+    });
 
     if (error) throw error;
-
-    // Write activity log
-    await writeActivity(supabase, {
-      entity_type: "task",
-      entity_id: task_id,
-      user_id: ownerId,
-      actor_id: actorId,
-      actor_type: actorType,
-      event_type: "status_changed",
-      payload: { field: "status", old_value: oldStatus, new_value: status },
-    });
 
     return NextResponse.json({ success: true, data: task });
   } catch (err) {
@@ -1442,7 +1455,6 @@ Authorization: Bearer <jwt>
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { resolveActor } from "../_lib/auth";
-import { writeActivity } from "../_lib/activity";
 
 const ALLOWED_TABLES = [
   "tasks", "meetings", "library_items", "diary_entries",
@@ -1457,18 +1469,6 @@ const schema = z.object({
     "At least one field required"
   ),
 });
-
-// Map table names to entity_type values
-const TABLE_TO_ENTITY: Record<string, string> = {
-  tasks: "task",
-  meetings: "meeting",
-  library_items: "library_item",
-  diary_entries: "diary_entry",
-  grocery_items: "grocery_item",
-  companies: "company",
-  people: "person",
-  deals: "deal",
-};
 
 export async function PATCH(request: Request) {
   try {
@@ -1487,24 +1487,16 @@ export async function PATCH(request: Request) {
       }
     }
 
-    const { data, error } = await supabase
-      .from(table)
-      .update(fields)
-      .eq("id", id)
-      .select()
-      .single();
+    // Single atomic RPC — updates entity + writes activity_log in one transaction
+    const { data, error } = await supabase.rpc("rpc_update_entity", {
+      p_table_name: table,
+      p_entity_id: id,
+      p_fields: fields,
+      p_actor_id: actorId,
+      p_user_id: ownerId,
+    });
 
     if (error) throw error;
-
-    await writeActivity(supabase, {
-      entity_type: TABLE_TO_ENTITY[table] ?? table,
-      entity_id: id,
-      user_id: ownerId,
-      actor_id: actorId,
-      actor_type: actorType,
-      event_type: "updated",
-      payload: { fields: Object.keys(fields) },
-    });
 
     return NextResponse.json({ success: true, data });
   } catch (err) {
@@ -1571,6 +1563,8 @@ OR user_id IN (SELECT owner_id FROM agent_owners WHERE agent_id = auth.uid())
 This is a subquery that runs once per policy evaluation. For performance, `agent_owners` is a tiny table (typically 2-3 rows total) with a PK index on `agent_id`. The subquery is effectively a single index lookup.
 
 **Performance note:** If this subquery becomes a bottleneck (unlikely with <100 users), we can memoize it with `SET LOCAL` at the start of each request or use a materialized view. But for the expected scale, this is fine.
+
+**Semantic command RPCs and RLS:** Semantic command RPCs are SECURITY DEFINER functions. They bypass RLS internally to perform mutations — which is intentional, because the API route has already validated actor identity. RLS still applies to all direct table reads.
 
 ### RLS on Join Tables
 
@@ -1978,7 +1972,6 @@ agentbase/
 │       └── commands/
 │           ├── _lib/
 │           │   ├── auth.ts
-│           │   ├── activity.ts
 │           │   └── validate.ts
 │           ├── create-task/
 │           │   └── route.ts
@@ -2063,7 +2056,8 @@ agentbase/
 │
 ├── scripts/
 │   ├── create-agent-users.ts     # One-time: create Lucy + Frank auth users
-│   └── generate-agent-jwt.ts     # One-time: generate long-lived agent JWTs
+│   ├── generate-agent-jwt.ts     # One-time: generate agent JWTs (90-day expiry, unique jti)
+│   └── refresh-agent-jwts.ts     # Periodic: regenerate agent JWTs before 90-day expiry
 │
 ├── supabase/
 │   ├── migrations/
@@ -2107,15 +2101,17 @@ agentbase/
 **Goal:** The full command bus infrastructure is working. Activity log writes and reads work. Toast system works.
 
 - [ ] Build `resolveActor()` — auth resolution for API routes (cookie + JWT)
-- [ ] Build `writeActivity()` — shared activity_log writer
-- [ ] Build `PATCH /api/commands/update` (generic update route)
-- [ ] Build `POST /api/commands/add-comment`
+- [ ] Write initial PL/pgSQL RPC functions: `rpc_create_task`, `rpc_change_task_status`, `rpc_add_comment`, `rpc_update_entity` (the first ones needed for Phase 3). Add remaining RPCs in each entity's phase.
+- [ ] Build `PATCH /api/commands/update` (generic update route — calls `rpc_update_entity`)
+- [ ] Build `POST /api/commands/add-comment` (calls `rpc_add_comment`)
 - [ ] Build `<ToastProvider>` and toast system (fires on command responses)
 - [ ] Build `<ActivityFeed>` component (fetch + render, no realtime yet)
 - [ ] Build `<CommentBox>` component
 - [ ] Build `<ActivityAndComments>` component
 - [ ] Build `<EditShelf>` component (container with activity slot)
 - [ ] Verify: can call commands via curl, see activity_log entries, see them in ActivityFeed
+
+**Note:** API routes are thin wrappers — `resolveActor()` + `rpc()` call + response. No multi-call sequences.
 
 ### Phase 3: First Full Entity — Tasks
 
@@ -2265,6 +2261,7 @@ agentbase/
 | **Grocery schema** | `item` (text), `checked` (bool), no user_id | `name`, `quantity`, `unit`, `category`, `is_checked`, `sort_order`, `user_id` | Multi-tenant. Richer data model for better UX (categories, quantities). |
 | **Tags** | Global (one namespace) | Per-user (scoped by `user_id`) | Multi-tenant isolation. |
 | **Migration strategy** | 35+ incremental migrations (organic growth) | Single initial migration with complete schema | Greenfield advantage. Clean start. |
+| **Atomicity** | Two separate Supabase calls (entity update, then activity insert) — can get out of sync | Single Postgres RPC call — entity mutation + activity_log insert in one transaction | Guaranteed consistency. No orphaned events. |
 
 ---
 
@@ -2272,8 +2269,8 @@ agentbase/
 
 These are real concerns but deliberately out of scope for v1. Ticket them when the core is stable.
 
-### L-1: JWT rotation and revocation strategy
-The 10-year agent JWTs have no revocation mechanism. If a JWT leaks, the only option is rotating the entire `SUPABASE_JWT_SECRET`, which invalidates all tokens. For now: document in onboarding that JWT secret rotation is the emergency revocation path. Future work: design a `revoked_tokens` table that API route auth checks against, or implement a shorter-lived token + refresh flow.
+### L-1: JWT refresh automation
+Agent JWTs use 90-day expiry with a manual refresh script. Future work: automate the refresh cycle (cron job that regenerates and stores JWTs before expiry, notifies if refresh fails). Also consider: PKCE-based agent auth flow for tighter security.
 
 ### L-2: Smart event detection on generic update route
 The `PATCH /api/commands/update` route writes `event_type: "updated"` for all field changes. For known semantic fields (status, priority, assignee), it could detect the change and write a richer event (e.g. `status_changed` with old/new values) automatically. Not blocking — semantic action routes handle the important mutations. Add after v1 is stable.
