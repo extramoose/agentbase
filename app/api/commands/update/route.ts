@@ -5,7 +5,7 @@ import { apiError } from '@/lib/api/errors'
 
 const ALLOWED_TABLES = [
   'tasks', 'meetings', 'library_items', 'diary_entries',
-  'grocery_items', 'companies', 'people', 'deals',
+  'grocery_items', 'companies', 'people', 'deals', 'essays',
 ] as const
 
 const schema = z.object({
