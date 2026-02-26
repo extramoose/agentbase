@@ -7,6 +7,7 @@ import {
   PointerSensor,
   useSensor,
   useSensors,
+  useDroppable,
   type DragEndEvent,
 } from '@dnd-kit/core'
 import {
@@ -16,7 +17,7 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { GripVertical, Plus, ChevronDown, ChevronRight, Trash2 } from 'lucide-react'
+import { GripVertical, Plus, ChevronDown, ChevronRight, AlertCircle, ArrowUp, Minus, ArrowDown } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { EditShelf } from '@/components/edit-shelf'
 import { SearchFilterBar } from '@/components/search-filter-bar'
@@ -67,12 +68,12 @@ type CurrentUser = {
 
 const PRIORITY_ORDER: Priority[] = ['urgent', 'high', 'medium', 'low', 'none']
 
-const PRIORITY_CONFIG: Record<Priority, { label: string; color: string; icon: string }> = {
-  urgent: { label: 'Urgent', color: 'text-red-400', icon: '🔴' },
-  high: { label: 'High', color: 'text-orange-400', icon: '🟠' },
-  medium: { label: 'Medium', color: 'text-yellow-400', icon: '🟡' },
-  low: { label: 'Low', color: 'text-blue-400', icon: '🔵' },
-  none: { label: 'No priority', color: 'text-muted-foreground', icon: '⚪' },
+const PRIORITY_CONFIG: Record<Priority, { label: string; color: string }> = {
+  urgent: { label: 'Urgent', color: 'text-red-500' },
+  high: { label: 'High', color: 'text-orange-400' },
+  medium: { label: 'Medium', color: 'text-muted-foreground' },
+  low: { label: 'Low', color: 'text-slate-400' },
+  none: { label: 'No priority', color: 'text-muted-foreground' },
 }
 
 const STATUS_CONFIG: Record<Status, { label: string; className: string }> = {
@@ -93,6 +94,21 @@ const STATUS_TABS: Array<{ value: Status | 'all'; label: string }> = [
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+function PriorityIcon({ priority, className }: { priority: Priority; className?: string }) {
+  switch (priority) {
+    case 'urgent':
+      return <AlertCircle className={cn('h-4 w-4 text-red-500', className)} />
+    case 'high':
+      return <ArrowUp className={cn('h-4 w-4 text-orange-400', className)} />
+    case 'medium':
+      return <Minus className={cn('h-4 w-4 text-muted-foreground', className)} />
+    case 'low':
+      return <ArrowDown className={cn('h-4 w-4 text-slate-400', className)} />
+    case 'none':
+      return <Minus className={cn('h-4 w-4 text-muted-foreground/50', className)} />
+  }
+}
 
 function groupByPriority(tasks: Task[]): Record<Priority, Task[]> {
   const groups: Record<Priority, Task[]> = {
@@ -136,7 +152,6 @@ function SortableTaskRow({
   }
 
   const statusCfg = STATUS_CONFIG[task.status]
-  const priorityCfg = PRIORITY_CONFIG[task.priority]
   const visibleTags = task.tags.slice(0, 2)
   const extraTagCount = task.tags.length - 2
 
@@ -144,7 +159,7 @@ function SortableTaskRow({
     <div
       ref={setNodeRef}
       style={style}
-      className="group flex items-center gap-2 px-3 py-2 rounded-md hover:bg-muted/50 cursor-pointer border border-transparent hover:border-border transition-colors"
+      className="group flex items-center gap-2 px-3 py-1.5 rounded-md hover:bg-accent/40 cursor-pointer border border-transparent hover:border-border transition-colors"
       onClick={onClick}
     >
       {/* Drag handle */}
@@ -163,13 +178,13 @@ function SortableTaskRow({
         #{task.ticket_id}
       </span>
 
-      {/* Priority dot */}
-      <span className="shrink-0 text-sm" title={priorityCfg.label}>
-        {priorityCfg.icon}
+      {/* Priority icon */}
+      <span className="shrink-0" title={PRIORITY_CONFIG[task.priority].label}>
+        <PriorityIcon priority={task.priority} />
       </span>
 
       {/* Title */}
-      <span className="flex-1 text-base truncate">{task.title}</span>
+      <span className="flex-1 text-sm font-medium truncate">{task.title}</span>
 
       {/* Status badge */}
       <Badge
@@ -227,7 +242,6 @@ function PriorityGroup({
   priority,
   tasks,
   onTaskClick,
-  onDragEnd,
   addingTo,
   onStartAdding,
   onCreateTask,
@@ -235,7 +249,6 @@ function PriorityGroup({
   priority: Priority
   tasks: Task[]
   onTaskClick: (task: Task) => void
-  onDragEnd: (event: DragEndEvent, priority: Priority) => void
   addingTo: boolean
   onStartAdding: () => void
   onCreateTask: (title: string, priority: Priority) => void
@@ -244,10 +257,7 @@ function PriorityGroup({
   const [newTitle, setNewTitle] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
   const cfg = PRIORITY_CONFIG[priority]
-
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
-  )
+  const { setNodeRef } = useDroppable({ id: `droppable-${priority}` })
 
   useEffect(() => {
     if (addingTo) inputRef.current?.focus()
@@ -264,7 +274,7 @@ function PriorityGroup({
     <div className="mb-4">
       {/* Group header */}
       <button
-        className="flex items-center gap-2 py-2 px-1 w-full text-left hover:bg-muted/30 rounded-md transition-colors"
+        className="flex items-center gap-2 py-1.5 px-1 w-full text-left hover:bg-muted/30 rounded-md transition-colors"
         onClick={() => setCollapsed(!collapsed)}
       >
         {collapsed ? (
@@ -272,17 +282,18 @@ function PriorityGroup({
         ) : (
           <ChevronDown className="h-4 w-4 text-muted-foreground" />
         )}
-        <span className={cn('text-sm font-medium', cfg.color)}>
-          {cfg.icon} {cfg.label}
+        <span className={cn('text-sm font-medium flex items-center gap-1.5', cfg.color)}>
+          <PriorityIcon priority={priority} className="h-3.5 w-3.5" />
+          {cfg.label}
         </span>
         <span className="text-xs text-muted-foreground">({tasks.length})</span>
       </button>
 
       {!collapsed && (
-        <div className="ml-1">
+        <div ref={setNodeRef} className="ml-1 min-h-[2px]">
           {/* Quick-add input */}
           {addingTo && (
-            <div className="flex items-center gap-2 px-3 py-2">
+            <div className="flex items-center gap-2 px-3 py-1.5">
               <Input
                 ref={inputRef}
                 value={newTitle}
@@ -301,29 +312,23 @@ function PriorityGroup({
           )}
 
           {/* Sortable task rows */}
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragEnd={(e) => onDragEnd(e, priority)}
+          <SortableContext
+            items={tasks.map((t) => t.id)}
+            strategy={verticalListSortingStrategy}
           >
-            <SortableContext
-              items={tasks.map((t) => t.id)}
-              strategy={verticalListSortingStrategy}
-            >
-              {tasks.map((task) => (
-                <SortableTaskRow
-                  key={task.id}
-                  task={task}
-                  onClick={() => onTaskClick(task)}
-                />
-              ))}
-            </SortableContext>
-          </DndContext>
+            {tasks.map((task) => (
+              <SortableTaskRow
+                key={task.id}
+                task={task}
+                onClick={() => onTaskClick(task)}
+              />
+            ))}
+          </SortableContext>
 
           {tasks.length === 0 && !addingTo && (
             <button
               onClick={onStartAdding}
-              className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+              className="flex items-center gap-2 px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
               <Plus className="h-3 w-3" />
               Add task
@@ -352,6 +357,9 @@ export function TasksClient({
   const [addingToPriority, setAddingToPriority] = useState<Priority | null>(null)
 
   const supabase = createClient()
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+  )
 
   // ----- Realtime subscription -----
 
@@ -506,64 +514,66 @@ export function TasksClient({
     []
   )
 
-  // ----- Delete task -----
-
-  const deleteTask = useCallback(
-    async (taskId: string) => {
-      const prev = tasks
-      setTasks((t) => t.filter((x) => x.id !== taskId))
-      setSelectedTask(null)
-
-      try {
-        const res = await fetch(`/api/tasks/${taskId}`, { method: 'DELETE' })
-        const json = await res.json()
-        if (!res.ok) throw new Error(json.error ?? 'Delete failed')
-        toast({ type: 'success', message: 'Task deleted' })
-      } catch (err) {
-        setTasks(prev)
-        toast({
-          type: 'error',
-          message: err instanceof Error ? err.message : 'Delete failed',
-        })
-      }
-    },
-    [tasks]
-  )
-
-  // ----- Drag reorder within priority group -----
+  // ----- Drag reorder / cross-group priority change -----
 
   const handleDragEnd = useCallback(
-    (event: DragEndEvent, priority: Priority) => {
+    (event: DragEndEvent) => {
       const { active, over } = event
       if (!over || active.id === over.id) return
 
-      const group = grouped[priority]
-      const oldIndex = group.findIndex((t) => t.id === active.id)
-      const newIndex = group.findIndex((t) => t.id === over.id)
-      if (oldIndex === -1 || newIndex === -1) return
+      const activeTask = filteredTasks.find((t) => t.id === active.id)
+      if (!activeTask) return
 
-      const reordered = arrayMove(group, oldIndex, newIndex)
+      // Determine target priority
+      const overIdStr = String(over.id)
+      let targetPriority: Priority
+      if (overIdStr.startsWith('droppable-')) {
+        targetPriority = overIdStr.replace('droppable-', '') as Priority
+      } else {
+        const overTask = filteredTasks.find((t) => t.id === over.id)
+        if (!overTask) return
+        targetPriority = overTask.priority
+      }
 
-      // Update local state
-      setTasks((prev) => {
-        const otherTasks = prev.filter((t) => t.priority !== priority)
-        const updated = reordered.map((t, i) => ({ ...t, sort_order: i }))
-        return [...otherTasks, ...updated]
-      })
+      if (activeTask.priority === targetPriority) {
+        // Same group: reorder
+        const group = grouped[targetPriority]
+        const oldIndex = group.findIndex((t) => t.id === active.id)
+        const newIndex = group.findIndex((t) => t.id === over.id)
+        if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) return
 
-      // Persist new sort_order for the moved task
-      const movedTask = reordered[newIndex]
-      updateTaskField(movedTask.id, { sort_order: newIndex })
+        const reordered = arrayMove(group, oldIndex, newIndex)
+
+        setTasks((prev) => {
+          const otherTasks = prev.filter((t) => t.priority !== targetPriority)
+          const updated = reordered.map((t, i) => ({ ...t, sort_order: i }))
+          return [...otherTasks, ...updated]
+        })
+
+        updateTaskField(activeTask.id, { sort_order: newIndex })
+      } else {
+        // Cross-group: update priority
+        const targetGroup = grouped[targetPriority]
+        const newSortOrder = targetGroup.length
+
+        setTasks((prev) =>
+          prev.map((t) =>
+            t.id === activeTask.id
+              ? { ...t, priority: targetPriority, sort_order: newSortOrder, updated_at: new Date().toISOString() }
+              : t
+          )
+        )
+
+        updateTaskField(activeTask.id, { priority: targetPriority, sort_order: newSortOrder })
+      }
     },
-    [grouped, updateTaskField]
+    [filteredTasks, grouped, updateTaskField]
   )
 
   // ----- New task button -----
 
   function handleNewTask() {
-    const priority: Priority =
-      statusFilter === 'all' ? 'medium' : 'medium'
-    setAddingToPriority(priority)
+    setAddingToPriority('medium')
   }
 
   // ----- Visible priority groups -----
@@ -628,18 +638,23 @@ export function TasksClient({
 
       {/* Priority groups */}
       <div className="flex-1 overflow-y-auto">
-        {displayPriorities.map((priority) => (
-          <PriorityGroup
-            key={priority}
-            priority={priority}
-            tasks={grouped[priority]}
-            onTaskClick={(task) => setSelectedTask(task)}
-            onDragEnd={handleDragEnd}
-            addingTo={addingToPriority === priority}
-            onStartAdding={() => setAddingToPriority(priority)}
-            onCreateTask={createTask}
-          />
-        ))}
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          {displayPriorities.map((priority) => (
+            <PriorityGroup
+              key={priority}
+              priority={priority}
+              tasks={grouped[priority]}
+              onTaskClick={(task) => setSelectedTask(task)}
+              addingTo={addingToPriority === priority}
+              onStartAdding={() => setAddingToPriority(priority)}
+              onCreateTask={createTask}
+            />
+          ))}
+        </DndContext>
 
         {filteredTasks.length === 0 && !addingToPriority && (
           <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
@@ -663,7 +678,6 @@ export function TasksClient({
           task={selectedTask}
           onClose={() => setSelectedTask(null)}
           onUpdate={updateTaskField}
-          onDelete={deleteTask}
         />
       )}
     </div>
@@ -678,12 +692,10 @@ function TaskEditShelf({
   task,
   onClose,
   onUpdate,
-  onDelete,
 }: {
   task: Task
   onClose: () => void
   onUpdate: (id: string, fields: Record<string, unknown>) => Promise<void>
-  onDelete: (id: string) => Promise<void>
 }) {
   const [title, setTitle] = useState(task.title)
   const [body, setBody] = useState(task.body ?? '')
@@ -721,21 +733,14 @@ function TaskEditShelf({
     <EditShelf
       isOpen
       onClose={onClose}
-      title={`Task #${task.ticket_id}`}
+      title={task.title}
       entityType="tasks"
       entityId={task.id}
-      headerRight={
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => onDelete(task.id)}
-          className="text-muted-foreground hover:text-destructive"
-        >
-          <Trash2 className="h-4 w-4" />
-        </Button>
-      }
     >
       <div className="space-y-5">
+        {/* Ticket number */}
+        <p className="text-xs text-muted-foreground -mt-1">#{task.ticket_id}</p>
+
         {/* Title */}
         <div>
           <label className="text-xs text-muted-foreground font-medium mb-1 block">
@@ -788,7 +793,7 @@ function TaskEditShelf({
             >
               {PRIORITY_ORDER.map((p) => (
                 <option key={p} value={p}>
-                  {PRIORITY_CONFIG[p].icon} {PRIORITY_CONFIG[p].label}
+                  {PRIORITY_CONFIG[p].label}
                 </option>
               ))}
             </select>
