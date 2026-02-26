@@ -6,25 +6,15 @@ import { ActorChip } from '@/components/actor-chip'
 import { SearchFilterBar } from '@/components/search-filter-bar'
 import { Badge } from '@/components/ui/badge'
 import { formatDistanceToNow } from 'date-fns'
-import { Loader2 } from 'lucide-react'
-import { formatActivityEvent } from '@/lib/format-activity'
+import { ChevronRight, Loader2 } from 'lucide-react'
+import {
+  formatActivityEvent,
+  groupActivityItems,
+  getMostSignificantItem,
+  type ActivityLogEntry,
+} from '@/lib/format-activity'
 import { EntityPreviewShelf, TABLE_MAP } from '@/components/entity-preview-shelf'
 import { MarkdownRenderer } from '@/components/markdown-renderer'
-
-type ActivityEntry = {
-  id: string
-  entity_type: string
-  entity_id: string
-  entity_label: string | null
-  event_type: string
-  actor_id: string
-  actor_type: 'human' | 'agent'
-  old_value: string | null
-  new_value: string | null
-  body: string | null
-  payload: Record<string, unknown> | null
-  created_at: string
-}
 
 const ENTITY_COLORS: Record<string, string> = {
   tasks:          'bg-blue-500/20 text-blue-400',
@@ -47,11 +37,11 @@ function formatEntityType(type: string): string {
 }
 
 interface HistoryClientProps {
-  initialEntries: ActivityEntry[]
+  initialEntries: ActivityLogEntry[]
 }
 
 export function HistoryClient({ initialEntries }: HistoryClientProps) {
-  const [entries, setEntries] = useState<ActivityEntry[]>(initialEntries)
+  const [entries, setEntries] = useState<ActivityLogEntry[]>(initialEntries)
   const [search, setSearch] = useState('')
   const [entityFilter, setEntityFilter] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -61,8 +51,18 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
     entityId: string
     entityLabel: string | null
   } | null>(null)
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
   const sentinelRef = useRef<HTMLDivElement>(null)
   const supabase = createClient()
+
+  function toggleGroup(groupKey: string) {
+    setExpandedGroups(prev => {
+      const next = new Set(prev)
+      if (next.has(groupKey)) next.delete(groupKey)
+      else next.add(groupKey)
+      return next
+    })
+  }
 
   // Load more entries
   const loadMore = useCallback(async () => {
@@ -74,7 +74,7 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
       ...(entityFilter ? { p_entity_type: entityFilter } : {}),
       ...(search.trim() ? { p_search: search.trim() } : {}),
     })
-    const newEntries = (data ?? []) as ActivityEntry[]
+    const newEntries = (data ?? []) as ActivityLogEntry[]
     setEntries(prev => [...prev, ...newEntries])
     setHasMore(newEntries.length >= 50)
     setLoading(false)
@@ -104,7 +104,7 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
         ...(search.trim() ? { p_search: search.trim() } : {}),
       })
       if (cancelled) return
-      const results = (data ?? []) as ActivityEntry[]
+      const results = (data ?? []) as ActivityLogEntry[]
       setEntries(results)
       setHasMore(results.length >= 50)
       setLoading(false)
@@ -121,7 +121,7 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'activity_log' },
         (payload) => {
-          const newEntry = payload.new as ActivityEntry
+          const newEntry = payload.new as ActivityLogEntry
           setEntries(prev => {
             if (prev.some(e => e.id === newEntry.id)) return prev
             return [newEntry, ...prev]
@@ -133,10 +133,47 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
     return () => { supabase.removeChannel(channel) }
   }, [supabase])
 
-  // Client-side filtering for realtime entries that may not match server filter
-  const filteredEntries = useMemo(() => {
-    return entries
-  }, [entries])
+  // Group consecutive same-entity activity items
+  const groups = useMemo(() => groupActivityItems(entries), [entries])
+
+  function renderSingleEntry(entry: ActivityLogEntry) {
+    const isDeleted = entry.event_type === 'deleted'
+    const isClickable = TABLE_MAP[entry.entity_type] != null && entry.entity_id != null && !isDeleted
+    return (
+      <div
+        key={entry.id}
+        className={`flex items-start gap-3 rounded-lg px-3 py-3 hover:bg-muted/40 transition-colors${isClickable ? ' cursor-pointer' : ''}`}
+        onClick={isClickable ? () => setActiveEntity({
+          entityType: entry.entity_type,
+          entityId: entry.entity_id,
+          entityLabel: entry.entity_label ?? null,
+        }) : undefined}
+      >
+        <ActorChip actorId={entry.actor_id} actorType={entry.actor_type} compact />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <Badge
+              variant="secondary"
+              className={`text-[10px] px-1.5 py-0 ${ENTITY_COLORS[entry.entity_type] ?? 'bg-muted text-muted-foreground'}`}
+            >
+              {formatEntityType(entry.entity_type)}
+            </Badge>
+            <span className={`text-sm ${isDeleted ? 'text-red-400' : 'text-foreground'}`}>
+              {formatActivityEvent(entry)}
+            </span>
+          </div>
+          {entry.event_type === 'commented' && entry.body && (
+            <div className="mt-1 rounded-md bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+              <MarkdownRenderer content={entry.body} />
+            </div>
+          )}
+        </div>
+        <span suppressHydrationWarning className="text-xs text-muted-foreground whitespace-nowrap shrink-0">
+          {formatDistanceToNow(new Date(entry.created_at), { addSuffix: true })}
+        </span>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -174,48 +211,60 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
 
       {/* Activity list */}
       <div className="space-y-1">
-        {filteredEntries.length === 0 && !loading ? (
+        {groups.length === 0 && !loading ? (
           <p className="text-sm text-muted-foreground py-8 text-center">
             No activity found.
           </p>
         ) : (
-          filteredEntries.map(entry => {
-            const isDeleted = entry.event_type === 'deleted'
-            const isClickable = TABLE_MAP[entry.entity_type] != null && entry.entity_id != null && !isDeleted
+          groups.map(group => {
+            // Single-item group — render exactly as before
+            if (group.items.length === 1) {
+              return renderSingleEntry(group.items[0])
+            }
+
+            // Multi-item group — collapsed/expandable row
+            const groupKey = group.firstItem.id
+            const isExpanded = expandedGroups.has(groupKey)
+            const headline = getMostSignificantItem(group.items)
+            const extraCount = group.items.length - 1
+
             return (
-            <div
-              key={entry.id}
-              className={`flex items-start gap-3 rounded-lg px-3 py-3 hover:bg-muted/40 transition-colors${isClickable ? ' cursor-pointer' : ''}`}
-              onClick={isClickable ? () => setActiveEntity({
-                entityType: entry.entity_type,
-                entityId: entry.entity_id,
-                entityLabel: entry.entity_label ?? null,
-              }) : undefined}
-            >
-              <ActorChip actorId={entry.actor_id} actorType={entry.actor_type} compact />
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <Badge
-                    variant="secondary"
-                    className={`text-[10px] px-1.5 py-0 ${ENTITY_COLORS[entry.entity_type] ?? 'bg-muted text-muted-foreground'}`}
-                  >
-                    {formatEntityType(entry.entity_type)}
-                  </Badge>
-                  <span className={`text-sm ${isDeleted ? 'text-red-400' : 'text-foreground'}`}>
-                    {formatActivityEvent(entry)}
+              <div key={groupKey}>
+                <div
+                  className="flex items-start gap-3 rounded-lg px-3 py-3 hover:bg-muted/40 transition-colors cursor-pointer"
+                  onClick={() => toggleGroup(groupKey)}
+                >
+                  <ActorChip actorId={group.firstItem.actor_id} actorType={group.firstItem.actor_type} compact />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Badge
+                        variant="secondary"
+                        className={`text-[10px] px-1.5 py-0 ${ENTITY_COLORS[group.entityType] ?? 'bg-muted text-muted-foreground'}`}
+                      >
+                        {formatEntityType(group.entityType)}
+                      </Badge>
+                      <span className={`text-sm ${headline.event_type === 'deleted' ? 'text-red-400' : 'text-foreground'}`}>
+                        {formatActivityEvent(headline)}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        +{extraCount} more {extraCount === 1 ? 'change' : 'changes'}
+                      </span>
+                    </div>
+                  </div>
+                  <span suppressHydrationWarning className="text-xs text-muted-foreground whitespace-nowrap shrink-0">
+                    {formatDistanceToNow(new Date(group.latestItem.created_at), { addSuffix: true })}
                   </span>
+                  <ChevronRight className={`h-4 w-4 text-muted-foreground shrink-0 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
                 </div>
-                {entry.event_type === 'commented' && entry.body && (
-                  <div className="mt-1 rounded-md bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
-                    <MarkdownRenderer content={entry.body} />
+
+                {isExpanded && (
+                  <div className="border-l-2 border-muted ml-6 space-y-1">
+                    {group.items.map(entry => renderSingleEntry(entry))}
                   </div>
                 )}
               </div>
-              <span suppressHydrationWarning className="text-xs text-muted-foreground whitespace-nowrap shrink-0">
-                {formatDistanceToNow(new Date(entry.created_at), { addSuffix: true })}
-              </span>
-            </div>
-          )})
+            )
+          })
         )}
       </div>
 

@@ -42,6 +42,73 @@ function TagChip({ tag, variant }: { tag: string; variant: 'added' | 'removed' }
   )
 }
 
+export type ActivityLogEntry = {
+  id: string
+  entity_type: string
+  entity_id: string
+  entity_label: string | null
+  event_type: string
+  actor_id: string
+  actor_type: 'human' | 'agent'
+  old_value: string | null
+  new_value: string | null
+  body: string | null
+  payload: Record<string, unknown> | null
+  created_at: string
+}
+
+export interface ActivityGroup {
+  items: ActivityLogEntry[]
+  entityId: string
+  entityType: string
+  firstItem: ActivityLogEntry
+  latestItem: ActivityLogEntry
+}
+
+const EVENT_SIGNIFICANCE: Record<string, number> = {
+  created: 0,
+  deleted: 1,
+  status_changed: 2,
+  priority_changed: 3,
+  assignee_changed: 4,
+  commented: 5,
+  updated: 6,
+}
+
+export function getMostSignificantItem(items: ActivityLogEntry[]): ActivityLogEntry {
+  return items.reduce((best, item) => {
+    const bestPrio = EVENT_SIGNIFICANCE[best.event_type] ?? 99
+    const itemPrio = EVENT_SIGNIFICANCE[item.event_type] ?? 99
+    return itemPrio < bestPrio ? item : best
+  })
+}
+
+export function groupActivityItems(items: ActivityLogEntry[]): ActivityGroup[] {
+  const groups: ActivityGroup[] = []
+
+  for (const item of items) {
+    const lastGroup = groups[groups.length - 1]
+    const timeDiff = lastGroup
+      ? Math.abs(new Date(lastGroup.latestItem.created_at).getTime() - new Date(item.created_at).getTime())
+      : Infinity
+
+    if (lastGroup && lastGroup.entityId === item.entity_id && timeDiff <= 60000) {
+      lastGroup.items.push(item)
+      lastGroup.latestItem = item
+    } else {
+      groups.push({
+        items: [item],
+        entityId: item.entity_id,
+        entityType: item.entity_type,
+        firstItem: item,
+        latestItem: item,
+      })
+    }
+  }
+
+  return groups
+}
+
 export function formatActivityEvent(event: {
   event_type: string
   entity_type: string
