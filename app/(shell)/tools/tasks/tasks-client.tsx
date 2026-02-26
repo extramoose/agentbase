@@ -567,7 +567,7 @@ export function TasksClient({
       setAddingToPriority(null)
 
       try {
-        const res = await fetch('/api/tasks', {
+        const res = await fetch('/api/commands/create-task', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -715,7 +715,11 @@ export function TasksClient({
     setSelectedTask(null)
     router.replace(`/tools/tasks${buildQs()}`)
     try {
-      const res = await fetch(`/api/tasks/${id}`, { method: 'DELETE' })
+      const res = await fetch('/api/commands/delete-entity', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ table: 'tasks', id }),
+      })
       if (!res.ok) {
         const json = await res.json()
         throw new Error(json.error ?? 'Failed to delete')
@@ -754,7 +758,11 @@ export function TasksClient({
     setTasks((prev) => prev.filter((t) => !ids.includes(t.id)))
     setSelectedIds(new Set())
     try {
-      const results = await Promise.all(ids.map((id) => fetch(`/api/tasks/${id}`, { method: 'DELETE' })))
+      const results = await Promise.all(ids.map((id) => fetch('/api/commands/delete-entity', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ table: 'tasks', id }),
+      })))
       const failed = results.filter((r) => !r.ok)
       if (failed.length > 0) throw new Error(`${failed.length} deletes failed`)
       toast({ type: 'success', message: `Deleted ${ids.length} task${ids.length === 1 ? '' : 's'}` })

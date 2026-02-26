@@ -134,7 +134,7 @@ export function GroceryClient({
     nameInputRef.current?.focus()
 
     try {
-      const res = await fetch('/api/grocery', {
+      const res = await fetch('/api/commands/create-grocery-item', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -195,7 +195,11 @@ export function GroceryClient({
       setItems((t) => t.filter((i) => i.id !== id))
 
       try {
-        const res = await fetch(`/api/grocery/${id}`, { method: 'DELETE' })
+        const res = await fetch('/api/commands/delete-entity', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ table: 'grocery_items', id }),
+        })
         const json = await res.json()
         if (!res.ok) throw new Error(json.error ?? 'Delete failed')
       } catch {

@@ -12,13 +12,188 @@ Authorization: Bearer <api_key>
 
 **Humans** authenticate via cookie session (browser only — do not send Bearer tokens from browsers).
 
-All mutating endpoints (`POST`, `PATCH`, `DELETE`) attribute actions to the authenticated actor. `actor_id` and `actor_type` are resolved server-side — do not send them in request bodies.
+All mutating endpoints attribute actions to the authenticated actor. `actor_id` and `actor_type` are resolved server-side — do not send them in request bodies.
 
 ---
 
-## Commands (agent-optimized mutation API)
+## Commands (write API)
 
-These two routes are the primary interface for agents. They handle any entity update or comment without needing entity-specific routes.
+All writes go through `/api/commands/*`. Resource routes are read-only (GET).
+
+### POST /api/commands/create-task
+
+Create a task.
+
+**Body:**
+```json
+{
+  "title": "Do the thing",
+  "priority": "high",
+  "status": "todo",
+  "body": "Optional description"
+}
+```
+- `priority` default: `"medium"` — one of: `urgent`, `high`, `medium`, `low`, `none`
+- `status` default: `"todo"` — one of: `todo`, `in_progress`, `done`, `blocked`
+- Optional: `assignee_id` (uuid), `assignee_type` (`human` | `agent`), `type` (`bug` | `improvement` | `feature`), `idempotency_key`
+
+**Response:** `{ "data": { ...task } }` — HTTP 201
+
+---
+
+### POST /api/commands/create-meeting
+
+**Body:**
+```json
+{
+  "title": "Weekly sync",
+  "date": "2026-03-01",
+  "meeting_time": "10:00",
+  "tags": ["work"]
+}
+```
+- Optional: `idempotency_key`
+
+**Response:** `{ "data": { ...meeting } }` — HTTP 201
+
+---
+
+### POST /api/commands/create-library-item
+
+**Body:**
+```json
+{
+  "type": "note",
+  "title": "Van maintenance log",
+  "body": "Replaced brake pads...",
+  "tags": ["van", "maintenance"],
+  "is_public": false
+}
+```
+- `type` — one of: `favorite`, `flag`, `restaurant`, `note`, `idea`, `article`
+- Optional: `url`, `source`, `excerpt`, `location_name`, `latitude`, `longitude`, `idempotency_key`
+
+**Response:** `{ "data": { ...library_item } }` — HTTP 201
+
+---
+
+### POST /api/commands/create-company
+
+**Body:**
+```json
+{
+  "name": "Acme Corp",
+  "domain": "acme.com",
+  "industry": "Software",
+  "notes": "Met at SaaStr",
+  "tags": ["prospect"]
+}
+```
+- Optional: `domain`, `industry`, `notes`, `tags`, `idempotency_key`
+
+**Response:** `{ "data": { ...company } }` — HTTP 201
+
+---
+
+### POST /api/commands/create-person
+
+**Body:**
+```json
+{
+  "name": "Jane Smith",
+  "email": "jane@acme.com",
+  "phone": "+1 555 0100",
+  "title": "CTO",
+  "tags": ["investor"]
+}
+```
+- Optional: `email`, `phone`, `title`, `notes`, `tags`, `idempotency_key`
+
+**Response:** `{ "data": { ...person } }` — HTTP 201
+
+---
+
+### POST /api/commands/create-deal
+
+**Body:**
+```json
+{
+  "title": "Acme Enterprise",
+  "status": "prospect",
+  "value": 50000,
+  "notes": "Intro call scheduled"
+}
+```
+- `status` default: `"prospect"` — one of: `prospect`, `active`, `won`, `lost`
+- Optional: `value`, `notes`, `tags`, `idempotency_key`
+
+**Response:** `{ "data": { ...deal } }` — HTTP 201
+
+---
+
+### POST /api/commands/create-grocery-item
+
+**Body:**
+```json
+{
+  "name": "Oat milk",
+  "category": "Dairy",
+  "quantity": "2"
+}
+```
+- Optional: `category`, `quantity`, `idempotency_key`
+
+**Response:** `{ "data": { ...grocery_item } }` — HTTP 201
+
+---
+
+### POST /api/commands/create-diary-entry
+
+Upserts (creates or replaces) the entry for the given date.
+
+**Body:**
+```json
+{
+  "date": "2026-02-26",
+  "content": "Today I..."
+}
+```
+
+**Response:** `{ "data": { ...diary_entry } }`
+
+---
+
+### POST /api/commands/create-essay
+
+**Body:**
+```json
+{
+  "title": "My Essay"
+}
+```
+- Optional: `idempotency_key`
+
+**Response:** `{ "data": { ...essay } }` — HTTP 201
+
+---
+
+### POST /api/commands/delete-entity
+
+Delete any entity. Agents cannot use this endpoint.
+
+**Body:**
+```json
+{
+  "table": "tasks",
+  "id": "<uuid>"
+}
+```
+
+**`table`** — one of: `tasks`, `meetings`, `library_items`, `companies`, `people`, `deals`, `grocery_items`, `diary_entries`, `essays`, `stream_entries`, `document_versions`
+
+**Response:** `{ "success": true }`
+
+---
 
 ### PATCH /api/commands/update
 
@@ -36,7 +211,7 @@ Update any field on any entity.
 }
 ```
 
-**`table`** — one of: `tasks`, `meetings`, `library_items`, `diary_entries`, `grocery_items`, `companies`, `people`, `deals`
+**`table`** — one of: `tasks`, `meetings`, `library_items`, `diary_entries`, `grocery_items`, `companies`, `people`, `deals`, `essays`
 
 **`fields`** — any updatable columns. Protected fields (`id`, `tenant_id`, `created_at`, `ticket_id`) are rejected. Type coercions:
 - `tags` → `string[]` (JSON array)
@@ -72,299 +247,85 @@ Add a comment to any entity.
 
 ---
 
-## Tasks
+### POST /api/commands/batch-update
 
-### GET /api/tasks
-Returns all tasks in the workspace, ordered by `sort_order` then `created_at` desc.
-
-**Response:** `{ "data": [ ...tasks ] }`
-
-**Task fields:**
-```
-id              uuid
-tenant_id       uuid
-title           text
-body            text | null
-status          text  — todo | in_progress | done | blocked | cancelled
-priority        text  — urgent | high | medium | low | none
-assignee        text | null
-due_date        date | null   (YYYY-MM-DD)
-tags            string[]
-source_meeting_id  uuid | null
-sort_order      integer
-ticket_id       integer | null
-created_at      timestamptz
-updated_at      timestamptz
-```
-
-### POST /api/tasks
-Create a task.
+Batch update multiple entities of the same type.
 
 **Body:**
 ```json
 {
-  "title": "Do the thing",
-  "priority": "high",
-  "status": "todo",
-  "body": "Optional description"
+  "table": "tasks",
+  "ids": ["<uuid>", "<uuid>"],
+  "fields": { "status": "done" }
 }
 ```
-- `priority` default: `"medium"`
-- `status` default: `"todo"`
 
-**Response:** `{ "data": { ...task } }` — HTTP 201
-
-### DELETE /api/tasks/:id
-Delete a task.
-
-**Response:** `{ "success": true }`
+**Response:** `{ "success": true, "updated": 2 }`
 
 ---
 
-## Meetings
+## Reads (resource routes)
+
+All resource routes are read-only (GET).
+
+### GET /api/tasks
+Returns all tasks ordered by `sort_order` then `created_at` desc.
+
+**Task fields:**
+```
+id, tenant_id, title, body, status, priority, assignee, due_date,
+tags, source_meeting_id, sort_order, ticket_id, created_at, updated_at
+```
 
 ### GET /api/meetings
 Returns all meetings ordered by `date` desc.
 
 **Meeting fields:**
 ```
-id              uuid
-tenant_id       uuid
-title           text
-date            date | null
-meeting_time    text | null
-status          text  — upcoming | in_meeting | ended | closed
-live_notes      text | null
-summary         text | null
-proposed_tasks  jsonb | null
-tags            string[]
-created_at      timestamptz
-updated_at      timestamptz
+id, tenant_id, title, date, meeting_time, status, live_notes,
+summary, proposed_tasks, tags, created_at, updated_at
 ```
-
-### POST /api/meetings
-```json
-{
-  "title": "Weekly sync",
-  "date": "2026-03-01",
-  "meeting_time": "10:00",
-  "tags": ["work"]
-}
-```
-
-### DELETE /api/meetings/:id
 
 ### POST /api/meetings/:id/summarize
-Triggers AI summary generation using the workspace's configured OpenRouter model. Returns `{ "summary": "..." }`.
+Triggers AI summary generation. Returns `{ "summary": "..." }`.
 
 ### POST /api/meetings/:id/suggest-tasks
-Generates suggested follow-up tasks from meeting notes. Returns `{ "tasks": [...] }`.
-
----
-
-## Library
+Generates suggested follow-up tasks. Returns `{ "tasks": [...] }`.
 
 ### GET /api/library
 Returns all library items ordered by `created_at` desc.
 
 **Item types:** `favorite` | `flag` | `restaurant` | `note` | `idea` | `article`
 
-**Library item fields:**
-```
-id              uuid
-tenant_id       uuid
-type            text
-title           text
-url             text | null
-source          text | null
-excerpt         text | null
-body            text | null
-location_name   text | null
-latitude        numeric | null
-longitude       numeric | null
-tags            string[]
-is_public       boolean
-created_at      timestamptz
-updated_at      timestamptz
-```
-
-### POST /api/library
-```json
-{
-  "type": "note",
-  "title": "Van maintenance log",
-  "body": "Replaced brake pads...",
-  "tags": ["van", "maintenance"],
-  "is_public": false
-}
-```
-
-### DELETE /api/library/:id
-
----
-
-## Diary
-
 ### GET /api/diary
 Returns all diary entries ordered by `date` desc.
-
-**Diary entry fields:**
-```
-id              uuid
-tenant_id       uuid
-date            date   (YYYY-MM-DD)
-content         text
-created_at      timestamptz
-updated_at      timestamptz
-```
 
 ### GET /api/diary/:date
 Returns a single diary entry for `YYYY-MM-DD`. Returns `{ "data": null }` if none exists.
 
-### POST /api/diary
-Upserts (creates or replaces) the entry for the given date.
-
-```json
-{
-  "date": "2026-02-26",
-  "content": "Today I..."
-}
-```
-
----
-
-## Grocery
-
 ### GET /api/grocery
 Returns all grocery items ordered by `sort_order` then `created_at`.
 
-**Grocery item fields:**
-```
-id              uuid
-tenant_id       uuid
-name            text
-category        text | null
-quantity        text | null
-checked         boolean
-sort_order      integer
-created_at      timestamptz
-updated_at      timestamptz
-```
+### DELETE /api/grocery?checked=true
+Delete all checked grocery items (bulk clear).
 
-### POST /api/grocery
-```json
-{
-  "name": "Oat milk",
-  "category": "Dairy",
-  "quantity": "2"
-}
-```
+### GET /api/essays
+Returns all essays ordered by `updated_at` desc.
 
-### DELETE /api/grocery/:id
+### GET /api/essays/:id
+Returns a single essay.
 
-### DELETE /api/grocery
-Delete all checked items (bulk clear).
+### PATCH /api/essays/:id
+Update essay fields via `rpc_update_entity`.
 
----
-
-## CRM
-
-### Companies
-
-#### GET /api/crm/companies
+### GET /api/crm/companies
 Returns all companies ordered by `name`.
 
-**Company fields:**
-```
-id              uuid
-tenant_id       uuid
-name            text
-domain          text | null
-industry        text | null
-notes           text | null
-tags            string[]
-created_at      timestamptz
-updated_at      timestamptz
-```
-
-#### POST /api/crm/companies
-```json
-{
-  "name": "Acme Corp",
-  "domain": "acme.com",
-  "industry": "Software",
-  "notes": "Met at SaaStr",
-  "tags": ["prospect"]
-}
-```
-
-#### DELETE /api/crm/companies/:id
-
----
-
-### People
-
-#### GET /api/crm/people
+### GET /api/crm/people
 Returns all people ordered by `name`.
 
-**Person fields:**
-```
-id              uuid
-tenant_id       uuid
-name            text
-email           text | null
-phone           text | null
-title           text | null
-notes           text | null
-tags            string[]
-created_at      timestamptz
-updated_at      timestamptz
-```
-
-#### POST /api/crm/people
-```json
-{
-  "name": "Jane Smith",
-  "email": "jane@acme.com",
-  "phone": "+1 555 0100",
-  "title": "CTO",
-  "tags": ["investor"]
-}
-```
-
-#### DELETE /api/crm/people/:id
-
----
-
-### Deals
-
-#### GET /api/crm/deals
+### GET /api/crm/deals
 Returns all deals ordered by `created_at` desc.
-
-**Deal fields:**
-```
-id              uuid
-tenant_id       uuid
-title           text
-status          text  — prospect | active | won | lost
-value           numeric | null
-notes           text | null
-tags            string[]
-created_at      timestamptz
-updated_at      timestamptz
-```
-
-#### POST /api/crm/deals
-```json
-{
-  "title": "Acme Enterprise",
-  "status": "prospect",
-  "value": 50000,
-  "notes": "Intro call scheduled"
-}
-```
-
-#### DELETE /api/crm/deals/:id
 
 ---
 

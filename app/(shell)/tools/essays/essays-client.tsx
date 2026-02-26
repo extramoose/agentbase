@@ -172,7 +172,7 @@ export function EssaysClient({
       setSelectedId(tempId)
 
       try {
-        const res = await fetch('/api/essays', {
+        const res = await fetch('/api/commands/create-essay', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ title: title.trim() }),
@@ -227,7 +227,11 @@ export function EssaysClient({
       setSelectedId((id) => (id === essayId ? null : id))
 
       try {
-        const res = await fetch(`/api/essays/${essayId}`, { method: 'DELETE' })
+        const res = await fetch('/api/commands/delete-entity', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ table: 'essays', id: essayId }),
+        })
         if (!res.ok) throw new Error('Delete failed')
         router.replace(`/tools/essays${buildQs()}`, { scroll: false })
         toast({ type: 'success', message: 'Essay deleted' })
