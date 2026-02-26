@@ -1,6 +1,6 @@
 import { requireAuthApi } from '@/lib/auth'
 import { apiError } from '@/lib/api/errors'
-import { env } from '@/lib/env'
+import { chatCompletion } from '@/lib/ai'
 import { createClient } from '@/lib/supabase/server'
 
 type SuggestedTask = {
@@ -19,14 +19,6 @@ export async function POST(
 ) {
   try {
     await requireAuthApi()
-
-    const apiKey = env.openrouterApiKey
-    if (!apiKey) {
-      return Response.json(
-        { error: 'OPENROUTER_API_KEY not configured' },
-        { status: 501 }
-      )
-    }
 
     const supabase = await createClient()
     const { id } = await params
@@ -55,33 +47,14 @@ export async function POST(
       )
     }
 
-    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
+    const raw = await chatCompletion([
+      {
+        role: 'system',
+        content:
+          "Extract actionable tasks from this meeting. Return a JSON array of objects with shape: [{title: string, priority: 'urgent'|'high'|'medium'|'low'|'none'}]. Return only valid JSON, no markdown.",
       },
-      body: JSON.stringify({
-        model: 'openai/gpt-4.1-nano',
-        messages: [
-          {
-            role: 'system',
-            content:
-              "Extract actionable tasks from this meeting. Return a JSON array of objects with shape: [{title: string, priority: 'urgent'|'high'|'medium'|'low'|'none'}]. Return only valid JSON, no markdown.",
-          },
-          { role: 'user', content },
-        ],
-      }),
-    })
-
-    if (!res.ok) {
-      const text = await res.text()
-      console.error('OpenRouter error:', text)
-      return Response.json({ error: 'AI service error' }, { status: 502 })
-    }
-
-    const json = await res.json()
-    const raw = json.choices?.[0]?.message?.content ?? '[]'
+      { role: 'user', content },
+    ])
 
     let suggested: SuggestedTask[]
     try {

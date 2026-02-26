@@ -6,11 +6,7 @@ export default async function AdminSettingsPage() {
   await requireAdmin()
   const supabase = await createClient()
 
-  const { data: tenant } = await supabase
-    .from('tenants')
-    .select('name')
-    .limit(1)
-    .single()
+  const { data: settings } = await supabase.rpc('get_workspace_settings')
 
   const supabaseProjectId = process.env.NEXT_PUBLIC_SUPABASE_URL
     ? new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).hostname.split('.')[0]
@@ -18,7 +14,7 @@ export default async function AdminSettingsPage() {
 
   return (
     <SettingsClient
-      workspaceName={tenant?.name ?? 'Unknown'}
+      settings={settings as Record<string, unknown> | null}
       supabaseProjectId={supabaseProjectId}
     />
   )

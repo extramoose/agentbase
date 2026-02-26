@@ -31,6 +31,9 @@ One workspace per tenant.
 | id | uuid | NO | `gen_random_uuid()` |
 | name | text | NO | — |
 | created_at | timestamptz | NO | `now()` |
+| updated_at | timestamptz | NO | `now()` |
+| openrouter_api_key | text | YES | — |
+| default_model | text | NO | `'openai/gpt-4o-mini'` |
 
 ---
 
@@ -324,6 +327,8 @@ All mutations go through these functions. They atomically write to the entity ta
 | `get_my_tenant_id()` | `uuid` | Uses `auth.uid()` |
 | `resolve_agent_by_key(p_key_hash)` | `jsonb` (agent row or null) | Looks up agent by hashed API key, updates `last_seen_at`. Callable by anon. |
 | `admin_update_profile(p_target_id, p_avatar_url, p_full_name, p_role)` | `void` | Admin/superadmin only. Updates profile fields via COALESCE. |
+| `get_workspace_settings()` | `jsonb` (tenant row) | Returns tenant for current user's workspace. |
+| `update_workspace_settings(p_name, p_openrouter_api_key, p_default_model)` | `void` | Superadmin only. Updates tenant settings via COALESCE. |
 
 ### Query helper
 | Function | Parameters | Returns |
@@ -367,6 +372,8 @@ All mutations go through these functions. They atomically write to the entity ta
 | `003_activity_log_mutations.sql` | All `rpc_create_*` (8 entities) + `rpc_delete_entity` |
 | `004_schema_fixes.sql` | Schema corrections: people (phone+title), deals status, companies (notes+industry), library_items (body, latitude, longitude, location_name) |
 | `005_agents_table.sql` | Custom `agents` table, `resolve_agent_by_key` + `admin_update_profile` RPCs, DROP `agent_owners` |
+| `006_rpc_fixes.sql` | `is_admin()`, `is_superadmin()` SECURITY DEFINER helpers; profiles RLS fix |
+| `007_workspace_settings.sql` | `tenants`: add `updated_at`, `openrouter_api_key`, `default_model`; `get_workspace_settings` + `update_workspace_settings` RPCs |
 
 ---
 
