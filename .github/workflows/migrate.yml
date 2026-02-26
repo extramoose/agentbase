@@ -32,8 +32,4 @@ jobs:
           PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
           PGDATABASE: postgres
           PGSSLMODE: require
-        run: |
-          # Resolve to IPv4 — GitHub Actions runners have no IPv6
-          export PGHOSTADDR=$(getent ahostsv4 $PGHOST | head -1 | awk '{print $1}')
-          echo "Connecting via $PGHOSTADDR"
-          python3 scripts/migrate.py
+        run: python3 scripts/migrate.py

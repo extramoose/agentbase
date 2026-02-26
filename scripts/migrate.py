@@ -22,11 +22,26 @@ Environment variables required:
 
 import os
 import sys
+import socket
 import subprocess
 import tempfile
 from pathlib import Path
 
 MIGRATIONS_DIR = Path(__file__).parent.parent / "supabase" / "migrations"
+
+
+def force_ipv4():
+    """Resolve PGHOST to IPv4 and set PGHOSTADDR so psql skips DNS (avoids IPv6 failures)."""
+    host = os.environ.get("PGHOST")
+    if not host:
+        return
+    try:
+        results = socket.getaddrinfo(host, 5432, socket.AF_INET)
+        ipv4 = results[0][4][0]
+        os.environ["PGHOSTADDR"] = ipv4
+        print(f"  Resolved {host} → {ipv4} (IPv4)")
+    except Exception as e:
+        print(f"  Warning: IPv4 resolution failed ({e}), using default DNS")
 
 
 def run_sql(sql: str) -> str:
@@ -113,6 +128,8 @@ def main():
     if not os.environ.get("PGPASSWORD"):
         print("ERROR: PGPASSWORD not set. Set PG* environment variables.", file=sys.stderr)
         sys.exit(1)
+
+    force_ipv4()
 
     # Check psql is available
     result = subprocess.run(["which", "psql"], capture_output=True)
