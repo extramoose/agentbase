@@ -29,7 +29,7 @@ const navItems = [
   { label: 'Library', href: '/tools/library', icon: BookOpen },
   { label: 'Diary', href: '/tools/diary', icon: BookText },
   { label: 'Grocery', href: '/tools/grocery', icon: ShoppingCart },
-  { label: 'CRM', href: '/tools/crm/companies', icon: Users },
+  { label: 'CRM', href: '/tools/crm', icon: Users },
   { label: 'History', href: '/history', icon: Clock },
 ]
 
