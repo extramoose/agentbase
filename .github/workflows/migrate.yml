@@ -26,6 +26,5 @@ jobs:
 
       - name: Run migrations
         env:
-          SUPABASE_PAT: ${{ secrets.SUPABASE_PAT }}
-          SUPABASE_PROJECT: lecsqzctdfjwencberdj
+          DATABASE_URL: postgresql://postgres:${{ secrets.SUPABASE_DB_PASSWORD }}@db.lecsqzctdfjwencberdj.supabase.co:5432/postgres
         run: python3 scripts/migrate.py
