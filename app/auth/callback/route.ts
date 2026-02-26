@@ -10,6 +10,10 @@ export async function GET(request: Request) {
     const supabase = await createClient()
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     if (!error) {
+      const { data: tenantId } = await supabase.rpc('get_my_tenant_id')
+      if (!tenantId) {
+        return NextResponse.redirect(`${origin}/onboarding`)
+      }
       return NextResponse.redirect(`${origin}${next}`)
     }
   }
