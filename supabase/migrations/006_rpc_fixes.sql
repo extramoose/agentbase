@@ -57,3 +57,23 @@ BEGIN
 
   RETURN v_result;
 END; $f$;
+
+-- Fix: profiles RLS "Admins read all profiles" was self-referential → infinite recursion
+-- Replace with SECURITY DEFINER helpers (postgres superuser bypasses RLS inside these)
+CREATE OR REPLACE FUNCTION is_admin()
+RETURNS boolean LANGUAGE sql SECURITY DEFINER SET search_path = public STABLE AS $$
+  SELECT EXISTS(SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin','superadmin'))
+$$;
+GRANT EXECUTE ON FUNCTION is_admin() TO authenticated, anon;
+
+CREATE OR REPLACE FUNCTION is_superadmin()
+RETURNS boolean LANGUAGE sql SECURITY DEFINER SET search_path = public STABLE AS $$
+  SELECT EXISTS(SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'superadmin')
+$$;
+GRANT EXECUTE ON FUNCTION is_superadmin() TO authenticated, anon;
+
+DROP POLICY IF EXISTS "Admins read all profiles" ON profiles;
+CREATE POLICY "Admins read all profiles" ON profiles FOR SELECT USING (is_admin());
+
+DROP POLICY IF EXISTS "Superadmins manage agents" ON agents;
+CREATE POLICY "Superadmins manage agents" ON agents FOR ALL USING (is_superadmin());
