@@ -175,8 +175,8 @@ function SortableTaskRow({
   }
 
   const statusCfg = STATUS_CONFIG[task.status]
-  const visibleTags = task.tags.slice(0, 2)
-  const extraTagCount = task.tags.length - 2
+  const visibleTags = (task.tags ?? []).slice(0, 2)
+  const extraTagCount = (task.tags ?? []).length - 2
 
   return (
     <div
@@ -923,8 +923,8 @@ export function TasksClient({
                 <div className="ml-1">
                   {groupTasks.map((task) => {
                     const statusCfg = STATUS_CONFIG[task.status]
-                    const visibleTags = task.tags.slice(0, 2)
-                    const extraTagCount = task.tags.length - 2
+                    const visibleTags = (task.tags ?? []).slice(0, 2)
+                    const extraTagCount = (task.tags ?? []).length - 2
                     return (
                       <div
                         key={task.id}
@@ -1109,7 +1109,7 @@ function TaskEditShelf({
   const [priority, setPriority] = useState<Priority>(task.priority)
   const [taskType, setTaskType] = useState<TaskType | null>(task.type)
   const [dueDate, setDueDate] = useState(task.due_date ?? '')
-  const [tags, setTags] = useState<string[]>(task.tags)
+  const [tags, setTags] = useState<string[]>(task.tags ?? [])
 
   // Sync when task prop changes (from realtime)
   useEffect(() => {
@@ -1119,7 +1119,7 @@ function TaskEditShelf({
     setPriority(task.priority)
     setTaskType(task.type)
     setDueDate(task.due_date ?? '')
-    setTags(task.tags)
+    setTags(task.tags ?? [])
   }, [task])
 
   function saveFieldImmediate(fields: Record<string, unknown>) {
