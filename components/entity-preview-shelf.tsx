@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { X } from 'lucide-react'
+import { MarkdownRenderer } from '@/components/markdown-renderer'
 
 const TABLE_MAP: Record<string, string> = {
   tasks: 'tasks',
@@ -84,6 +85,8 @@ export function EntityPreviewShelf({ entityType, entityId, entityLabel, onClose 
   )
 }
 
+const MARKDOWN_FIELDS = new Set(['Body', 'Notes', 'Content'])
+
 function EntityFields({ entityType, entity }: { entityType: string; entity: Record<string, unknown> }) {
   const rows: { label: string; value: unknown }[] = []
 
@@ -147,7 +150,11 @@ function EntityFields({ entityType, entity }: { entityType: string; entity: Reco
       {rows.filter(r => r.value != null && r.value !== '').map(({ label, value }) => (
         <div key={label}>
           <dt className="text-xs text-muted-foreground mb-1">{label}</dt>
-          <dd className="text-sm text-foreground whitespace-pre-wrap">{String(value)}</dd>
+          <dd className="text-sm text-foreground">
+            {MARKDOWN_FIELDS.has(label)
+              ? <MarkdownRenderer content={String(value)} />
+              : <span className="whitespace-pre-wrap">{String(value)}</span>}
+          </dd>
         </div>
       ))}
     </dl>

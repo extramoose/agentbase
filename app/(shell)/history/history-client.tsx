@@ -9,6 +9,7 @@ import { formatDistanceToNow } from 'date-fns'
 import { Loader2 } from 'lucide-react'
 import { formatActivityEvent } from '@/lib/format-activity'
 import { EntityPreviewShelf, TABLE_MAP } from '@/components/entity-preview-shelf'
+import { MarkdownRenderer } from '@/components/markdown-renderer'
 
 type ActivityEntry = {
   id: string
@@ -206,7 +207,7 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
                 </div>
                 {entry.event_type === 'commented' && entry.body && (
                   <div className="mt-1 rounded-md bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
-                    {entry.body}
+                    <MarkdownRenderer content={entry.body} />
                   </div>
                 )}
               </div>

@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { formatDistanceToNow } from 'date-fns'
 import { Send } from 'lucide-react'
 import { formatActivityEvent } from '@/lib/format-activity'
+import { MarkdownRenderer } from '@/components/markdown-renderer'
 
 type ActivityEntry = {
   id: string
@@ -152,7 +153,7 @@ export function ActivityAndComments({ entityType, entityId, currentUserId }: Act
               <div className="flex-1 min-w-0">
                 {entry.event_type === 'commented' ? (
                   <div className="rounded-lg bg-muted/40 px-3 py-2 text-sm">
-                    {entry.body}
+                    <MarkdownRenderer content={entry.body ?? ''} />
                   </div>
                 ) : (
                   <p className="text-sm text-muted-foreground">

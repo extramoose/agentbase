@@ -19,6 +19,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { RichTextEditor } from '@/components/rich-text-editor'
+import { MarkdownRenderer } from '@/components/markdown-renderer'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 
@@ -689,14 +690,14 @@ function MeetingDetail({
               <label className="text-xs text-muted-foreground font-medium mb-1 block">
                 Prep Notes
               </label>
-              <Textarea
+              <RichTextEditor
                 value={prepNotes}
-                onChange={(e) => {
-                  setPrepNotes(e.target.value)
-                  saveField({ prep_notes: e.target.value })
+                onChange={(md) => {
+                  setPrepNotes(md)
+                  saveField({ prep_notes: md })
                 }}
                 placeholder="Meeting prep notes..."
-                className="min-h-[150px] text-sm resize-y"
+                minHeight="150px"
               />
             </div>
           )}
@@ -724,11 +725,9 @@ function MeetingDetail({
                 <label className="text-xs text-muted-foreground font-medium mb-1 block">
                   Meeting Notes
                 </label>
-                <RichTextEditor
-                  value={meeting.live_notes}
-                  readOnly
-                  minHeight="100px"
-                />
+                <div className="rounded-md border border-border p-3 bg-muted/20">
+                  <MarkdownRenderer content={meeting.live_notes} />
+                </div>
               </div>
             )}
 
@@ -763,8 +762,8 @@ function MeetingDetail({
                 Summary
               </label>
               {summary ? (
-                <div className="rounded-md border border-border p-3 bg-muted/20 text-sm whitespace-pre-wrap">
-                  {summary}
+                <div className="rounded-md border border-border p-3 bg-muted/20">
+                  <MarkdownRenderer content={summary} />
                 </div>
               ) : (
                 <p className="text-sm text-muted-foreground">No summary generated yet.</p>

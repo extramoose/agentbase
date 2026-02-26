@@ -25,6 +25,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { RichTextEditor } from '@/components/rich-text-editor'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
+import { stripMarkdown } from '@/lib/strip-markdown'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -362,7 +363,7 @@ function ItemCard({ item, onClick }: { item: LibraryItem; onClick: () => void })
   const cfg = TYPE_CONFIG[item.type]
   const Icon = cfg.icon
   const domain = domainFromUrl(item.url)
-  const snippet = item.excerpt || item.body
+  const snippet = item.excerpt || stripMarkdown(item.body ?? '', 120)
 
   return (
     <button
