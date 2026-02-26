@@ -7,7 +7,7 @@
 
 ## 1. Project Overview
 
-AgentBase is a greenfield "Life OS" — a personal productivity platform where human users and AI agents (Lucy, Frank) collaborate on tasks, meetings, CRM, notes, diary, and grocery lists. Every mutation flows through a typed command bus, every change is recorded in a unified activity log, and every surface is multi-tenant with strict user isolation via RLS.
+AgentBase is a greenfield "Life OS" — a personal productivity platform where human users and AI agents (Lucy, Frank) collaborate on tasks, meetings, CRM, notes, diary, and grocery lists. Every mutation flows through a typed command bus, every change is recorded in a unified activity log, and every surface is multi-tenant with workspace-based isolation via RLS.
 
 **Domain:** Configurable via `NEXT_PUBLIC_APP_DOMAIN` env var (default: `agentbase.hah.to`).
 **Repo:** `git@github.com:extramoose/agentbase.git`
@@ -32,7 +32,7 @@ AgentBase is a greenfield "Life OS" — a personal productivity platform where h
 
 - **Command bus (new):** HAH Toolbox has ad-hoc Supabase client calls scattered across components. AgentBase routes all mutations through Next.js API routes so agents (external HTTP clients) and browsers use the same path.
 - **Real agent auth (new):** HAH Toolbox uses `SET LOCAL app.current_actor` for agent attribution — fragile, service-role-dependent. AgentBase gives agents real Supabase Auth users with hand-signed JWTs.
-- **Multi-tenancy (new):** HAH Toolbox is single-user. AgentBase scopes all data by `user_id` via RLS from day one.
+- **Multi-tenancy (new):** HAH Toolbox is single-user. AgentBase scopes all data by `tenant_id` (workspace) via RLS from day one.
 - **Componentized edit shelf (new):** HAH Toolbox's task shelf is a monolithic 900+ line component. AgentBase has a universal `<EditShelf>` with a pluggable content slot and a shared `<ActivityAndComments>` section.
 
 ### Environment Variables
@@ -116,8 +116,8 @@ Content-Type: application/json
 ```
 
 - Validates `table` against an allowlist
-- Validates `id` exists and belongs to the requesting user
-- Calls `rpc_update_entity(table_name, entity_id, fields jsonb, actor_id uuid, user_id uuid)` — a Postgres function that runs `UPDATE {table} SET ... WHERE id = entity_id AND user_id = user_id` and `INSERT INTO activity_log (...)` in one transaction
+- Validates `id` exists and belongs to the requesting user's workspace
+- Calls `rpc_update_entity(table_name, entity_id, fields jsonb, actor_id uuid, tenant_id uuid)` — a Postgres function that runs `UPDATE {table} SET ... WHERE id = entity_id AND tenant_id = tenant_id` and `INSERT INTO activity_log (...)` in one transaction
 - Returns `{ success: true, data: {...} }`
 
 #### Auth Resolution in API Routes
@@ -163,11 +163,19 @@ export async function resolveActor(request: Request) {
     .eq("agent_id", user.id)
     .single();
 
+  // Resolve the actor's workspace (tenant_id) from tenant_members
+  const { data: membership } = await supabase
+    .from("tenant_members")
+    .select("tenant_id")
+    .eq("user_id", user.id)
+    .single();
+
   return {
     supabase,
     actorId: user.id,
     actorType: agentMapping ? "agent" as const : "human" as const,
     ownerId: agentMapping?.owner_id ?? user.id,
+    tenantId: membership?.tenant_id ?? null,
   };
 }
 ```
@@ -181,7 +189,7 @@ CREATE TABLE activity_log (
   id          uuid DEFAULT gen_random_uuid() PRIMARY KEY,
   entity_type text NOT NULL,
   entity_id   uuid NOT NULL,
-  user_id     uuid NOT NULL REFERENCES auth.users(id),
+  tenant_id   uuid NOT NULL REFERENCES tenants(id),
   actor_id    uuid NOT NULL REFERENCES auth.users(id),
   actor_type  text NOT NULL CHECK (actor_type IN ('human', 'agent', 'platform')),
   event_type  text NOT NULL,
@@ -191,11 +199,11 @@ CREATE TABLE activity_log (
 
 CREATE INDEX idx_activity_log_entity ON activity_log (entity_type, entity_id, created_at DESC);
 CREATE INDEX idx_activity_log_actor  ON activity_log (actor_id, created_at DESC);
-CREATE INDEX idx_activity_log_user   ON activity_log (user_id, created_at DESC);
+CREATE INDEX idx_activity_log_tenant ON activity_log (tenant_id, created_at DESC);
 CREATE INDEX idx_activity_log_time   ON activity_log (created_at DESC);
 ```
 
-`user_id` is the data owner — the human user whose data this event pertains to. `actor_id` is who performed the action. These can differ: Frank (actor) creates a task for Hunter (owner). The command bus knows the owner at write time, so we denormalize it directly onto the table instead of computing it via subqueries at read time.
+`tenant_id` is the workspace this event belongs to — all workspace members can read it. `actor_id` is who performed the action (attribution). The command bus resolves `tenant_id` from the actor's `tenant_members` row at write time.
 
 **Event types** (extensible, not enum — allows new types without migration):
 - `created`, `updated`, `deleted`
@@ -219,7 +227,7 @@ CREATE INDEX idx_activity_log_time   ON activity_log (created_at DESC);
 { "title": "New task title" }
 ```
 
-**Key difference from HAH Toolbox:** The old `activity_log` used `author` as a text string (`"hunter"`, `"frank"`) and had no `user_id` scoping. AgentBase uses `actor_id` as a real FK to `auth.users`, enabling proper RLS and multi-tenant filtering. Actor display names are resolved client-side from a profiles lookup.
+**Key difference from HAH Toolbox:** The old `activity_log` used `author` as a text string (`"hunter"`, `"frank"`) and had no tenant scoping. AgentBase uses `actor_id` as a real FK to `auth.users` for attribution, and `tenant_id` for workspace-scoped visibility via RLS. Actor display names are resolved client-side from a profiles lookup.
 
 ### 3.3 Action → Activity → Toast → Realtime Pipeline
 
@@ -278,67 +286,60 @@ const channel = supabase
 
 ### 3.4 Multi-Tenancy & RLS Model
 
-**Core principle:** All data is scoped by `user_id`. No cross-user reads, ever.
+**Workspace-based tenancy.** Every entity row belongs to a workspace (tenant), not to a user. RLS checks workspace membership: a user can read/write rows where `tenant_id` is a workspace they belong to.
 
-Every entity table has:
+Three distinct concepts — do not conflate them:
+- **`tenant_id`** on entity rows = visibility scope ("who can see this")
+- **`actor_id`** in `activity_log` on create/update events = attribution ("who did this")
+- **`assignee`** on tasks = workflow ownership ("who is responsible")
+
+Every entity table (except `diary_entries`) has:
 ```sql
-user_id uuid NOT NULL DEFAULT auth.uid() REFERENCES auth.users(id)
+tenant_id uuid NOT NULL REFERENCES tenants(id)
 ```
 
-Every entity table has these RLS policies:
+Every entity table (except `diary_entries`) has these RLS policies:
 ```sql
--- Users can only see their own data
-CREATE POLICY "Users read own" ON {table}
-  FOR SELECT USING (auth.uid() = user_id);
+-- Workspace members can read tenant data
+CREATE POLICY "Tenant members read" ON {table}
+  FOR SELECT USING (is_tenant_member(tenant_id));
 
--- Users can only insert their own data
-CREATE POLICY "Users insert own" ON {table}
-  FOR INSERT WITH CHECK (auth.uid() = user_id);
+-- Workspace members can insert tenant data
+CREATE POLICY "Tenant members insert" ON {table}
+  FOR INSERT WITH CHECK (is_tenant_member(tenant_id));
 
--- Users can only update their own data
-CREATE POLICY "Users update own" ON {table}
-  FOR UPDATE USING (auth.uid() = user_id)
-  WITH CHECK (auth.uid() = user_id);
+-- Workspace members can update tenant data
+CREATE POLICY "Tenant members update" ON {table}
+  FOR UPDATE USING (is_tenant_member(tenant_id))
+  WITH CHECK (is_tenant_member(tenant_id));
 
--- Users can only delete their own data
-CREATE POLICY "Users delete own" ON {table}
-  FOR DELETE USING (auth.uid() = user_id);
+-- Workspace members can delete tenant data
+CREATE POLICY "Tenant members delete" ON {table}
+  FOR DELETE USING (is_tenant_member(tenant_id));
 ```
 
-**Agent access:** Agents (Lucy, Frank) are real Supabase Auth users. They operate within their owner's scope. This requires a mapping:
-
+**Helper function** (avoids repeating the membership subquery):
 ```sql
-CREATE TABLE agent_owners (
-  agent_id uuid NOT NULL REFERENCES auth.users(id),
-  owner_id uuid NOT NULL REFERENCES auth.users(id),
-  PRIMARY KEY (agent_id)
-);
-```
-
-RLS policies for agent-writable tables need an additional clause:
-```sql
--- Agents can read/write data belonging to their owner
-CREATE POLICY "Agents access owner data" ON {table}
-  FOR ALL USING (
-    auth.uid() = user_id
-    OR EXISTS (
-      SELECT 1 FROM agent_owners
-      WHERE agent_owners.agent_id = auth.uid()
-      AND agent_owners.owner_id = {table}.user_id
-    )
+CREATE OR REPLACE FUNCTION is_tenant_member(p_tenant_id uuid)
+RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM tenant_members
+    WHERE tenant_id = p_tenant_id AND user_id = auth.uid()
   );
+$$;
 ```
 
-In practice, this means the per-table policies combine both clauses:
-```sql
-CREATE POLICY "Owner or agent read" ON tasks
-  FOR SELECT USING (
-    user_id = auth.uid()
-    OR user_id IN (SELECT owner_id FROM agent_owners WHERE agent_id = auth.uid())
-  );
-```
+**v1 has one workspace.** There is a single row in `tenants` (HunterTenant). Hunter is a `superadmin` member. Lucy and Frank are `agent` members. All entities belong to this tenant. All members can see all entities.
 
-**Agent writes and user_id:** When an agent creates a record, we need the `user_id` to be the owner, not the agent. The command bus API route handles this: it looks up the agent's owner from `agent_owners` and explicitly sets `user_id` to the owner's ID.
+**Adding more humans later** = insert a row into `tenant_members`. Their RLS membership check passes immediately. No schema changes. No data migrations. No RLS rewrites.
+
+**Diary entries are the one exception.** Diary is always private to the author, even within a workspace. The `diary_entries` table is scoped by `user_id = auth.uid()`, not by `tenant_id`. This is intentional and permanent.
+
+**Agent access:** Agents (Lucy, Frank) are real Supabase Auth users and members of the workspace with `role = 'agent'`. Their RLS access is identical to human members — workspace membership is all that's needed. The `agent_owners` table continues to map agent → owning human for delegation tracking.
+
+**Agent writes and tenant_id:** When an agent creates a record, the command bus resolves `tenant_id` from the actor's `tenant_members` row — not from client input. Clients never supply `tenant_id` directly.
 
 **Admin access:** Admin users can read all data (for the admin panel). Admin policies:
 ```sql
@@ -397,7 +398,17 @@ await supabase.from("agent_owners").insert([
   { agent_id: lucyId, owner_id: OWNER_ID },
   { agent_id: frankId, owner_id: OWNER_ID },
 ]);
+
+// Add agents to the workspace as 'agent' members
+// (Run after the tenant has been created — see seed data in §5)
+const HUNTER_TENANT_ID = "..."; // HunterTenant's id from tenants table
+await supabase.from("tenant_members").insert([
+  { tenant_id: HUNTER_TENANT_ID, user_id: lucyId, role: "agent" },
+  { tenant_id: HUNTER_TENANT_ID, user_id: frankId, role: "agent" },
+]);
 ```
+
+After creating agent users, insert them into `tenant_members` for HunterTenant. Agents' RLS access is now identical to human members — they can read/write all workspace entities. The `agent_owners` table continues to map agent → owning human for delegation tracking.
 
 #### Step 2: Generate long-lived JWTs
 
@@ -446,11 +457,11 @@ Hand-sign agent JWTs with a unique `jti` (UUID). Store the `jti` in `openclaw.js
 
 #### Step 3: RLS policies that work for agents
 
-Because agents are real `authenticated` users, `auth.uid()` resolves to their UUID. The RLS policies in §3.4 handle this via the `agent_owners` table — no special exceptions needed. The agent's UUID is in `agent_owners.agent_id`, and the policy checks if the data's `user_id` matches the agent's `owner_id`.
+Because agents are real `authenticated` users and members of the workspace, `auth.uid()` resolves to their UUID. The RLS policies in §3.4 check `is_tenant_member(tenant_id)` — which passes for agents because they are in `tenant_members` with `role = 'agent'`. No special agent-specific policies needed.
 
-**Policies that reference agent UUIDs directly (none needed):** The `agent_owners` join handles all access control. No hardcoded UUIDs in policies.
+**Policies that reference agent UUIDs directly (none needed):** Workspace membership handles all access control. No hardcoded UUIDs in policies.
 
-**activity_log writes:** The INSERT policy on `activity_log` allows inserts where `auth.uid() = actor_id`. In practice, all writes go through SECURITY DEFINER RPC functions (e.g. `rpc_create_task`) — clients never insert into `activity_log` directly. The RPC sets `user_id` server-side by looking up entity ownership, so clients cannot supply or tamper with `user_id`. There are no UPDATE or DELETE policies on `activity_log` — it is append-only and immutable.
+**activity_log writes:** All writes go through SECURITY DEFINER RPC functions (e.g. `rpc_create_task`) — clients never insert into `activity_log` directly. The RPC sets `tenant_id` server-side from the actor's workspace membership, so clients cannot supply or tamper with `tenant_id`. There are no UPDATE or DELETE policies on `activity_log` — it is append-only and immutable.
 
 ---
 
@@ -460,12 +471,12 @@ Because agents are real `authenticated` users, `auth.uid()` resolves to their UU
 
 | Surface | Subscription | Why |
 |---------|-------------|-----|
-| **Tasks list** | `postgres_changes` on `tasks` filtered by `user_id` | Agents frequently create/update tasks. Humans need to see changes immediately. Core workflow surface. |
+| **Tasks list** | `postgres_changes` on `tasks` filtered by `tenant_id` | Agents frequently create/update tasks. Humans need to see changes immediately. Core workflow surface. |
 | **Task EditShelf → ActivityAndComments** | `postgres_changes` on `activity_log` filtered by `entity_type=task, entity_id=X` | Comments and status changes appear live while shelf is open. |
 | **Meetings detail** | `postgres_changes` on `meetings` filtered by `id=X` | During live meetings, agent writes meeting_summary, proposed_tasks. Must appear without refresh. |
 | **Meeting EditShelf → ActivityAndComments** | Same as task shelf | Same pattern. |
-| **Global History page** | `postgres_changes` on `activity_log` filtered by actor's `user_id` scope | The "everything" feed. New events stream in live. |
-| **Grocery list** | `postgres_changes` on `grocery_items` filtered by `user_id` | Shared between user + agent. Checking items off should sync instantly. |
+| **Global History page** | `postgres_changes` on `activity_log` filtered by `tenant_id` | The "everything" feed. New events stream in live. |
+| **Grocery list** | `postgres_changes` on `grocery_items` filtered by `tenant_id` | Shared between user + agent. Checking items off should sync instantly. |
 
 ### Where Realtime Is Overkill (Don't Subscribe)
 
@@ -489,12 +500,12 @@ supabase
     event: "*",
     schema: "public",
     table: "tasks",
-    filter: `user_id=eq.${userId}`,
+    filter: `tenant_id=eq.${tenantId}`,
   }, handler)
   .subscribe();
 ```
 
-**Why per-table, not per-entity:** Supabase Realtime filters are applied server-side, so a `user_id=eq.X` filter means only events for that user's data are sent. This is both efficient and secure (no data leaks).
+**Why per-table, not per-entity:** Supabase Realtime filters are applied server-side, so a `tenant_id=eq.X` filter means only events for that workspace's data are sent. This is both efficient and secure (no data leaks).
 
 **Why not one global subscription:** Different surfaces need different update handlers. A task list update handler differs from a meeting detail handler. Multiplexing onto one channel adds complexity with no benefit — Supabase Realtime handles multiple channels efficiently.
 
@@ -611,6 +622,69 @@ CREATE POLICY "Agents read own mapping" ON agent_owners
   FOR SELECT USING (auth.uid() = agent_id);
 ```
 
+### Workspaces / Tenants
+
+```sql
+-- ============================================================
+-- WORKSPACES / TENANTS
+-- ============================================================
+
+CREATE TABLE tenants (
+  id         uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  name       text NOT NULL,
+  slug       text NOT NULL UNIQUE,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+-- RLS: readable by all tenant members
+ALTER TABLE tenants ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "tenant members can read their tenant"
+  ON tenants FOR SELECT
+  USING (id IN (SELECT tenant_id FROM tenant_members WHERE user_id = auth.uid()));
+
+-- Seed: one tenant for v1
+-- INSERT INTO tenants (name, slug) VALUES ('Hunter Workspace', 'hunter') ON CONFLICT DO NOTHING;
+
+
+CREATE TABLE tenant_members (
+  tenant_id  uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  user_id    uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  role       text NOT NULL DEFAULT 'member' CHECK (role IN ('superadmin', 'admin', 'member', 'agent')),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (tenant_id, user_id)
+);
+-- RLS: members can see who else is in their tenant
+ALTER TABLE tenant_members ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "members can read tenant membership"
+  ON tenant_members FOR SELECT
+  USING (tenant_id IN (SELECT tenant_id FROM tenant_members WHERE user_id = auth.uid()));
+-- Superadmin can manage membership
+CREATE POLICY "superadmin manages members"
+  ON tenant_members FOR ALL
+  USING (
+    EXISTS (
+      SELECT 1 FROM tenant_members tm
+      WHERE tm.tenant_id = tenant_members.tenant_id
+        AND tm.user_id = auth.uid()
+        AND tm.role = 'superadmin'
+    )
+  );
+```
+
+### RLS Helper Function
+
+```sql
+-- Helper function for tenant membership checks (avoids repeating the subquery)
+CREATE OR REPLACE FUNCTION is_tenant_member(p_tenant_id uuid)
+RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM tenant_members
+    WHERE tenant_id = p_tenant_id AND user_id = auth.uid()
+  );
+$$;
+```
+
 ### Global Tags
 
 ```sql
@@ -640,6 +714,10 @@ ALTER TABLE tags DROP CONSTRAINT IF EXISTS tags_name_key;
 CREATE UNIQUE INDEX idx_tags_name_user ON tags (user_id, name);
 ```
 
+### Entity Tables
+
+> **Scoping note:** All entity types except Diary use `tenant_id` for visibility scoping. All members of the workspace can see all entities. Attribution (who created or changed something) lives in `activity_log`, not on the entity row.
+
 ### Tasks
 
 ```sql
@@ -647,7 +725,7 @@ CREATE SEQUENCE tasks_ticket_id_seq;
 
 CREATE TABLE tasks (
   id                uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-  user_id           uuid NOT NULL DEFAULT auth.uid() REFERENCES auth.users(id),
+  tenant_id         uuid NOT NULL REFERENCES tenants(id),
   title             text NOT NULL,
   body              text,
   status            text NOT NULL DEFAULT 'todo' CHECK (status IN ('todo', 'in_progress', 'blocked', 'done')),
@@ -662,37 +740,22 @@ CREATE TABLE tasks (
   updated_at        timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_tasks_user_status ON tasks (user_id, status);
-CREATE INDEX idx_tasks_user_priority ON tasks (user_id, priority);
-CREATE INDEX idx_tasks_due_date ON tasks (user_id, due_date) WHERE due_date IS NOT NULL;
+CREATE INDEX idx_tasks_tenant_status ON tasks (tenant_id, status);
+CREATE INDEX idx_tasks_tenant_priority ON tasks (tenant_id, priority);
+CREATE INDEX idx_tasks_due_date ON tasks (tenant_id, due_date) WHERE due_date IS NOT NULL;
 CREATE INDEX idx_tasks_tags ON tasks USING gin (tags);
 
 ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Tasks owner or agent select" ON tasks
-  FOR SELECT USING (
-    user_id = auth.uid()
-    OR user_id IN (SELECT owner_id FROM agent_owners WHERE agent_id = auth.uid())
-  );
-CREATE POLICY "Tasks owner or agent insert" ON tasks
-  FOR INSERT WITH CHECK (
-    user_id = auth.uid()
-    OR user_id IN (SELECT owner_id FROM agent_owners WHERE agent_id = auth.uid())
-  );
-CREATE POLICY "Tasks owner or agent update" ON tasks
-  FOR UPDATE USING (
-    user_id = auth.uid()
-    OR user_id IN (SELECT owner_id FROM agent_owners WHERE agent_id = auth.uid())
-  )
-  WITH CHECK (
-    user_id = auth.uid()
-    OR user_id IN (SELECT owner_id FROM agent_owners WHERE agent_id = auth.uid())
-  );
-CREATE POLICY "Tasks owner or agent delete" ON tasks
-  FOR DELETE USING (
-    user_id = auth.uid()
-    OR user_id IN (SELECT owner_id FROM agent_owners WHERE agent_id = auth.uid())
-  );
+CREATE POLICY "Tasks tenant members select" ON tasks
+  FOR SELECT USING (is_tenant_member(tenant_id));
+CREATE POLICY "Tasks tenant members insert" ON tasks
+  FOR INSERT WITH CHECK (is_tenant_member(tenant_id));
+CREATE POLICY "Tasks tenant members update" ON tasks
+  FOR UPDATE USING (is_tenant_member(tenant_id))
+  WITH CHECK (is_tenant_member(tenant_id));
+CREATE POLICY "Tasks tenant members delete" ON tasks
+  FOR DELETE USING (is_tenant_member(tenant_id));
 CREATE POLICY "Admins read all tasks" ON tasks
   FOR SELECT USING (
     EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'superadmin'))
@@ -704,7 +767,7 @@ CREATE POLICY "Admins read all tasks" ON tasks
 ```sql
 CREATE TABLE meetings (
   id              uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-  user_id         uuid NOT NULL DEFAULT auth.uid() REFERENCES auth.users(id),
+  tenant_id       uuid NOT NULL REFERENCES tenants(id),
   title           text NOT NULL,
   date            date NOT NULL,
   meeting_time    text,
@@ -719,42 +782,27 @@ CREATE TABLE meetings (
   updated_at      timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_meetings_user_date ON meetings (user_id, date DESC);
-CREATE INDEX idx_meetings_user_status ON meetings (user_id, status);
+CREATE INDEX idx_meetings_tenant_date ON meetings (tenant_id, date DESC);
+CREATE INDEX idx_meetings_tenant_status ON meetings (tenant_id, status);
 CREATE INDEX idx_meetings_tags ON meetings USING gin (tags);
 
 ALTER TABLE meetings ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Meetings owner or agent select" ON meetings
-  FOR SELECT USING (
-    user_id = auth.uid()
-    OR user_id IN (SELECT owner_id FROM agent_owners WHERE agent_id = auth.uid())
-  );
-CREATE POLICY "Meetings owner or agent insert" ON meetings
-  FOR INSERT WITH CHECK (
-    user_id = auth.uid()
-    OR user_id IN (SELECT owner_id FROM agent_owners WHERE agent_id = auth.uid())
-  );
-CREATE POLICY "Meetings owner or agent update" ON meetings
-  FOR UPDATE USING (
-    user_id = auth.uid()
-    OR user_id IN (SELECT owner_id FROM agent_owners WHERE agent_id = auth.uid())
-  )
-  WITH CHECK (
-    user_id = auth.uid()
-    OR user_id IN (SELECT owner_id FROM agent_owners WHERE agent_id = auth.uid())
-  );
-CREATE POLICY "Meetings owner or agent delete" ON meetings
-  FOR DELETE USING (
-    user_id = auth.uid()
-    OR user_id IN (SELECT owner_id FROM agent_owners WHERE agent_id = auth.uid())
-  );
+CREATE POLICY "Meetings tenant members select" ON meetings
+  FOR SELECT USING (is_tenant_member(tenant_id));
+CREATE POLICY "Meetings tenant members insert" ON meetings
+  FOR INSERT WITH CHECK (is_tenant_member(tenant_id));
+CREATE POLICY "Meetings tenant members update" ON meetings
+  FOR UPDATE USING (is_tenant_member(tenant_id))
+  WITH CHECK (is_tenant_member(tenant_id));
+CREATE POLICY "Meetings tenant members delete" ON meetings
+  FOR DELETE USING (is_tenant_member(tenant_id));
 CREATE POLICY "Admins read all meetings" ON meetings
   FOR SELECT USING (
     EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'superadmin'))
   );
 
--- Join table: meetings ↔ people
+-- Join table: meetings ↔ people (inherits workspace scope from parent via JOIN)
 CREATE TABLE meetings_people (
   meeting_id uuid NOT NULL REFERENCES meetings(id) ON DELETE CASCADE,
   person_id  uuid NOT NULL REFERENCES people(id) ON DELETE CASCADE,
@@ -763,16 +811,16 @@ CREATE TABLE meetings_people (
 
 ALTER TABLE meetings_people ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Meetings_people via meeting ownership" ON meetings_people
+CREATE POLICY "Meetings_people via meeting tenant" ON meetings_people
   FOR ALL USING (
     EXISTS (
       SELECT 1 FROM meetings m
       WHERE m.id = meeting_id
-      AND m.user_id = auth.uid()
+      AND is_tenant_member(m.tenant_id)
     )
   );
 
--- Join table: meetings ↔ companies
+-- Join table: meetings ↔ companies (inherits workspace scope from parent via JOIN)
 CREATE TABLE meetings_companies (
   meeting_id  uuid NOT NULL REFERENCES meetings(id) ON DELETE CASCADE,
   company_id  uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
@@ -781,12 +829,12 @@ CREATE TABLE meetings_companies (
 
 ALTER TABLE meetings_companies ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Meetings_companies via meeting ownership" ON meetings_companies
+CREATE POLICY "Meetings_companies via meeting tenant" ON meetings_companies
   FOR ALL USING (
     EXISTS (
       SELECT 1 FROM meetings m
       WHERE m.id = meeting_id
-      AND m.user_id = auth.uid()
+      AND is_tenant_member(m.tenant_id)
     )
   );
 ```
@@ -796,7 +844,7 @@ CREATE POLICY "Meetings_companies via meeting ownership" ON meetings_companies
 ```sql
 CREATE TABLE library_items (
   id           uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-  user_id      uuid NOT NULL DEFAULT auth.uid() REFERENCES auth.users(id),
+  tenant_id    uuid NOT NULL REFERENCES tenants(id),
   type         text NOT NULL CHECK (type IN ('note', 'idea', 'article', 'restaurant', 'favorite', 'flag')),
   title        text NOT NULL,
   description  text,
@@ -811,37 +859,21 @@ CREATE TABLE library_items (
   updated_at   timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_library_user_type ON library_items (user_id, type);
+CREATE INDEX idx_library_tenant_type ON library_items (tenant_id, type);
 CREATE INDEX idx_library_tags ON library_items USING gin (tags);
 CREATE INDEX idx_library_public ON library_items (is_public) WHERE is_public = true;
 
 ALTER TABLE library_items ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Library owner or agent select" ON library_items
-  FOR SELECT USING (
-    user_id = auth.uid()
-    OR user_id IN (SELECT owner_id FROM agent_owners WHERE agent_id = auth.uid())
-    OR is_public = true
-  );
-CREATE POLICY "Library owner or agent insert" ON library_items
-  FOR INSERT WITH CHECK (
-    user_id = auth.uid()
-    OR user_id IN (SELECT owner_id FROM agent_owners WHERE agent_id = auth.uid())
-  );
-CREATE POLICY "Library owner or agent update" ON library_items
-  FOR UPDATE USING (
-    user_id = auth.uid()
-    OR user_id IN (SELECT owner_id FROM agent_owners WHERE agent_id = auth.uid())
-  )
-  WITH CHECK (
-    user_id = auth.uid()
-    OR user_id IN (SELECT owner_id FROM agent_owners WHERE agent_id = auth.uid())
-  );
-CREATE POLICY "Library owner or agent delete" ON library_items
-  FOR DELETE USING (
-    user_id = auth.uid()
-    OR user_id IN (SELECT owner_id FROM agent_owners WHERE agent_id = auth.uid())
-  );
+CREATE POLICY "Library tenant members select" ON library_items
+  FOR SELECT USING (is_tenant_member(tenant_id) OR is_public = true);
+CREATE POLICY "Library tenant members insert" ON library_items
+  FOR INSERT WITH CHECK (is_tenant_member(tenant_id));
+CREATE POLICY "Library tenant members update" ON library_items
+  FOR UPDATE USING (is_tenant_member(tenant_id))
+  WITH CHECK (is_tenant_member(tenant_id));
+CREATE POLICY "Library tenant members delete" ON library_items
+  FOR DELETE USING (is_tenant_member(tenant_id));
 CREATE POLICY "Admins read all library items" ON library_items
   FOR SELECT USING (
     EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'superadmin'))
@@ -866,25 +898,14 @@ CREATE INDEX idx_diary_user_date ON diary_entries (user_id, date DESC);
 
 ALTER TABLE diary_entries ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Diary owner or agent select" ON diary_entries
-  FOR SELECT USING (
-    user_id = auth.uid()
-    OR user_id IN (SELECT owner_id FROM agent_owners WHERE agent_id = auth.uid())
-  );
-CREATE POLICY "Diary owner or agent insert" ON diary_entries
-  FOR INSERT WITH CHECK (
-    user_id = auth.uid()
-    OR user_id IN (SELECT owner_id FROM agent_owners WHERE agent_id = auth.uid())
-  );
-CREATE POLICY "Diary owner or agent update" ON diary_entries
-  FOR UPDATE USING (
-    user_id = auth.uid()
-    OR user_id IN (SELECT owner_id FROM agent_owners WHERE agent_id = auth.uid())
-  )
-  WITH CHECK (
-    user_id = auth.uid()
-    OR user_id IN (SELECT owner_id FROM agent_owners WHERE agent_id = auth.uid())
-  );
+-- Diary is the ONE exception: scoped by user_id, not tenant_id. Private to the author.
+CREATE POLICY "Diary author select" ON diary_entries
+  FOR SELECT USING (user_id = auth.uid());
+CREATE POLICY "Diary author insert" ON diary_entries
+  FOR INSERT WITH CHECK (user_id = auth.uid());
+CREATE POLICY "Diary author update" ON diary_entries
+  FOR UPDATE USING (user_id = auth.uid())
+  WITH CHECK (user_id = auth.uid());
 CREATE POLICY "Admins read all diary" ON diary_entries
   FOR SELECT USING (
     EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'superadmin'))
@@ -896,7 +917,7 @@ CREATE POLICY "Admins read all diary" ON diary_entries
 ```sql
 CREATE TABLE grocery_items (
   id         uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-  user_id    uuid NOT NULL DEFAULT auth.uid() REFERENCES auth.users(id),
+  tenant_id  uuid NOT NULL REFERENCES tenants(id),
   name       text NOT NULL,
   quantity   numeric,
   unit       text,
@@ -906,34 +927,19 @@ CREATE TABLE grocery_items (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_grocery_user ON grocery_items (user_id, sort_order);
+CREATE INDEX idx_grocery_tenant ON grocery_items (tenant_id, sort_order);
 
 ALTER TABLE grocery_items ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Grocery owner or agent select" ON grocery_items
-  FOR SELECT USING (
-    user_id = auth.uid()
-    OR user_id IN (SELECT owner_id FROM agent_owners WHERE agent_id = auth.uid())
-  );
-CREATE POLICY "Grocery owner or agent insert" ON grocery_items
-  FOR INSERT WITH CHECK (
-    user_id = auth.uid()
-    OR user_id IN (SELECT owner_id FROM agent_owners WHERE agent_id = auth.uid())
-  );
-CREATE POLICY "Grocery owner or agent update" ON grocery_items
-  FOR UPDATE USING (
-    user_id = auth.uid()
-    OR user_id IN (SELECT owner_id FROM agent_owners WHERE agent_id = auth.uid())
-  )
-  WITH CHECK (
-    user_id = auth.uid()
-    OR user_id IN (SELECT owner_id FROM agent_owners WHERE agent_id = auth.uid())
-  );
-CREATE POLICY "Grocery owner or agent delete" ON grocery_items
-  FOR DELETE USING (
-    user_id = auth.uid()
-    OR user_id IN (SELECT owner_id FROM agent_owners WHERE agent_id = auth.uid())
-  );
+CREATE POLICY "Grocery tenant members select" ON grocery_items
+  FOR SELECT USING (is_tenant_member(tenant_id));
+CREATE POLICY "Grocery tenant members insert" ON grocery_items
+  FOR INSERT WITH CHECK (is_tenant_member(tenant_id));
+CREATE POLICY "Grocery tenant members update" ON grocery_items
+  FOR UPDATE USING (is_tenant_member(tenant_id))
+  WITH CHECK (is_tenant_member(tenant_id));
+CREATE POLICY "Grocery tenant members delete" ON grocery_items
+  FOR DELETE USING (is_tenant_member(tenant_id));
 ```
 
 ### CRM — Companies
@@ -941,7 +947,7 @@ CREATE POLICY "Grocery owner or agent delete" ON grocery_items
 ```sql
 CREATE TABLE companies (
   id          uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-  user_id     uuid NOT NULL DEFAULT auth.uid() REFERENCES auth.users(id),
+  tenant_id   uuid NOT NULL REFERENCES tenants(id),
   name        text NOT NULL,
   domain      text,
   description text,
@@ -950,35 +956,20 @@ CREATE TABLE companies (
   updated_at  timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_companies_user ON companies (user_id);
+CREATE INDEX idx_companies_tenant ON companies (tenant_id);
 CREATE INDEX idx_companies_tags ON companies USING gin (tags);
 
 ALTER TABLE companies ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Companies owner or agent select" ON companies
-  FOR SELECT USING (
-    user_id = auth.uid()
-    OR user_id IN (SELECT owner_id FROM agent_owners WHERE agent_id = auth.uid())
-  );
-CREATE POLICY "Companies owner or agent insert" ON companies
-  FOR INSERT WITH CHECK (
-    user_id = auth.uid()
-    OR user_id IN (SELECT owner_id FROM agent_owners WHERE agent_id = auth.uid())
-  );
-CREATE POLICY "Companies owner or agent update" ON companies
-  FOR UPDATE USING (
-    user_id = auth.uid()
-    OR user_id IN (SELECT owner_id FROM agent_owners WHERE agent_id = auth.uid())
-  )
-  WITH CHECK (
-    user_id = auth.uid()
-    OR user_id IN (SELECT owner_id FROM agent_owners WHERE agent_id = auth.uid())
-  );
-CREATE POLICY "Companies owner or agent delete" ON companies
-  FOR DELETE USING (
-    user_id = auth.uid()
-    OR user_id IN (SELECT owner_id FROM agent_owners WHERE agent_id = auth.uid())
-  );
+CREATE POLICY "Companies tenant members select" ON companies
+  FOR SELECT USING (is_tenant_member(tenant_id));
+CREATE POLICY "Companies tenant members insert" ON companies
+  FOR INSERT WITH CHECK (is_tenant_member(tenant_id));
+CREATE POLICY "Companies tenant members update" ON companies
+  FOR UPDATE USING (is_tenant_member(tenant_id))
+  WITH CHECK (is_tenant_member(tenant_id));
+CREATE POLICY "Companies tenant members delete" ON companies
+  FOR DELETE USING (is_tenant_member(tenant_id));
 CREATE POLICY "Admins read all companies" ON companies
   FOR SELECT USING (
     EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'superadmin'))
@@ -990,7 +981,7 @@ CREATE POLICY "Admins read all companies" ON companies
 ```sql
 CREATE TABLE people (
   id         uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-  user_id    uuid NOT NULL DEFAULT auth.uid() REFERENCES auth.users(id),
+  tenant_id  uuid NOT NULL REFERENCES tenants(id),
   name       text NOT NULL,
   email      text,
   role       text,
@@ -1000,41 +991,26 @@ CREATE TABLE people (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_people_user ON people (user_id);
+CREATE INDEX idx_people_tenant ON people (tenant_id);
 CREATE INDEX idx_people_tags ON people USING gin (tags);
 
 ALTER TABLE people ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "People owner or agent select" ON people
-  FOR SELECT USING (
-    user_id = auth.uid()
-    OR user_id IN (SELECT owner_id FROM agent_owners WHERE agent_id = auth.uid())
-  );
-CREATE POLICY "People owner or agent insert" ON people
-  FOR INSERT WITH CHECK (
-    user_id = auth.uid()
-    OR user_id IN (SELECT owner_id FROM agent_owners WHERE agent_id = auth.uid())
-  );
-CREATE POLICY "People owner or agent update" ON people
-  FOR UPDATE USING (
-    user_id = auth.uid()
-    OR user_id IN (SELECT owner_id FROM agent_owners WHERE agent_id = auth.uid())
-  )
-  WITH CHECK (
-    user_id = auth.uid()
-    OR user_id IN (SELECT owner_id FROM agent_owners WHERE agent_id = auth.uid())
-  );
-CREATE POLICY "People owner or agent delete" ON people
-  FOR DELETE USING (
-    user_id = auth.uid()
-    OR user_id IN (SELECT owner_id FROM agent_owners WHERE agent_id = auth.uid())
-  );
+CREATE POLICY "People tenant members select" ON people
+  FOR SELECT USING (is_tenant_member(tenant_id));
+CREATE POLICY "People tenant members insert" ON people
+  FOR INSERT WITH CHECK (is_tenant_member(tenant_id));
+CREATE POLICY "People tenant members update" ON people
+  FOR UPDATE USING (is_tenant_member(tenant_id))
+  WITH CHECK (is_tenant_member(tenant_id));
+CREATE POLICY "People tenant members delete" ON people
+  FOR DELETE USING (is_tenant_member(tenant_id));
 CREATE POLICY "Admins read all people" ON people
   FOR SELECT USING (
     EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'superadmin'))
   );
 
--- Join table: people ↔ companies
+-- Join table: people ↔ companies (inherits workspace scope from parent via JOIN)
 CREATE TABLE people_companies (
   person_id  uuid NOT NULL REFERENCES people(id) ON DELETE CASCADE,
   company_id uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
@@ -1044,16 +1020,13 @@ CREATE TABLE people_companies (
 
 ALTER TABLE people_companies ENABLE ROW LEVEL SECURITY;
 
--- RLS via join to parent tables (person must belong to user)
-CREATE POLICY "People_companies via person ownership" ON people_companies
+-- RLS via join to parent tables (person must belong to workspace)
+CREATE POLICY "People_companies via person tenant" ON people_companies
   FOR ALL USING (
     EXISTS (
       SELECT 1 FROM people
       WHERE people.id = people_companies.person_id
-      AND (
-        people.user_id = auth.uid()
-        OR people.user_id IN (SELECT owner_id FROM agent_owners WHERE agent_id = auth.uid())
-      )
+      AND is_tenant_member(people.tenant_id)
     )
   );
 ```
@@ -1063,7 +1036,7 @@ CREATE POLICY "People_companies via person ownership" ON people_companies
 ```sql
 CREATE TABLE deals (
   id         uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-  user_id    uuid NOT NULL DEFAULT auth.uid() REFERENCES auth.users(id),
+  tenant_id  uuid NOT NULL REFERENCES tenants(id),
   title      text NOT NULL,
   status     text NOT NULL DEFAULT 'lead'
                CHECK (status IN ('lead', 'qualified', 'proposal', 'negotiation', 'won', 'lost')),
@@ -1074,42 +1047,27 @@ CREATE TABLE deals (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_deals_user ON deals (user_id);
-CREATE INDEX idx_deals_user_status ON deals (user_id, status);
+CREATE INDEX idx_deals_tenant ON deals (tenant_id);
+CREATE INDEX idx_deals_tenant_status ON deals (tenant_id, status);
 CREATE INDEX idx_deals_tags ON deals USING gin (tags);
 
 ALTER TABLE deals ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Deals owner or agent select" ON deals
-  FOR SELECT USING (
-    user_id = auth.uid()
-    OR user_id IN (SELECT owner_id FROM agent_owners WHERE agent_id = auth.uid())
-  );
-CREATE POLICY "Deals owner or agent insert" ON deals
-  FOR INSERT WITH CHECK (
-    user_id = auth.uid()
-    OR user_id IN (SELECT owner_id FROM agent_owners WHERE agent_id = auth.uid())
-  );
-CREATE POLICY "Deals owner or agent update" ON deals
-  FOR UPDATE USING (
-    user_id = auth.uid()
-    OR user_id IN (SELECT owner_id FROM agent_owners WHERE agent_id = auth.uid())
-  )
-  WITH CHECK (
-    user_id = auth.uid()
-    OR user_id IN (SELECT owner_id FROM agent_owners WHERE agent_id = auth.uid())
-  );
-CREATE POLICY "Deals owner or agent delete" ON deals
-  FOR DELETE USING (
-    user_id = auth.uid()
-    OR user_id IN (SELECT owner_id FROM agent_owners WHERE agent_id = auth.uid())
-  );
+CREATE POLICY "Deals tenant members select" ON deals
+  FOR SELECT USING (is_tenant_member(tenant_id));
+CREATE POLICY "Deals tenant members insert" ON deals
+  FOR INSERT WITH CHECK (is_tenant_member(tenant_id));
+CREATE POLICY "Deals tenant members update" ON deals
+  FOR UPDATE USING (is_tenant_member(tenant_id))
+  WITH CHECK (is_tenant_member(tenant_id));
+CREATE POLICY "Deals tenant members delete" ON deals
+  FOR DELETE USING (is_tenant_member(tenant_id));
 CREATE POLICY "Admins read all deals" ON deals
   FOR SELECT USING (
     EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'superadmin'))
   );
 
--- Join table: deals ↔ companies
+-- Join table: deals ↔ companies (inherits workspace scope from parent via JOIN)
 CREATE TABLE deals_companies (
   deal_id    uuid NOT NULL REFERENCES deals(id) ON DELETE CASCADE,
   company_id uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
@@ -1118,19 +1076,16 @@ CREATE TABLE deals_companies (
 
 ALTER TABLE deals_companies ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Deals_companies via deal ownership" ON deals_companies
+CREATE POLICY "Deals_companies via deal tenant" ON deals_companies
   FOR ALL USING (
     EXISTS (
       SELECT 1 FROM deals
       WHERE deals.id = deals_companies.deal_id
-      AND (
-        deals.user_id = auth.uid()
-        OR deals.user_id IN (SELECT owner_id FROM agent_owners WHERE agent_id = auth.uid())
-      )
+      AND is_tenant_member(deals.tenant_id)
     )
   );
 
--- Join table: deals ↔ people
+-- Join table: deals ↔ people (inherits workspace scope from parent via JOIN)
 CREATE TABLE deals_people (
   deal_id   uuid NOT NULL REFERENCES deals(id) ON DELETE CASCADE,
   person_id uuid NOT NULL REFERENCES people(id) ON DELETE CASCADE,
@@ -1139,15 +1094,12 @@ CREATE TABLE deals_people (
 
 ALTER TABLE deals_people ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Deals_people via deal ownership" ON deals_people
+CREATE POLICY "Deals_people via deal tenant" ON deals_people
   FOR ALL USING (
     EXISTS (
       SELECT 1 FROM deals
       WHERE deals.id = deals_people.deal_id
-      AND (
-        deals.user_id = auth.uid()
-        OR deals.user_id IN (SELECT owner_id FROM agent_owners WHERE agent_id = auth.uid())
-      )
+      AND is_tenant_member(deals.tenant_id)
     )
   );
 ```
@@ -1159,7 +1111,7 @@ CREATE TABLE activity_log (
   id          uuid DEFAULT gen_random_uuid() PRIMARY KEY,
   entity_type text NOT NULL,
   entity_id   uuid NOT NULL,
-  user_id     uuid NOT NULL REFERENCES auth.users(id),
+  tenant_id   uuid NOT NULL REFERENCES tenants(id),
   actor_id    uuid NOT NULL REFERENCES auth.users(id),
   actor_type  text NOT NULL CHECK (actor_type IN ('human', 'agent', 'platform')),
   event_type  text NOT NULL,
@@ -1169,7 +1121,7 @@ CREATE TABLE activity_log (
 
 CREATE INDEX idx_activity_log_entity ON activity_log (entity_type, entity_id, created_at DESC);
 CREATE INDEX idx_activity_log_actor  ON activity_log (actor_id, created_at DESC);
-CREATE INDEX idx_activity_log_user   ON activity_log (user_id, created_at DESC);
+CREATE INDEX idx_activity_log_tenant ON activity_log (tenant_id, created_at DESC);
 CREATE INDEX idx_activity_log_time   ON activity_log (created_at DESC);
 
 -- Composite index for realtime subscription filtering
@@ -1178,12 +1130,9 @@ CREATE INDEX idx_activity_log_entity_pair ON activity_log (entity_type, entity_i
 
 ALTER TABLE activity_log ENABLE ROW LEVEL SECURITY;
 
--- RLS: identical to all other tables — simple user_id check, no subqueries needed
-CREATE POLICY "Activity owner or agent select" ON activity_log
-  FOR SELECT USING (
-    user_id = auth.uid()
-    OR user_id IN (SELECT owner_id FROM agent_owners WHERE agent_id = auth.uid())
-  );
+-- activity_log: append-only, tenant-scoped reads
+CREATE POLICY "Tenant members read activity" ON activity_log
+  FOR SELECT USING (is_tenant_member(tenant_id));
 
 CREATE POLICY "Admins read all activity" ON activity_log
   FOR SELECT USING (
@@ -1192,16 +1141,15 @@ CREATE POLICY "Admins read all activity" ON activity_log
 
 -- activity_log has NO UPDATE policy and NO DELETE policy — it is append-only.
 -- Rows are immutable once written. Only SECURITY DEFINER RPCs insert into this table.
-
-CREATE POLICY "Authenticated insert activity" ON activity_log
-  FOR INSERT WITH CHECK (auth.uid() = actor_id);
+-- No INSERT policy needed — all inserts go through SECURITY DEFINER RPCs.
 ```
 
-**activity_log is append-only and write-protected.** The INSERT policy allows inserts only from SECURITY DEFINER RPC functions — not from direct client calls. `activity_log.user_id` is always derived server-side: for human actors, it is the entity owner's `user_id` (looked up from the entity being mutated); for agent actors, it is looked up from `agent_owners` where `agent_user_id = auth.uid()`. Clients cannot supply `user_id` directly. The table has no UPDATE or DELETE policies — activity events are immutable once written.
+**activity_log is append-only and write-protected.** All inserts go through SECURITY DEFINER RPC functions — not from direct client calls. `activity_log.tenant_id` is always derived server-side from the entity being mutated or from the actor's workspace membership. Clients cannot supply `tenant_id` directly. The table has no UPDATE or DELETE policies — activity events are immutable once written.
 
 ```sql
 -- RPC for paginated activity log (SECURITY DEFINER for reliable access)
 CREATE OR REPLACE FUNCTION get_activity_log(
+  p_tenant_id   uuid,
   p_entity_type text DEFAULT NULL,
   p_entity_id   uuid DEFAULT NULL,
   p_actor_id    uuid DEFAULT NULL,
@@ -1212,19 +1160,18 @@ CREATE OR REPLACE FUNCTION get_activity_log(
   p_offset      integer DEFAULT 0
 )
 RETURNS SETOF activity_log AS $$
-DECLARE
-  v_user_id uuid := auth.uid();
-  v_owner_id uuid;
 BEGIN
-  -- Resolve owner if caller is an agent
-  SELECT owner_id INTO v_owner_id FROM agent_owners WHERE agent_id = v_user_id;
+  -- Verify caller is a member of the requested workspace
+  IF NOT is_tenant_member(p_tenant_id) THEN
+    RAISE EXCEPTION 'Not a member of this workspace';
+  END IF;
 
   RETURN QUERY
   SELECT al.*
   FROM activity_log al
   WHERE
-    -- Scope to user's data (simple user_id check — no entity joins needed)
-    al.user_id = COALESCE(v_owner_id, v_user_id)
+    -- Scope to workspace data
+    al.tenant_id = p_tenant_id
     -- Optional filters
     AND (p_entity_type IS NULL OR al.entity_type = p_entity_type)
     AND (p_entity_id   IS NULL OR al.entity_id   = p_entity_id)
@@ -1242,24 +1189,24 @@ $$ LANGUAGE plpgsql SECURITY DEFINER STABLE;
 
 ```sql
 -- Semantic command RPCs (each does entity mutation + activity_log INSERT atomically)
--- rpc_create_task(title, body, status, priority, assignee, due_date, tags, actor_id, user_id, idempotency_key)
--- rpc_change_task_status(task_id, new_status, actor_id, user_id)
--- rpc_create_meeting(title, date, meeting_time, tags, actor_id, user_id, idempotency_key)
--- rpc_change_meeting_status(meeting_id, new_status, actor_id, user_id)
--- rpc_accept_suggested_task(meeting_id, task_title, task_body, actor_id, user_id)
--- rpc_create_library_item(type, title, description, url, tags, is_public, actor_id, user_id, idempotency_key)
--- rpc_upsert_diary_entry(date, summary, content, actor_id, user_id)
--- rpc_add_grocery_item(name, quantity, unit, category, actor_id, user_id, idempotency_key)
--- rpc_check_grocery_item(item_id, is_checked, actor_id, user_id)
--- rpc_create_company(name, domain, description, tags, actor_id, user_id, idempotency_key)
--- rpc_create_person(name, email, role, notes, tags, actor_id, user_id, idempotency_key)
--- rpc_create_deal(title, status, value, notes, tags, actor_id, user_id, idempotency_key)
--- rpc_change_deal_status(deal_id, new_status, actor_id, user_id)
--- rpc_add_comment(entity_type, entity_id, entity_label, comment_body, actor_id, user_id)
--- rpc_update_entity(table_name, entity_id, fields jsonb, actor_id, user_id)  -- generic
+-- rpc_create_task(title, body, status, priority, assignee, due_date, tags, actor_id, tenant_id, idempotency_key)
+-- rpc_change_task_status(task_id, new_status, actor_id, tenant_id)
+-- rpc_create_meeting(title, date, meeting_time, tags, actor_id, tenant_id, idempotency_key)
+-- rpc_change_meeting_status(meeting_id, new_status, actor_id, tenant_id)
+-- rpc_accept_suggested_task(meeting_id, task_title, task_body, actor_id, tenant_id)
+-- rpc_create_library_item(type, title, description, url, tags, is_public, actor_id, tenant_id, idempotency_key)
+-- rpc_upsert_diary_entry(date, summary, content, actor_id, user_id)  -- diary uses user_id (private)
+-- rpc_add_grocery_item(name, quantity, unit, category, actor_id, tenant_id, idempotency_key)
+-- rpc_check_grocery_item(item_id, is_checked, actor_id, tenant_id)
+-- rpc_create_company(name, domain, description, tags, actor_id, tenant_id, idempotency_key)
+-- rpc_create_person(name, email, role, notes, tags, actor_id, tenant_id, idempotency_key)
+-- rpc_create_deal(title, status, value, notes, tags, actor_id, tenant_id, idempotency_key)
+-- rpc_change_deal_status(deal_id, new_status, actor_id, tenant_id)
+-- rpc_add_comment(entity_type, entity_id, entity_label, comment_body, actor_id, tenant_id)
+-- rpc_update_entity(table_name, entity_id, fields jsonb, actor_id, tenant_id)  -- generic
 ```
 
-These RPCs are defined in the initial migration. Each is a SECURITY DEFINER function so it can bypass RLS internally while still running in the caller's transaction context. The API route validates identity before calling — the RPC trusts the actor_id it receives.
+These RPCs are defined in the initial migration. Each is a SECURITY DEFINER function so it can bypass RLS internally while still running in the caller's transaction context. The API route validates identity and resolves `tenant_id` from the actor's `tenant_members` row before calling — the RPC trusts the actor_id and tenant_id it receives. Clients never supply `tenant_id` directly.
 
 ### Triggers — Updated At
 
@@ -1397,7 +1344,9 @@ const schema = z.object({
 
 export async function POST(request: Request) {
   try {
-    const { supabase, actorId, actorType, ownerId } = await resolveActor(request);
+    const { supabase, actorId, tenantId } = await resolveActor(request);
+    if (!tenantId) throw new Error("Actor is not a member of any workspace");
+
     const body = await request.json();
     const input = schema.parse(body);
 
@@ -1411,7 +1360,7 @@ export async function POST(request: Request) {
       p_due_date: input.due_date ?? null,
       p_tags: input.tags,
       p_actor_id: actorId,
-      p_user_id: ownerId,
+      p_tenant_id: tenantId,
       p_idempotency_key: input.idempotency_key ?? null,
     });
 
@@ -1446,7 +1395,7 @@ Content-Type: application/json
   "success": true,
   "data": {
     "id": "abc123...",
-    "user_id": "owner-uuid",
+    "tenant_id": "tenant-uuid",
     "title": "Review Q3 financials",
     "status": "todo",
     "priority": "high",
@@ -1475,7 +1424,9 @@ const schema = z.object({
 
 export async function POST(request: Request) {
   try {
-    const { supabase, actorId, actorType, ownerId } = await resolveActor(request);
+    const { supabase, actorId, tenantId } = await resolveActor(request);
+    if (!tenantId) throw new Error("Actor is not a member of any workspace");
+
     const body = await request.json();
     const { task_id, status } = schema.parse(body);
 
@@ -1484,7 +1435,7 @@ export async function POST(request: Request) {
       p_task_id: task_id,
       p_new_status: status,
       p_actor_id: actorId,
-      p_user_id: ownerId,
+      p_tenant_id: tenantId,
     });
 
     if (error) throw error;
@@ -1537,12 +1488,14 @@ const schema = z.object({
 
 export async function PATCH(request: Request) {
   try {
-    const { supabase, actorId, actorType, ownerId } = await resolveActor(request);
+    const { supabase, actorId, tenantId } = await resolveActor(request);
+    if (!tenantId) throw new Error("Actor is not a member of any workspace");
+
     const body = await request.json();
     const { table, id, fields } = schema.parse(body);
 
     // Prevent updating protected fields
-    const PROTECTED_FIELDS = ["id", "user_id", "created_at", "ticket_id"];
+    const PROTECTED_FIELDS = ["id", "tenant_id", "created_at", "ticket_id"];
     for (const key of PROTECTED_FIELDS) {
       if (key in fields) {
         return NextResponse.json(
@@ -1558,7 +1511,7 @@ export async function PATCH(request: Request) {
       p_entity_id: id,
       p_fields: fields,
       p_actor_id: actorId,
-      p_user_id: ownerId,
+      p_tenant_id: tenantId,
     });
 
     if (error) throw error;
@@ -1597,47 +1550,49 @@ Authorization: Bearer <jwt>
 
 ### Summary Table
 
-| Table | Owner Read | Owner Write | Agent Read | Agent Write | Admin Read | Public Read |
-|-------|-----------|-------------|-----------|-------------|-----------|-------------|
-| profiles | Own row | Own row | — | — | All rows | — |
-| agent_owners | Own row (agent) | — | Own row | — | All (superadmin) | — |
-| tags | Own | Insert | Via owner | Via owner | — | — |
-| tasks | Own | Own | Via owner | Via owner | All | — |
-| meetings | Own | Own | Via owner | Via owner | All | — |
-| library_items | Own | Own | Via owner | Via owner | All | `is_public=true` |
-| diary_entries | Own | Own | Via owner | Via owner | All | — |
-| grocery_items | Own | Own | Via owner | Via owner | — | — |
-| companies | Own | Own | Via owner | Via owner | All | — |
-| people | Own | Own | Via owner | Via owner | All | — |
-| deals | Own | Own | Via owner | Via owner | All | — |
-| people_companies | Via person | Via person | Via person | Via person | — | — |
-| deals_companies | Via deal | Via deal | Via deal | Via deal | — | — |
-| deals_people | Via deal | Via deal | Via deal | Via deal | — | — |
-| meetings_people | Via meeting | Via meeting | Via meeting | Via meeting | — | — |
-| meetings_companies | Via meeting | Via meeting | Via meeting | Via meeting | — | — |
-| activity_log | Own (`user_id`) | Insert (own actor_id) | Via owner | Insert (own actor_id) | All | — |
+| Table | Workspace Members | Admin Read | Public Read | Notes |
+|-------|------------------|-----------|-------------|-------|
+| tenants | Read own tenant | — | — | Via `tenant_members` subquery |
+| tenant_members | Read own tenant | — | — | Superadmin manages membership |
+| profiles | Own row (read/write) | All rows | — | Not tenant-scoped |
+| agent_owners | Own row (agent reads) | All (superadmin) | — | Not tenant-scoped |
+| tags | Read/write own | — | — | Scoped by `user_id` (per-user) |
+| tasks | Full CRUD | All | — | `is_tenant_member(tenant_id)` |
+| meetings | Full CRUD | All | — | `is_tenant_member(tenant_id)` |
+| library_items | Full CRUD | All | `is_public=true` | `is_tenant_member(tenant_id)` |
+| diary_entries | Author only | All | — | `user_id = auth.uid()` — exception |
+| grocery_items | Full CRUD | — | — | `is_tenant_member(tenant_id)` |
+| companies | Full CRUD | All | — | `is_tenant_member(tenant_id)` |
+| people | Full CRUD | All | — | `is_tenant_member(tenant_id)` |
+| deals | Full CRUD | All | — | `is_tenant_member(tenant_id)` |
+| people_companies | Via parent tenant | — | — | JOIN to `people.tenant_id` |
+| deals_companies | Via parent tenant | — | — | JOIN to `deals.tenant_id` |
+| deals_people | Via parent tenant | — | — | JOIN to `deals.tenant_id` |
+| meetings_people | Via parent tenant | — | — | JOIN to `meetings.tenant_id` |
+| meetings_companies | Via parent tenant | — | — | JOIN to `meetings.tenant_id` |
+| activity_log | Read (tenant-scoped) | All | — | Append-only. INSERT via SECURITY DEFINER RPCs only. |
 
 ### UPDATE Policies: USING + WITH CHECK
 
-**UPDATE policies require both USING and WITH CHECK.** `USING` controls which rows a user can target. `WITH CHECK` controls what the row can look like after the update. Without `WITH CHECK`, an authenticated user who owns a row can change its `user_id`, transferring ownership to another tenant — creating cross-tenant data injection. Every UPDATE policy in AgentBase sets both clauses to `user_id = auth.uid()`.
+**UPDATE policies require both USING and WITH CHECK.** `USING` controls which rows a user can target. `WITH CHECK` controls what the row can look like after the update. Without `WITH CHECK`, a workspace member could change a row's `tenant_id`, moving it to another workspace — creating cross-tenant data injection. Every UPDATE policy in AgentBase sets both clauses to `is_tenant_member(tenant_id)`.
 
-### The Agent Access Pattern (Used Everywhere)
+### The Tenant Membership Pattern (Used Everywhere)
 
-Every entity RLS policy uses this pattern:
+Every entity RLS policy (except diary) uses the `is_tenant_member()` helper:
 ```sql
-user_id = auth.uid()
-OR user_id IN (SELECT owner_id FROM agent_owners WHERE agent_id = auth.uid())
+USING (is_tenant_member(tenant_id))
+WITH CHECK (is_tenant_member(tenant_id))
 ```
 
-This is a subquery that runs once per policy evaluation. For performance, `agent_owners` is a tiny table (typically 2-3 rows total) with a PK index on `agent_id`. The subquery is effectively a single index lookup.
+This calls the SECURITY DEFINER function that checks `tenant_members` for a matching `(tenant_id, user_id)` row. For performance, `tenant_members` has a composite PK on `(tenant_id, user_id)` — the check is a single index lookup.
 
-**Performance note:** If this subquery becomes a bottleneck (unlikely with <100 users), we can memoize it with `SET LOCAL` at the start of each request or use a materialized view. But for the expected scale, this is fine.
+**Performance note:** If membership checks become a bottleneck (unlikely with <100 users), we can memoize with `SET LOCAL` at the start of each request. But for the expected scale, this is fine.
 
 **Semantic command RPCs and RLS:** Semantic command RPCs are SECURITY DEFINER functions. They bypass RLS internally to perform mutations — which is intentional, because the API route has already validated actor identity. RLS still applies to all direct table reads.
 
 ### RLS on Join Tables
 
-Join tables (people_companies, deals_companies, deals_people, meetings_people, meetings_companies) don't have `user_id` directly. They inherit access from their parent entity:
+Join tables (people_companies, deals_companies, deals_people, meetings_people, meetings_companies) don't have `tenant_id` directly. They inherit access from their parent entity:
 
 ```sql
 -- Example: people_companies
@@ -1646,10 +1601,7 @@ CREATE POLICY "..." ON people_companies
     EXISTS (
       SELECT 1 FROM people
       WHERE people.id = people_companies.person_id
-      AND (
-        people.user_id = auth.uid()
-        OR people.user_id IN (SELECT owner_id FROM agent_owners WHERE agent_id = auth.uid())
-      )
+      AND is_tenant_member(people.tenant_id)
     )
   );
 ```
@@ -1766,7 +1718,7 @@ type ActivityLogEntry = {
   id: string;
   entity_type: string;
   entity_id: string;
-  user_id: string;
+  tenant_id: string;
   actor_id: string;
   actor_type: "human" | "agent" | "platform";
   event_type: string;
@@ -2268,7 +2220,7 @@ agentbase/
 
 ## 11. Open Questions / Decisions Deferred to Hunter
 
-1. **Agent user_id in writes:** When Frank creates a task, should `user_id` be Hunter's ID (the owner) or Frank's ID? The plan assumes the owner's ID (so RLS scoping works naturally), but this means the `created_by` information lives only in `activity_log.actor_id`, not on the entity itself. **Alternative:** Add a `created_by` column to entity tables. **Recommendation:** Keep it in activity_log only — simpler schema, single source of truth for attribution.
+1. ~~**Agent user_id in writes**~~ — **RESOLVED.** Entity rows use `tenant_id` (workspace), not creator identity. Attribution lives in `activity_log.actor_id` on the created event. There is no `created_by` column on entity tables. This is the correct separation of visibility vs. attribution.
 
 2. **Task assignee values:** HAH Toolbox uses string assignees (`"hunter"`, `"frank"`, `"lucy"`). Should AgentBase use UUIDs referencing `auth.users` instead? **Tradeoff:** UUIDs are cleaner but require a join to display names. Strings are simpler but don't validate. **Recommendation:** Use UUIDs, resolve display names client-side from a profiles cache.
 
@@ -2312,10 +2264,10 @@ agentbase/
 
 | Area | HAH Toolbox | AgentBase | Why |
 |------|-------------|-----------|-----|
-| **Multi-tenancy** | Single-user. No `user_id` on most tables. | All tables have `user_id`. RLS scopes everything. | Anyone can deploy and use it. Data isolation is a must. |
+| **Multi-tenancy** | Single-user. No `user_id` on most tables. | `tenant_id` on rows = workspace. All workspace members see all rows. Attribution in `activity_log`. | Correct separation of visibility vs. attribution. Adding a human to the team = one row insert, no schema change. |
 | **Agent auth** | Service role key + `SET LOCAL app.current_actor` | Real Supabase Auth users with hand-signed JWTs. `auth.uid()` resolves correctly. | Eliminates the fragile `SET LOCAL` pattern. Proper audit trail. RLS works naturally. |
 | **Mutation path** | Direct Supabase client calls from components | All mutations go through API routes (command bus) | Agents (external HTTP clients) need the same endpoints as the browser. Server actions can't be called by Docker containers. |
-| **Activity log** | `author` as text (`"hunter"`, `"frank"`). No `user_id` scope. | `actor_id` as UUID FK to `auth.users`. Activity scoped via entity ownership. | Multi-tenant safe. Proper FK relationships. Actors resolved client-side. |
+| **Activity log** | `author` as text (`"hunter"`, `"frank"`). No tenant scope. | `actor_id` as UUID FK to `auth.users`. `tenant_id` for workspace-scoped visibility. | Multi-tenant safe. Proper FK relationships. Actors resolved client-side. |
 | **Task activity** | Dual-write to `task_activity` AND `activity_log` | Single write to `activity_log` only | One source of truth. No sync issues. `task_activity` was a legacy artifact. |
 | **Edit shelf** | Generic `RightShelf` container. ActivityFeed manually included per entity. | `EditShelf` always includes `ActivityAndComments`. Universal pattern. | Can't forget activity/comments. Consistent UX across all entities. |
 | **Task component** | Single 900+ line monolithic file | Decomposed: list view, shelf content, shared components | Maintainable. Testable. Reusable pieces. |
@@ -2327,7 +2279,7 @@ agentbase/
 | **Meeting lifecycle** | `upcoming → in_meeting → wrapping_up → complete` | `upcoming → in_meeting → ended → closed` | Cleaner naming. `ended` = post-meeting work. `closed` = done. |
 | **Meeting schema** | `contact` (text), `prep_notes`, `meeting_summary`, `notes`, `summary` (legacy) | `title`, `agent_notes` (replaces `meeting_summary`), no legacy fields | Clean schema. No accumulated cruft. |
 | **Library schema** | No `url`, `source`, `excerpt` fields | Added `url`, `source`, `excerpt` for article/bookmark types | Library items need to store web content properly. |
-| **Grocery schema** | `item` (text), `checked` (bool), no user_id | `name`, `quantity`, `unit`, `category`, `is_checked`, `sort_order`, `user_id` | Multi-tenant. Richer data model for better UX (categories, quantities). |
+| **Grocery schema** | `item` (text), `checked` (bool), no scoping | `name`, `quantity`, `unit`, `category`, `is_checked`, `sort_order`, `tenant_id` | Multi-tenant. Richer data model for better UX (categories, quantities). |
 | **Tags** | Global (one namespace) | Per-user (scoped by `user_id`) | Multi-tenant isolation. |
 | **Migration strategy** | 35+ incremental migrations (organic growth) | Single initial migration with complete schema | Greenfield advantage. Clean start. |
 | **Atomicity** | Two separate Supabase calls (entity update, then activity insert) — can get out of sync | Single Postgres RPC call — entity mutation + activity_log insert in one transaction | Guaranteed consistency. No orphaned events. |
