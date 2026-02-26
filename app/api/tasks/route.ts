@@ -13,6 +13,8 @@ const createSchema = z.object({
     .optional()
     .default('todo'),
   body: z.string().optional(),
+  assignee_id: z.string().uuid().optional().nullable(),
+  assignee_type: z.enum(['human', 'agent']).optional().nullable(),
 })
 
 export async function GET(request: Request) {
@@ -52,6 +54,8 @@ export async function POST(request: Request) {
       p_priority: input.priority,
       p_status: input.status,
       p_body: input.body ?? null,
+      p_assignee_id: input.assignee_id ?? null,
+      p_assignee_type: input.assignee_type ?? null,
     })
     if (error) throw error
     return Response.json({ data }, { status: 201 })

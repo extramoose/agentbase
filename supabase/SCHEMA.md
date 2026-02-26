@@ -97,7 +97,9 @@ Workspace-scoped tag registry.
 | body | text | YES | — | Markdown |
 | status | text | NO | `'todo'` | CHECK: `todo \| in_progress \| done \| cancelled \| blocked` |
 | priority | text | NO | `'medium'` | CHECK: `critical \| high \| medium \| low` |
-| assignee | text | YES | — | Display name string |
+| assignee | text | YES | — | Display name string (legacy freetext) |
+| assignee_id | uuid | YES | — | Actor reference — profiles or agents |
+| assignee_type | text | YES | — | CHECK: `human \| agent` |
 | due_date | date | YES | — | |
 | tags | text[] | YES | `'{}'` | |
 | source_meeting_id | uuid | YES | — | FK → meetings |
@@ -338,7 +340,7 @@ All mutations go through these functions. They atomically write to the entity ta
 ### Entity creates
 | Function | Key params | Returns |
 |----------|-----------|---------|
-| `rpc_create_task` | tenant_id, actor_id, actor_type, title, priority, status, body | jsonb (task row) |
+| `rpc_create_task` | tenant_id, actor_id, actor_type, title, priority, status, body, assignee_id, assignee_type | jsonb (task row) |
 | `rpc_create_meeting` | tenant_id, actor_id, actor_type, title, date, meeting_time, tags | jsonb (meeting row) |
 | `rpc_create_library_item` | tenant_id, actor_id, actor_type, type, title, url, body, source, excerpt, location_name, latitude, longitude, tags, is_public | jsonb |
 | `rpc_upsert_diary_entry` | tenant_id, actor_id, actor_type, date, content | jsonb — logs `created` or `updated` |
@@ -375,6 +377,7 @@ All mutations go through these functions. They atomically write to the entity ta
 | `006_rpc_fixes.sql` | `is_admin()`, `is_superadmin()` SECURITY DEFINER helpers; profiles RLS fix |
 | `007_workspace_settings.sql` | `tenants`: add `updated_at`, `openrouter_api_key`, `default_model`; `get_workspace_settings` + `update_workspace_settings` RPCs |
 | `008_rich_activity_diffs.sql` | `rpc_update_entity` captures per-field diffs with semantic event types; emits one `activity_log` row per changed field |
+| `010_task_assignee.sql` | Add `assignee_id` + `assignee_type` to tasks; update `rpc_create_task` + `rpc_update_entity` (uuid cast for `assignee_id`) |
 
 ---
 

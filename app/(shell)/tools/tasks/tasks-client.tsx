@@ -26,6 +26,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { RichTextEditor } from '@/components/rich-text-editor'
 import { Badge } from '@/components/ui/badge'
+import { AssigneePicker } from '@/components/assignee-picker'
+import { ActorChip } from '@/components/actor-chip'
 import { cn } from '@/lib/utils'
 
 // ---------------------------------------------------------------------------
@@ -44,6 +46,8 @@ type Task = {
   priority: Priority
   tags: string[]
   due_date: string | null
+  assignee_id: string | null
+  assignee_type: 'human' | 'agent' | null
   sort_order: number
   source_meeting_id: string | null
   created_at: string
@@ -174,6 +178,13 @@ function SortableTaskRow({
       >
         {statusCfg.label}
       </Badge>
+
+      {/* Assignee */}
+      {task.assignee_id ? (
+        <ActorChip actorId={task.assignee_id} actorType={task.assignee_type as 'human' | 'agent'} compact />
+      ) : (
+        <span className="text-xs text-muted-foreground shrink-0">Unassigned</span>
+      )}
 
       {/* Due date */}
       {task.due_date && (
@@ -423,6 +434,8 @@ export function TasksClient({
         priority,
         tags: [],
         due_date: null,
+        assignee_id: null,
+        assignee_type: null,
         sort_order: 0,
         source_meeting_id: null,
         created_at: new Date().toISOString(),
@@ -780,6 +793,22 @@ function TaskEditShelf({
               ))}
             </select>
           </div>
+        </div>
+
+        {/* Assignee */}
+        <div>
+          <label className="text-xs text-muted-foreground font-medium mb-1 block">
+            Assignee
+          </label>
+          <AssigneePicker
+            value={task.assignee_id ? { id: task.assignee_id, type: task.assignee_type as 'human' | 'agent' } : null}
+            onChange={(actor) => {
+              saveFieldImmediate({
+                assignee_id: actor?.id ?? null,
+                assignee_type: actor?.type ?? null,
+              })
+            }}
+          />
         </div>
 
         {/* Body */}
