@@ -592,7 +592,7 @@ export function TasksClient({
       result = result.filter(
         (t) =>
           t.title.toLowerCase().includes(q) ||
-          t.tags.some((tag) => tag.toLowerCase().includes(q))
+          (t.tags ?? []).some((tag) => tag.toLowerCase().includes(q))
       )
     }
 
@@ -867,12 +867,11 @@ export function TasksClient({
       {/* Top bar */}
       <div className="flex items-center justify-between gap-4 mb-4">
         <h1 className="text-2xl font-bold shrink-0">Tasks</h1>
-        <div className="flex items-center gap-3 flex-1 justify-end">
+        <div className="flex items-center gap-2">
           <SearchFilterBar
             search={search}
             onSearchChange={setSearch}
             placeholder="Search tasks..."
-            className="flex-1 max-w-lg"
           />
           <Button size="sm" onClick={handleNewTask}>
             <Plus className="h-4 w-4 mr-1" />
