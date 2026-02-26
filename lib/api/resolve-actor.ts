@@ -1,6 +1,5 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import { createClient as createServerClient } from '@/lib/supabase/server'
-import { getTenantId } from '@/lib/auth'
 import { UnauthorizedError, RateLimitError } from './errors'
 import { checkRateLimit } from './rate-limit'
 
@@ -73,7 +72,8 @@ export async function resolveActorUnified(request: Request): Promise<ResolvedAct
   const { allowed, retryAfter } = checkRateLimit(user.id)
   if (!allowed) throw new RateLimitError(retryAfter)
 
-  const tenantId = await getTenantId()
+  // Use same client instance — avoids spinning up a second SSR client
+  const { data: tenantId } = await supabase.rpc('get_my_tenant_id')
   if (!tenantId) throw new UnauthorizedError('No workspace')
 
   const { data: agentOwner } = await supabase
@@ -86,7 +86,7 @@ export async function resolveActorUnified(request: Request): Promise<ResolvedAct
     supabase,
     actorId: user.id,
     actorType: agentOwner ? 'agent' : 'human',
-    tenantId,
+    tenantId: tenantId as string,
     ownerId: agentOwner?.owner_id ?? user.id,
   }
 }

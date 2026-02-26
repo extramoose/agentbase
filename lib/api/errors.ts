@@ -47,7 +47,20 @@ export function apiError(error: unknown): Response {
       { status: error.status, headers }
     )
   }
-  const message = error instanceof Error ? error.message : 'Unknown error'
-  console.error('Unhandled API error:', error)
-  return Response.json({ success: false, error: message }, { status: 500 })
+  if (error instanceof Error) {
+    console.error('Unhandled API error:', error)
+    return Response.json({ success: false, error: error.message }, { status: 500 })
+  }
+  // Supabase PostgrestError is a plain object with { message, code, details, hint }
+  if (error && typeof error === 'object' && 'message' in error) {
+    const msg = String((error as Record<string, unknown>).message)
+    const code = 'code' in error ? String((error as Record<string, unknown>).code) : undefined
+    console.error('Unhandled Supabase error:', error)
+    return Response.json(
+      { success: false, error: msg, code },
+      { status: 500 }
+    )
+  }
+  console.error('Unhandled API error (unknown type):', error)
+  return Response.json({ success: false, error: 'Unknown error' }, { status: 500 })
 }
