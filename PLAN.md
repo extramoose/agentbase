@@ -37,17 +37,28 @@ AgentBase is a greenfield "Life OS" — a personal productivity platform where h
 
 ### Environment Variables
 
+#### Key Naming: Old vs Current Supabase Terminology
+
+Supabase deprecated its original key naming in 2024. If you've used Supabase before, here's the mapping:
+
+| Old name (deprecated) | Current name | What it does |
+|----------------------|--------------|--------------|
+| `anon key` | **publishable key** | Safe to expose in the browser. Used by the Supabase JS client for all authenticated + unauthenticated requests. RLS enforces access. |
+| `service role key` | **secret key** | Bypasses ALL RLS. Full database access. Never expose in a browser or runtime environment. Scripts only. |
+
+The env var name `NEXT_PUBLIC_SUPABASE_ANON_KEY` is what the Supabase JS SDK still expects (kept for SDK compatibility), but the key it holds is what the Supabase dashboard now labels **"publishable key"**. `SUPABASE_SECRET_KEY` is our env var name for what the dashboard calls the **"secret key"**.
+
 **Runtime env vars** (in Vercel / `.env.local` for the Next.js app):
 ```
 NEXT_PUBLIC_SUPABASE_URL        # Supabase project URL
-NEXT_PUBLIC_SUPABASE_ANON_KEY   # Supabase publishable key (Supabase now calls this "publishable" not "anon")
+NEXT_PUBLIC_SUPABASE_ANON_KEY   # Supabase publishable key — safe to expose, RLS-enforced
 NEXT_PUBLIC_APP_DOMAIN          # App domain (default: agentbase.hah.to)
 DEAL_LABEL                      # Optional label override for "Deals" entity
 ```
 
-> ⚠️ **`SUPABASE_SECRET_KEY` (formerly "service role key") must never be in the Next.js runtime environment.** This key bypasses all RLS — if it is present in a deployed runtime environment, any server-side bug becomes a full database compromise. It belongs only in one-time admin scripts run locally. Next.js server components and API routes use the publishable key + user session JWT. Admin operations (user management, migrations) are performed via SECURITY DEFINER RPCs or run as local scripts.
+> ⚠️ **`SUPABASE_SECRET_KEY` (the publishable key's dangerous sibling) must never be in the Next.js runtime environment.** It bypasses all RLS — if present in a deployed runtime, any server-side bug becomes a full database compromise. It belongs only in one-time admin scripts run locally. API routes and server components use the publishable key + the caller's session token. Admin operations use SECURITY DEFINER RPCs.
 >
-> Add a boot-time assertion in `app/layout.tsx` or a dedicated `lib/env.ts`:
+> Add a boot-time assertion in `lib/env.ts`:
 > ```ts
 > if (process.env.SUPABASE_SECRET_KEY && process.env.NODE_ENV === 'production') {
 >   throw new Error('SUPABASE_SECRET_KEY must not be present in production runtime')
@@ -56,7 +67,7 @@ DEAL_LABEL                      # Optional label override for "Deals" entity
 
 **Scripts-only env vars** (local `.env.local` only — NOT in Vercel):
 ```
-SUPABASE_SECRET_KEY   # Supabase secret key (formerly "service role key") — admin scripts only: create-agent-users. NEVER in Vercel runtime.
+SUPABASE_SECRET_KEY   # Supabase secret key (old name: "service role key") — scripts only. NEVER in Vercel.
 ```
 
 ---
@@ -2257,7 +2268,7 @@ All questions have been resolved. No open questions remain.
 
 | Area | HAH Toolbox | AgentBase | Why |
 |------|-------------|-----------|-----|
-| **Multi-tenancy** | Single-user. No `user_id` on most tables. | `tenant_id` on rows = workspace. All workspace members see all rows. Attribution in `activity_log`. | Correct separation of visibility vs. attribution. Adding a human to the team = one row insert, no schema change. |
+| **Multi-tenancy** | Single-user app — no workspace concept. All data implicitly belongs to one user. | All entity tables (`tasks`, `meetings`, `library_items`, etc.) have `tenant_id` as the scoping field. `user_id` does **not** appear on entity tables — it exists only in `tenant_members` (maps users into workspaces), `agent_owners` (maps agents to owners), and `notifications` (per-person routing). Attribution is separate: `activity_log.actor_id`. | Correct separation of visibility (workspace) vs. attribution (who did it). Adding a teammate = one row in `tenant_members`, no schema changes. |
 | **Agent auth** | Service role key + `SET LOCAL app.current_actor` | Real Supabase Auth users with refresh token sessions. `auth.uid()` resolves natively in all triggers and RLS policies. No JWT signing, no custom crypto. See §3.5. | Eliminates the fragile `SET LOCAL` pattern. Proper audit trail. RLS works naturally. |
 | **Mutation path** | Direct Supabase client calls from components | All mutations go through API routes (command bus) | Agents (external HTTP clients) need the same endpoints as the browser. Server actions can't be called by Docker containers. |
 | **Activity log** | `author` as text (`"hunter"`, `"frank"`). No tenant scope. | `actor_id` as UUID FK to `auth.users`. `tenant_id` for workspace-scoped visibility. | Multi-tenant safe. Proper FK relationships. Actors resolved client-side. |
@@ -2305,7 +2316,7 @@ The `notifications` table is in the schema (stub only). No UI, no triggers. Buil
 Both grocery and diary are workspace-scoped (tenant_id). One shared grocery list and one shared diary per workspace. All tenant members (humans and agents) can read and write.
 
 ### L-8: Field-level validation on generic update route
-The `PATCH /api/commands/update` route validates table name and protected fields (user_id, actor_id) but doesn't validate field values — Postgres CHECK constraints are the only guard. Future work: add optional per-table validation schemas (e.g. zod) that the generic route checks before writing. Not a v1 concern — CHECK constraints catch bad data at the DB level.
+The `PATCH /api/commands/update` route validates table name and protected fields (tenant_id, actor_id) but doesn't validate field values — Postgres CHECK constraints are the only guard. Future work: add optional per-table validation schemas (e.g. zod) that the generic route checks before writing. Not a v1 concern — CHECK constraints catch bad data at the DB level.
 
 ### L-9: Artifacts table for OpenClaw tool traces
 OpenClaw agents generate tool outputs — screenshots, DOM dumps, search results, file reads. Currently, `activity_log.payload` can hold small JSON blobs, but large binary or text artifacts would bloat the log. Future work: add an `artifacts` table with object storage pointers (Supabase Storage or S3-compatible), and allow `activity_log.payload` to reference artifact IDs instead of embedding content inline. Design the schema now if agents start generating large outputs.
