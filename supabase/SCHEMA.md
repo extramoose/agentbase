@@ -9,7 +9,7 @@ Migrations: `supabase/migrations/`
 ## Tables
 
 ### `profiles`
-One row per Supabase Auth user (humans and agents). Populated by `handle_new_user()` trigger.
+One row per Supabase Auth user (humans only). Populated by `handle_new_user()` trigger.
 
 | Column | Type | Nullable | Default | Notes |
 |--------|------|----------|---------|-------|
@@ -48,16 +48,26 @@ PK: `(tenant_id, user_id)`
 
 ---
 
-### `agent_owners`
-Maps agent auth users to their human owner.
+### `agents`
+Custom API key-authenticated agents. Not Supabase Auth users. Ownership via `owner_id`.
 
-| Column | Type | Nullable | Default |
-|--------|------|----------|---------|
-| agent_id | uuid | NO | — | FK → auth.users (the agent) |
-| owner_id | uuid | NO | — | FK → auth.users (the human) |
-| created_at | timestamptz | NO | `now()` |
+| Column | Type | Nullable | Default | Notes |
+|--------|------|----------|---------|-------|
+| id | uuid | NO | `gen_random_uuid()` | |
+| tenant_id | uuid | NO | — | FK → tenants |
+| name | text | NO | — | |
+| avatar_url | text | YES | — | |
+| api_key_hash | text | NO | — | UNIQUE, SHA-256 of plain key |
+| owner_id | uuid | NO | — | FK → profiles |
+| last_seen_at | timestamptz | YES | — | Updated on each API call |
+| revoked_at | timestamptz | YES | — | Non-null = revoked |
+| created_at | timestamptz | NO | `now()` | |
 
-PK: `(agent_id, owner_id)`
+RLS: `is_tenant_member(tenant_id)` for SELECT; superadmins for ALL.
+
+---
+
+### ~~`agent_owners`~~ (DROPPED in migration 005)
 
 ---
 
@@ -312,6 +322,8 @@ All mutations go through these functions. They atomically write to the entity ta
 |----------|---------|-------|
 | `get_my_profile()` | `profiles` row | Uses `auth.uid()` |
 | `get_my_tenant_id()` | `uuid` | Uses `auth.uid()` |
+| `resolve_agent_by_key(p_key_hash)` | `jsonb` (agent row or null) | Looks up agent by hashed API key, updates `last_seen_at`. Callable by anon. |
+| `admin_update_profile(p_target_id, p_avatar_url, p_full_name, p_role)` | `void` | Admin/superadmin only. Updates profile fields via COALESCE. |
 
 ### Query helper
 | Function | Parameters | Returns |
@@ -354,6 +366,7 @@ All mutations go through these functions. They atomically write to the entity ta
 | `002_command_bus_rpcs.sql` | `rpc_update_entity`, `rpc_add_comment`, `get_my_profile`, `get_my_tenant_id` |
 | `003_activity_log_mutations.sql` | All `rpc_create_*` (8 entities) + `rpc_delete_entity` |
 | `004_schema_fixes.sql` | Schema corrections: people (phone+title), deals status, companies (notes+industry), library_items (body, latitude, longitude, location_name) |
+| `005_agents_table.sql` | Custom `agents` table, `resolve_agent_by_key` + `admin_update_profile` RPCs, DROP `agent_owners` |
 
 ---
 
@@ -361,7 +374,7 @@ All mutations go through these functions. They atomically write to the entity ta
 
 - **All entity mutations go through SECURITY DEFINER RPCs** — never direct table inserts from route handlers
 - **Both humans and agents use the same routes** — `resolveActorUnified()` handles Bearer (agent) vs cookie (human) auth
-- **`SUPABASE_SECRET_KEY` is scripts/admin routes only** — never in client code, never in Vercel runtime for non-admin purposes
+- **`SUPABASE_SECRET_KEY` is scripts only** — not in any runtime code (admin routes use SECURITY DEFINER RPCs instead)
 - **`actor_type` CHECK is `human | agent` only** — no `system` or `platform`
 - **All text content is Markdown** — stored as plain text, rendered by Tiptap or markdown parser
 - **`diary_entries.summary` is deprecated** — always read/write `content`

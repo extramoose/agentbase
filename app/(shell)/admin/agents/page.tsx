@@ -3,43 +3,29 @@ import { createClient } from '@/lib/supabase/server'
 import { AgentsClient } from './agents-client'
 
 export default async function AdminAgentsPage() {
-  const profile = await requireAdmin()
+  await requireAdmin()
   const supabase = await createClient()
 
-  const { data: agentOwners } = await supabase
-    .from('agent_owners')
-    .select('agent_id, owner_id, created_at')
+  const { data: agents } = await supabase
+    .from('agents')
+    .select('id, name, avatar_url, owner_id, last_seen_at, revoked_at, created_at')
+    .order('created_at', { ascending: false })
 
-  const agentIds = (agentOwners ?? []).map(a => a.agent_id)
-  const ownerIds = (agentOwners ?? []).map(a => a.owner_id)
-  const allIds = [...new Set([...agentIds, ...ownerIds])]
-
-  const { data: profiles } = allIds.length > 0
-    ? await supabase
-        .from('profiles')
-        .select('id, email, full_name, avatar_url, created_at')
-        .in('id', allIds)
+  // Get owner profiles
+  const ownerIds = [...new Set((agents ?? []).map(a => a.owner_id))]
+  const { data: owners } = ownerIds.length > 0
+    ? await supabase.from('profiles').select('id, full_name, email').in('id', ownerIds)
     : { data: [] }
+  const ownerMap = new Map((owners ?? []).map(p => [p.id, p]))
 
-  const profileMap = new Map((profiles ?? []).map(p => [p.id, p]))
+  const agentsWithOwners = (agents ?? []).map(a => ({
+    ...a,
+    owner_name: ownerMap.get(a.owner_id)?.full_name ?? ownerMap.get(a.owner_id)?.email ?? 'Unknown',
+  }))
 
-  const agents = (agentOwners ?? []).map(ao => {
-    const agentProfile = profileMap.get(ao.agent_id)
-    const ownerProfile = profileMap.get(ao.owner_id)
-    return {
-      id: ao.agent_id,
-      email: agentProfile?.email ?? '',
-      full_name: agentProfile?.full_name ?? null,
-      avatar_url: agentProfile?.avatar_url ?? null,
-      created_at: agentProfile?.created_at ?? ao.created_at,
-      owner_name: ownerProfile?.full_name ?? ownerProfile?.email ?? 'Unknown',
-    }
-  })
+  // Get current user for the client
+  const { data: { user } } = await supabase.auth.getUser()
+  const { data: profile } = await supabase.from('profiles').select('full_name').eq('id', user!.id).single()
 
-  return (
-    <AgentsClient
-      agents={agents}
-      currentUserName={profile.full_name ?? profile.email}
-    />
-  )
+  return <AgentsClient agents={agentsWithOwners} currentUserName={profile?.full_name ?? user?.email ?? 'You'} currentUserId={user!.id} />
 }

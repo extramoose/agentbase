@@ -2,6 +2,7 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import { createClient as createServerClient } from '@/lib/supabase/server'
 import { UnauthorizedError, RateLimitError } from './errors'
 import { checkRateLimit } from './rate-limit'
+import { createHash } from 'crypto'
 
 export type ResolvedActor = {
   supabase: SupabaseClient
@@ -11,60 +12,44 @@ export type ResolvedActor = {
   ownerId: string
 }
 
+// Agent path: Bearer token is a custom API key.
+// Hash it, look up in agents table via SECURITY DEFINER RPC (no secret key needed).
 export async function resolveActor(request: Request): Promise<ResolvedActor> {
   const authHeader = request.headers.get('Authorization')
   if (!authHeader?.startsWith('Bearer ')) {
     throw new UnauthorizedError('Missing or invalid Authorization header')
   }
   const token = authHeader.slice(7)
+  const keyHash = createHash('sha256').update(token).digest('hex')
 
-  // Create a Supabase client authenticated with the caller's token
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      global: { headers: { Authorization: `Bearer ${token}` } },
-      auth: { autoRefreshToken: false, persistSession: false },
-    }
+    { auth: { autoRefreshToken: false, persistSession: false } }
   )
 
-  // Verify token and get user
-  const { data: { user }, error } = await supabase.auth.getUser()
-  if (error || !user) throw new UnauthorizedError('Invalid or expired token')
+  const { data: agent } = await supabase.rpc('resolve_agent_by_key', { p_key_hash: keyHash })
+  if (!agent) throw new UnauthorizedError('Invalid or revoked API key')
 
-  // Rate limiting
-  const { allowed, retryAfter } = checkRateLimit(user.id)
+  const { allowed, retryAfter } = checkRateLimit(agent.id as string)
   if (!allowed) throw new RateLimitError(retryAfter)
-
-  // Resolve workspace membership via SECURITY DEFINER RPC (avoids RLS recursion)
-  const { data: tenantId } = await supabase.rpc('get_my_tenant_id')
-  if (!tenantId) throw new UnauthorizedError('Actor is not a member of any workspace')
-
-  // Determine actor type (is this an agent account?)
-  const { data: agentOwner } = await supabase
-    .from('agent_owners')
-    .select('owner_id')
-    .eq('agent_id', user.id)
-    .single()
 
   return {
     supabase,
-    actorId: user.id,
-    actorType: agentOwner ? 'agent' : 'human',
-    tenantId: tenantId as string,
-    ownerId: agentOwner?.owner_id ?? user.id,
+    actorId: agent.id as string,
+    actorType: 'agent',
+    tenantId: agent.tenant_id as string,
+    ownerId: agent.owner_id as string,
   }
 }
 
+// Human path: cookie-based session. Agents never use cookies.
 export async function resolveActorUnified(request: Request): Promise<ResolvedActor> {
   const authHeader = request.headers.get('Authorization')
-
-  // Agent path: Bearer token present
   if (authHeader?.startsWith('Bearer ')) {
     return resolveActor(request)
   }
 
-  // Human path: cookie-based session
   const supabase = await createServerClient()
   const { data: { user }, error } = await supabase.auth.getUser()
   if (error || !user) throw new UnauthorizedError()
@@ -72,21 +57,15 @@ export async function resolveActorUnified(request: Request): Promise<ResolvedAct
   const { allowed, retryAfter } = checkRateLimit(user.id)
   if (!allowed) throw new RateLimitError(retryAfter)
 
-  // Use same client instance — avoids spinning up a second SSR client
   const { data: tenantId } = await supabase.rpc('get_my_tenant_id')
   if (!tenantId) throw new UnauthorizedError('No workspace')
 
-  const { data: agentOwner } = await supabase
-    .from('agent_owners')
-    .select('owner_id')
-    .eq('agent_id', user.id)
-    .single()
-
+  // Cookie path is always a human — agents use Bearer API keys, not cookies
   return {
     supabase,
     actorId: user.id,
-    actorType: agentOwner ? 'agent' : 'human',
+    actorType: 'human',
     tenantId: tenantId as string,
-    ownerId: agentOwner?.owner_id ?? user.id,
+    ownerId: user.id,
   }
 }

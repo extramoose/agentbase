@@ -11,9 +11,11 @@ import { Bot, Check, Copy, Loader2, Pencil, Plus, Trash2, X } from 'lucide-react
 
 type Agent = {
   id: string
-  email: string
-  full_name: string | null
+  name: string
   avatar_url: string | null
+  owner_id: string
+  last_seen_at: string | null
+  revoked_at: string | null
   created_at: string
   owner_name: string
 }
@@ -21,11 +23,10 @@ type Agent = {
 interface AgentsClientProps {
   agents: Agent[]
   currentUserName: string
+  currentUserId: string
 }
 
-const OWNER_ID = '86f74cef-4a09-4b94-91cd-9305cda2e644'
-
-export function AgentsClient({ agents: initialAgents, currentUserName }: AgentsClientProps) {
+export function AgentsClient({ agents: initialAgents, currentUserName, currentUserId }: AgentsClientProps) {
   const [agents, setAgents] = useState(initialAgents)
   const [showCreate, setShowCreate] = useState(false)
   const [creating, setCreating] = useState(false)
@@ -38,7 +39,7 @@ export function AgentsClient({ agents: initialAgents, currentUserName }: AgentsC
   // Result after create
   const [createResult, setCreateResult] = useState<{
     agent: Agent
-    refresh_token: string | null
+    api_key: string | null
   } | null>(null)
   const [copied, setCopied] = useState(false)
 
@@ -55,9 +56,8 @@ export function AgentsClient({ agents: initialAgents, currentUserName }: AgentsC
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          full_name: name.trim(),
+          name: name.trim(),
           avatar_url: avatarUrl.trim() || null,
-          owner_id: OWNER_ID,
         }),
       })
       const json = await res.json()
@@ -65,23 +65,25 @@ export function AgentsClient({ agents: initialAgents, currentUserName }: AgentsC
 
       const newAgent: Agent = {
         id: json.agent.id,
-        email: json.agent.email,
-        full_name: json.agent.full_name,
+        name: json.agent.name,
         avatar_url: json.agent.avatar_url,
+        owner_id: currentUserId,
+        last_seen_at: null,
+        revoked_at: null,
         created_at: new Date().toISOString(),
         owner_name: currentUserName,
       }
-      setAgents(prev => [...prev, newAgent])
-      setCreateResult({ agent: newAgent, refresh_token: json.refresh_token })
+      setAgents(prev => [newAgent, ...prev])
+      setCreateResult({ agent: newAgent, api_key: json.api_key })
       setName('')
       setAvatarUrl('')
-      toast({ type: 'success', message: `Agent "${newAgent.full_name}" created` })
+      toast({ type: 'success', message: `Agent "${newAgent.name}" created` })
     } catch (err) {
       toast({ type: 'error', message: err instanceof Error ? err.message : 'Failed to create agent' })
     } finally {
       setCreating(false)
     }
-  }, [name, avatarUrl, currentUserName])
+  }, [name, avatarUrl, currentUserName, currentUserId])
 
   const handleRevoke = useCallback(async (agentId: string) => {
     setRevoking(agentId)
@@ -90,7 +92,9 @@ export function AgentsClient({ agents: initialAgents, currentUserName }: AgentsC
       const json = await res.json()
       if (!res.ok) throw new Error(json.error ?? 'Failed to revoke agent')
 
-      setAgents(prev => prev.filter(a => a.id !== agentId))
+      setAgents(prev => prev.map(a =>
+        a.id === agentId ? { ...a, revoked_at: new Date().toISOString() } : a
+      ))
       toast({ type: 'success', message: 'Agent revoked' })
     } catch (err) {
       toast({ type: 'error', message: err instanceof Error ? err.message : 'Failed to revoke agent' })
@@ -185,38 +189,38 @@ export function AgentsClient({ agents: initialAgents, currentUserName }: AgentsC
         </div>
       )}
 
-      {/* Refresh token result */}
+      {/* API key result */}
       {createResult && (
         <div className="rounded-lg border border-border p-4 space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-medium text-green-400">
-              Agent &quot;{createResult.agent.full_name}&quot; created
+              Agent &quot;{createResult.agent.name}&quot; created
             </h2>
             <Button variant="ghost" size="icon-xs" onClick={() => { setCreateResult(null); setShowCreate(false) }}>
               <X className="h-4 w-4" />
             </Button>
           </div>
-          {createResult.refresh_token ? (
+          {createResult.api_key ? (
             <>
               <div className="relative">
                 <pre className="rounded-md bg-muted p-3 text-xs font-mono break-all whitespace-pre-wrap">
-                  {createResult.refresh_token}
+                  {createResult.api_key}
                 </pre>
                 <Button
                   variant="ghost"
                   size="icon-xs"
                   className="absolute top-2 right-2"
-                  onClick={() => handleCopy(createResult.refresh_token!)}
+                  onClick={() => handleCopy(createResult.api_key!)}
                 >
                   {copied ? <Check className="h-3 w-3 text-green-400" /> : <Copy className="h-3 w-3" />}
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground">
-                Paste this as <code className="text-xs bg-muted px-1 rounded">REFRESH_TOKEN</code> in your agent&apos;s openclaw.json env config. It will not be shown again.
+                Paste this as <code className="text-xs bg-muted px-1 rounded">AGENT_API_KEY</code> in the agent&apos;s environment config. It will not be shown again.
               </p>
             </>
           ) : (
-            <p className="text-xs text-muted-foreground">No refresh token was returned.</p>
+            <p className="text-xs text-muted-foreground">No API key was returned.</p>
           )}
         </div>
       )}
@@ -234,9 +238,10 @@ export function AgentsClient({ agents: initialAgents, currentUserName }: AgentsC
           </thead>
           <tbody>
             {agents.map(agent => {
-              const displayName = agent.full_name ?? agent.email.split('@')[0]
+              const displayName = agent.name
               const initials = displayName.slice(0, 2).toUpperCase()
               const isEditingAvatar = editingAvatar === agent.id
+              const isRevoked = !!agent.revoked_at
 
               return (
                 <tr key={agent.id} className="border-b border-border last:border-0 hover:bg-muted/40">
@@ -247,7 +252,7 @@ export function AgentsClient({ agents: initialAgents, currentUserName }: AgentsC
                           <AvatarImage src={agent.avatar_url ?? undefined} alt={displayName} />
                           <AvatarFallback className="text-xs">{initials}</AvatarFallback>
                         </Avatar>
-                        {!isEditingAvatar && (
+                        {!isEditingAvatar && !isRevoked && (
                           <button
                             className="absolute inset-0 flex items-center justify-center rounded-full bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity"
                             onClick={() => { setEditingAvatar(agent.id); setAvatarDraft(agent.avatar_url ?? '') }}
@@ -263,8 +268,12 @@ export function AgentsClient({ agents: initialAgents, currentUserName }: AgentsC
                             <Bot className="h-3 w-3 mr-1" />
                             Agent
                           </Badge>
+                          {isRevoked && (
+                            <Badge variant="secondary" className="bg-red-500/20 text-red-400">
+                              Revoked
+                            </Badge>
+                          )}
                         </div>
-                        <p className="text-xs text-muted-foreground truncate">{agent.email}</p>
                         {isEditingAvatar && (
                           <div className="flex items-center gap-1 mt-1">
                             <Input
@@ -304,20 +313,22 @@ export function AgentsClient({ agents: initialAgents, currentUserName }: AgentsC
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    <Button
-                      variant="ghost"
-                      size="xs"
-                      className="text-destructive hover:text-destructive"
-                      onClick={() => handleRevoke(agent.id)}
-                      disabled={revoking === agent.id}
-                    >
-                      {revoking === agent.id ? (
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                      ) : (
-                        <Trash2 className="h-3 w-3" />
-                      )}
-                      Revoke
-                    </Button>
+                    {!isRevoked && (
+                      <Button
+                        variant="ghost"
+                        size="xs"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => handleRevoke(agent.id)}
+                        disabled={revoking === agent.id}
+                      >
+                        {revoking === agent.id ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-3 w-3" />
+                        )}
+                        Revoke
+                      </Button>
+                    )}
                   </td>
                 </tr>
               )
