@@ -26,13 +26,15 @@ interface AgentsClientProps {
   agents: Agent[]
   currentUserName: string
   currentUserId: string
+  isSuperadmin: boolean
 }
 
-export function AgentsClient({ agents: initialAgents, currentUserName, currentUserId }: AgentsClientProps) {
+export function AgentsClient({ agents: initialAgents, currentUserName, currentUserId, isSuperadmin }: AgentsClientProps) {
   const [agents, setAgents] = useState(initialAgents)
   const [showCreate, setShowCreate] = useState(false)
   const [creating, setCreating] = useState(false)
   const [revoking, setRevoking] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState<string | null>(null)
 
   // Create form state
   const [name, setName] = useState('')
@@ -90,7 +92,7 @@ export function AgentsClient({ agents: initialAgents, currentUserName, currentUs
   const handleRevoke = useCallback(async (agentId: string) => {
     setRevoking(agentId)
     try {
-      const res = await fetch(`/api/admin/agents/${agentId}`, { method: 'DELETE' })
+      const res = await fetch(`/api/admin/agents/${agentId}`, { method: 'PATCH' })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error ?? 'Failed to revoke agent')
 
@@ -102,6 +104,25 @@ export function AgentsClient({ agents: initialAgents, currentUserName, currentUs
       toast({ type: 'error', message: err instanceof Error ? err.message : 'Failed to revoke agent' })
     } finally {
       setRevoking(null)
+    }
+  }, [])
+
+  const handleDelete = useCallback(async (agent: Agent) => {
+    const confirmed = confirm(`Permanently delete ${agent.name}? Their activity history will be preserved.`)
+    if (!confirmed) return
+
+    setDeleting(agent.id)
+    try {
+      const res = await fetch(`/api/admin/agents/${agent.id}`, { method: 'DELETE' })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? 'Failed to delete agent')
+
+      setAgents(prev => prev.filter(a => a.id !== agent.id))
+      toast({ type: 'success', message: 'Agent deleted' })
+    } catch (err) {
+      toast({ type: 'error', message: err instanceof Error ? err.message : 'Failed to delete agent' })
+    } finally {
+      setDeleting(null)
     }
   }, [])
 
@@ -246,7 +267,7 @@ export function AgentsClient({ agents: initialAgents, currentUserName, currentUs
               const isRevoked = !!agent.revoked_at
 
               return (
-                <tr key={agent.id} className="border-b border-border last:border-0 hover:bg-muted/40">
+                <tr key={agent.id} className={`border-b border-border last:border-0 hover:bg-muted/40${isRevoked ? ' opacity-60' : ''}`}>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
                       <div className="relative group">
@@ -271,9 +292,9 @@ export function AgentsClient({ agents: initialAgents, currentUserName, currentUs
                             Agent
                           </Badge>
                           {isRevoked && (
-                            <Badge variant="secondary" className="bg-red-500/20 text-red-400">
+                            <span className="bg-red-500/20 text-red-400 text-xs rounded px-1.5 py-0.5">
                               Revoked
-                            </Badge>
+                            </span>
                           )}
                         </div>
                         {isEditingAvatar && (
@@ -313,6 +334,11 @@ export function AgentsClient({ agents: initialAgents, currentUserName, currentUs
                     <span className="text-sm text-muted-foreground">
                       {formatDistanceToNow(new Date(agent.created_at), { addSuffix: true })}
                     </span>
+                    {isRevoked && agent.revoked_at && (
+                      <p className="text-xs text-muted-foreground/70">
+                        Revoked {formatDistanceToNow(new Date(agent.revoked_at), { addSuffix: true })}
+                      </p>
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     {!isRevoked && (
@@ -329,6 +355,22 @@ export function AgentsClient({ agents: initialAgents, currentUserName, currentUs
                           <Trash2 className="h-3 w-3" />
                         )}
                         Revoke
+                      </Button>
+                    )}
+                    {isRevoked && isSuperadmin && (
+                      <Button
+                        variant="ghost"
+                        size="xs"
+                        className="text-red-400 hover:text-red-300"
+                        onClick={() => handleDelete(agent)}
+                        disabled={deleting === agent.id}
+                      >
+                        {deleting === agent.id ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-3 w-3" />
+                        )}
+                        Delete
                       </Button>
                     )}
                   </td>
