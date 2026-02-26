@@ -15,6 +15,34 @@ const PRIORITY_COLORS: Record<string, string> = {
   low: 'text-muted-foreground',
 }
 
+const INTERNAL_FIELDS = new Set([
+  'assignee_type',   // always paired with assignee_id — suppress, use assignee_id only
+  'sort_order',      // internal ordering — never user-facing
+  'updated_at',      // system timestamp
+  'ticket_id',       // auto-assigned integer — not a user action
+  'tenant_id',       // infrastructure
+  'id',              // primary key
+  'created_at',      // system timestamp
+])
+
+const FIELD_LABELS: Record<string, string> = {
+  assignee_id: 'assignee',
+  due_date: 'due date',
+  source_meeting_id: 'linked meeting',
+  body: 'description',
+  name: 'name',
+  title: 'title',
+  tags: 'tags',
+  type: 'type',
+  notes: 'notes',
+  location: 'location',
+  url: 'URL',
+  calendar_url: 'calendar link',
+  phase: 'phase',
+  start_time: 'start time',
+  end_time: 'end time',
+}
+
 function formatLabel(value: string): string {
   return value.replace(/_/g, ' ')
 }
@@ -73,6 +101,16 @@ const EVENT_SIGNIFICANCE: Record<string, number> = {
   assignee_changed: 4,
   commented: 5,
   updated: 6,
+}
+
+export function filterActivityItems(items: ActivityLogEntry[]): ActivityLogEntry[] {
+  return items.filter(item => {
+    if (item.event_type === 'field_updated') {
+      const field = String(item.payload?.field ?? '')
+      return !INTERNAL_FIELDS.has(field)
+    }
+    return true
+  })
 }
 
 export function getMostSignificantItem(items: ActivityLogEntry[]): ActivityLogEntry {
@@ -179,8 +217,20 @@ export function formatActivityEvent(event: {
         </>
       )
     }
-    case 'field_updated':
-      return <>updated {formatLabel(String(payload?.field ?? 'field'))}</>
+    case 'field_updated': {
+      const field = String(payload?.field ?? 'field')
+      const label = FIELD_LABELS[field] ?? field.replace(/_/g, ' ')
+      const newVal = payload?.new
+      if (newVal !== null && newVal !== undefined && String(newVal).length < 60) {
+        return <>updated {label} to <span className="text-foreground font-medium">{String(newVal)}</span></>
+      }
+      return <>updated {label}</>
+    }
+    case 'assignee_changed': {
+      const newVal = payload?.new_label ?? payload?.new ?? null
+      if (!newVal) return <>cleared assignee</>
+      return <>assigned to <span className="text-foreground font-medium">{String(newVal)}</span></>
+    }
     case 'created':
       return entity_label ? <>created &ldquo;{entity_label}&rdquo;</> : <>created</>
     case 'deleted':
