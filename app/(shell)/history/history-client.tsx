@@ -12,6 +12,7 @@ import {
   formatActivityEvent,
   groupActivityItems,
   getMostSignificantItem,
+  filterActivityItems,
   type ActivityLogEntry,
 } from '@/lib/format-activity'
 import { MarkdownRenderer } from '@/components/markdown-renderer'
@@ -153,8 +154,8 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
     return () => { supabase.removeChannel(channel) }
   }, [])
 
-  // Group consecutive same-entity activity items
-  const groups = useMemo(() => groupActivityItems(entries), [entries])
+  // Filter internal events, then group consecutive same-entity activity items
+  const groups = useMemo(() => groupActivityItems(filterActivityItems(entries)), [entries])
 
   function renderSingleEntry(entry: ActivityLogEntry) {
     const isDeleted = entry.event_type === 'deleted'
@@ -249,6 +250,7 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
             const isExpanded = expandedGroups.has(groupKey)
             const headline = getMostSignificantItem(group.items)
             const extraCount = group.items.length - 1
+            const isCreateWithFields = headline.event_type === 'created' && group.items.every(i => i === headline || i.event_type === 'field_updated')
 
             return (
               <div key={groupKey}>
@@ -277,9 +279,11 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
                       <span className={`text-sm ${headline.event_type === 'deleted' ? 'text-red-400' : 'text-foreground'}`}>
                         {formatActivityEvent(headline)}
                       </span>
-                      <span className="text-xs text-muted-foreground">
-                        +{extraCount} more {extraCount === 1 ? 'change' : 'changes'}
-                      </span>
+                      {extraCount > 0 && (
+                        <span className="text-xs text-muted-foreground">
+                          +{extraCount} {isCreateWithFields ? (extraCount === 1 ? 'field set' : 'fields set') : (extraCount === 1 ? 'more change' : 'more changes')}
+                        </span>
+                      )}
                     </div>
                   </div>
                   <span suppressHydrationWarning className="text-xs text-muted-foreground whitespace-nowrap shrink-0">

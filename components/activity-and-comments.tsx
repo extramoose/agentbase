@@ -11,6 +11,7 @@ import {
   formatActivityEvent,
   groupActivityItems,
   getMostSignificantItem,
+  filterActivityItems,
   type ActivityLogEntry,
 } from '@/lib/format-activity'
 import { MarkdownRenderer } from '@/components/markdown-renderer'
@@ -107,7 +108,7 @@ export function ActivityAndComments({ entityType, entityId, currentUserId }: Act
     }
   }
 
-  const groups = useMemo(() => groupActivityItems(entries), [entries])
+  const groups = useMemo(() => groupActivityItems(filterActivityItems(entries)), [entries])
 
   function renderSingleEntry(entry: ActivityLogEntry) {
     return (
@@ -182,6 +183,7 @@ export function ActivityAndComments({ entityType, entityId, currentUserId }: Act
             const isExpanded = expandedGroups.has(groupKey)
             const headline = getMostSignificantItem(group.items)
             const extraCount = group.items.length - 1
+            const isCreateWithFields = headline.event_type === 'created' && group.items.every(i => i === headline || i.event_type === 'field_updated')
 
             return (
               <div key={groupKey}>
@@ -193,9 +195,11 @@ export function ActivityAndComments({ entityType, entityId, currentUserId }: Act
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-muted-foreground">
                       {formatActivityEvent(headline)}
-                      <span className="text-xs ml-2">
-                        +{extraCount} more {extraCount === 1 ? 'change' : 'changes'}
-                      </span>
+                      {extraCount > 0 && (
+                        <span className="text-xs ml-2">
+                          +{extraCount} {isCreateWithFields ? (extraCount === 1 ? 'field set' : 'fields set') : (extraCount === 1 ? 'more change' : 'more changes')}
+                        </span>
+                      )}
                     </p>
                     <p suppressHydrationWarning className="text-xs text-muted-foreground mt-1">
                       {formatDistanceToNow(new Date(group.latestItem.created_at), { addSuffix: true })}
