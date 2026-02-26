@@ -20,7 +20,7 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { GripVertical, Plus, ChevronDown, ChevronRight, AlertCircle, ArrowUp, Minus, ArrowDown, Trash2, X } from 'lucide-react'
+import { GripVertical, Plus, ChevronDown, ChevronRight, AlertCircle, ArrowUp, Minus, ArrowDown, Trash2, X, User } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { EditShelf } from '@/components/edit-shelf'
 import { SearchFilterBar } from '@/components/search-filter-bar'
@@ -32,7 +32,9 @@ import { RichTextEditor } from '@/components/rich-text-editor'
 import { Badge } from '@/components/ui/badge'
 import { AssigneePicker } from '@/components/assignee-picker'
 import { ActorChip } from '@/components/actor-chip'
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import { cn } from '@/lib/utils'
+import { ANON_AVATAR_URL } from '@/lib/constants'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -67,6 +69,12 @@ type CurrentUser = {
   avatar_url: string | null
   role: string
 } | null
+
+type WorkspaceMember = {
+  id: string
+  name: string
+  avatarUrl: string | null
+}
 
 // ---------------------------------------------------------------------------
 // Config
@@ -397,6 +405,7 @@ function PriorityGroup({
 
 export function TasksClient({
   initialTasks,
+  currentUser,
   initialTaskId,
 }: {
   initialTasks: Task[]
@@ -427,6 +436,8 @@ export function TasksClient({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [mounted, setMounted] = useState(false)
   const [activeDragId, setActiveDragId] = useState<string | null>(null)
+  const [assigneeFilter, setAssigneeFilter] = useState<string | null>('me')
+  const [workspaceMembers, setWorkspaceMembers] = useState<WorkspaceMember[]>([])
 
   const supabase = createClient()
   const initialHandled = useRef(false)
@@ -461,6 +472,32 @@ export function TasksClient({
 
   // Hydration guard — defer dnd-kit tree to avoid SSR ID mismatch
   useEffect(() => setMounted(true), [])
+
+  // Fetch workspace members for assignee filter
+  useEffect(() => {
+    async function fetchMembers() {
+      try {
+        const res = await fetch('/api/workspace/members')
+        if (!res.ok) return
+        const json = await res.json() as {
+          success: boolean
+          data: {
+            agents: Array<{ id: string; name: string; avatar_url: string | null }>
+            humans: Array<{ id: string; name: string; avatar_url: string | null }>
+          }
+        }
+        if (!json.success) return
+        const members: WorkspaceMember[] = [
+          ...json.data.humans.map((h) => ({ id: h.id, name: h.name, avatarUrl: h.avatar_url })),
+          ...json.data.agents.map((a) => ({ id: a.id, name: a.name, avatarUrl: a.avatar_url })),
+        ]
+        setWorkspaceMembers(members)
+      } catch {
+        // silently ignore — filter chips just won't show
+      }
+    }
+    fetchMembers()
+  }, [])
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
@@ -531,6 +568,13 @@ export function TasksClient({
       result = result.filter((t) => t.type === typeFilter)
     }
 
+    // Assignee filter
+    if (assigneeFilter === 'me' && currentUser) {
+      result = result.filter((t) => t.assignee_id === currentUser.id)
+    } else if (assigneeFilter && assigneeFilter !== 'me') {
+      result = result.filter((t) => t.assignee_id === assigneeFilter)
+    }
+
     // Search filter
     if (search.trim()) {
       const q = search.toLowerCase()
@@ -542,7 +586,7 @@ export function TasksClient({
     }
 
     return result
-  }, [tasks, statusFilter, typeFilter, search])
+  }, [tasks, statusFilter, typeFilter, search, assigneeFilter, currentUser])
 
   const grouped = useMemo(() => groupByPriority(filteredTasks), [filteredTasks])
 
@@ -871,6 +915,51 @@ export function TasksClient({
             </button>
           ))}
         </div>
+      </div>
+
+      {/* Assignee filter row */}
+      <div className="flex gap-2 mb-3 overflow-x-auto pb-1">
+        <button
+          onClick={() => setAssigneeFilter('me')}
+          className={cn(
+            'flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-full border transition-colors shrink-0',
+            assigneeFilter === 'me'
+              ? 'bg-primary/20 border-primary text-foreground'
+              : 'bg-muted/40 border-transparent text-muted-foreground hover:bg-muted/60'
+          )}
+        >
+          <User className="h-3.5 w-3.5" />
+          To me
+        </button>
+        {workspaceMembers.map((m) => (
+          <button
+            key={m.id}
+            onClick={() => setAssigneeFilter(m.id)}
+            className={cn(
+              'flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-full border transition-colors shrink-0',
+              assigneeFilter === m.id
+                ? 'bg-primary/20 border-primary text-foreground'
+                : 'bg-muted/40 border-transparent text-muted-foreground hover:bg-muted/60'
+            )}
+          >
+            <Avatar className="h-4 w-4">
+              <AvatarImage src={m.avatarUrl ?? ANON_AVATAR_URL} alt={m.name} />
+              <AvatarFallback className="text-[8px]">{m.name.slice(0, 2).toUpperCase()}</AvatarFallback>
+            </Avatar>
+            <span className="truncate max-w-[80px]">{m.name}</span>
+          </button>
+        ))}
+        <button
+          onClick={() => setAssigneeFilter(null)}
+          className={cn(
+            'px-2.5 py-1 text-xs rounded-full border transition-colors shrink-0',
+            assigneeFilter === null
+              ? 'bg-primary/20 border-primary text-foreground'
+              : 'bg-muted/40 border-transparent text-muted-foreground hover:bg-muted/60'
+          )}
+        >
+          All
+        </button>
       </div>
 
       {/* Select-all row */}
