@@ -31,17 +31,24 @@ MIGRATIONS_DIR = Path(__file__).parent.parent / "supabase" / "migrations"
 
 
 def force_ipv4():
-    """Resolve PGHOST to IPv4 and set PGHOSTADDR so psql skips DNS (avoids IPv6 failures)."""
-    host = os.environ.get("PGHOST")
-    if not host:
-        return
+    """
+    Resolve PGHOST to IPv4 and replace it directly.
+    GitHub Actions runners have no IPv6, so psql's default DNS (which returns AAAA first)
+    causes 'Network is unreachable'. Replacing PGHOST with the numeric IPv4 skips DNS.
+    sslmode=require encrypts without validating the cert hostname, so the IP swap is safe.
+    """
+    host = os.environ.get("PGHOST", "")
+    if not host or host.replace(".", "").isdigit():
+        return  # Already an IP, nothing to do
     try:
         results = socket.getaddrinfo(host, 5432, socket.AF_INET)
         ipv4 = results[0][4][0]
-        os.environ["PGHOSTADDR"] = ipv4
-        print(f"  Resolved {host} → {ipv4} (IPv4)")
+        os.environ["PGHOST"] = ipv4
+        print(f"  Resolved {host} → {ipv4} (IPv4 forced)")
+        sys.stdout.flush()
     except Exception as e:
-        print(f"  Warning: IPv4 resolution failed ({e}), using default DNS")
+        print(f"  Warning: IPv4 resolution failed ({e}), psql may try IPv6")
+        sys.stdout.flush()
 
 
 def run_sql(sql: str) -> str:
