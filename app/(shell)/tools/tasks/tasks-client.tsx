@@ -716,7 +716,7 @@ export function TasksClient({
   const deleteTask = useCallback(async (id: string) => {
     setTasks((prev) => prev.filter((t) => t.id !== id))
     setSelectedTask(null)
-    router.replace(`/tools/tasks${buildQs()}`)
+    router.replace(`/tools/tasks${buildQs()}`, { scroll: false })
     try {
       const res = await fetch('/api/commands/delete-entity', {
         method: 'POST',
@@ -896,7 +896,7 @@ export function TasksClient({
                 tasks={grouped[priority]}
                 onTaskClick={(task) => {
                   setSelectedTask(task)
-                  router.replace(`/tools/tasks/${task.id}${buildQs()}`)
+                  router.replace(`/tools/tasks/${task.id}${buildQs()}`, { scroll: false })
                 }}
                 addingTo={addingToPriority === priority}
                 onStartAdding={() => setAddingToPriority(priority)}
@@ -931,7 +931,7 @@ export function TasksClient({
                         className="group flex items-center gap-2 px-3 py-1.5 rounded-md hover:bg-accent/40 cursor-pointer border border-transparent hover:border-border transition-colors"
                         onClick={() => {
                           setSelectedTask(task)
-                          router.replace(`/tools/tasks/${task.id}${buildQs()}`)
+                          router.replace(`/tools/tasks/${task.id}${buildQs()}`, { scroll: false })
                         }}
                       >
                         <input
@@ -1078,7 +1078,7 @@ export function TasksClient({
           task={selectedTask}
           onClose={() => {
             setSelectedTask(null)
-            router.replace(`/tools/tasks${buildQs()}`)
+            router.replace(`/tools/tasks${buildQs()}`, { scroll: false })
           }}
           onUpdate={updateTaskField}
           onDelete={deleteTask}
