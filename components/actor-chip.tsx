@@ -1,8 +1,9 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { cn } from '@/lib/utils'
 import { ANON_AVATAR_URL } from '@/lib/constants'
 
@@ -24,6 +25,7 @@ interface ActorChipProps {
 
 export function ActorChip({ actorId, actorType, compact = false, className }: ActorChipProps) {
   const [actor, setActor] = useState<ActorDisplay | null>(actorCache.get(actorId) ?? null)
+  const [imgError, setImgError] = useState(false)
   const supabase = createClient()
 
   useEffect(() => {
@@ -87,8 +89,18 @@ export function ActorChip({ actorId, actorType, compact = false, className }: Ac
   if (compact) {
     return (
       <Avatar className={cn('h-6 w-6 shrink-0', className)}>
-        <AvatarImage src={avatarSrc} alt={displayName} />
-        <AvatarFallback className="text-xs">{initials}</AvatarFallback>
+        {!imgError ? (
+          <Image
+            src={avatarSrc}
+            alt={displayName}
+            width={24}
+            height={24}
+            className="aspect-square size-full object-cover"
+            onError={() => setImgError(true)}
+          />
+        ) : (
+          <AvatarFallback className="text-xs">{initials}</AvatarFallback>
+        )}
       </Avatar>
     )
   }
@@ -96,8 +108,18 @@ export function ActorChip({ actorId, actorType, compact = false, className }: Ac
   return (
     <div className={cn('flex items-center gap-2', className)}>
       <Avatar className="h-6 w-6 shrink-0">
-        <AvatarImage src={avatarSrc} alt={displayName} />
-        <AvatarFallback className="text-xs">{initials}</AvatarFallback>
+        {!imgError ? (
+          <Image
+            src={avatarSrc}
+            alt={displayName}
+            width={24}
+            height={24}
+            className="aspect-square size-full object-cover"
+            onError={() => setImgError(true)}
+          />
+        ) : (
+          <AvatarFallback className="text-xs">{initials}</AvatarFallback>
+        )}
       </Avatar>
       <span className="text-sm text-muted-foreground truncate">{displayName}</span>
     </div>
