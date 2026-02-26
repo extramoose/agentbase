@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { ActorChip } from '@/components/actor-chip'
 import { SearchFilterBar } from '@/components/search-filter-bar'
@@ -13,8 +14,20 @@ import {
   getMostSignificantItem,
   type ActivityLogEntry,
 } from '@/lib/format-activity'
-import { EntityPreviewShelf, TABLE_MAP } from '@/components/entity-preview-shelf'
 import { MarkdownRenderer } from '@/components/markdown-renderer'
+
+function getEntityUrl(entityType: string, entityId: string): string {
+  switch (entityType) {
+    case 'tasks':         return `/tools/tasks/${entityId}`
+    case 'meetings':      return `/tools/meetings/${entityId}`
+    case 'library_items': return `/tools/library/${entityId}`
+    case 'companies':     return `/tools/crm/companies/${entityId}`
+    case 'people':        return `/tools/crm/people/${entityId}`
+    case 'deals':         return `/tools/crm/deals/${entityId}`
+    case 'essays':        return `/tools/essays/${entityId}`
+    default:              return ''
+  }
+}
 
 const ENTITY_COLORS: Record<string, string> = {
   tasks:          'bg-blue-500/20 text-blue-400',
@@ -41,15 +54,11 @@ interface HistoryClientProps {
 }
 
 export function HistoryClient({ initialEntries }: HistoryClientProps) {
+  const router = useRouter()
   const [entries, setEntries] = useState<ActivityLogEntry[]>(initialEntries)
   const [search, setSearch] = useState('')
   const [entityFilter, setEntityFilter] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-  const [activeEntity, setActiveEntity] = useState<{
-    entityType: string
-    entityId: string
-    entityLabel: string | null
-  } | null>(null)
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
   const sentinelRef = useRef<HTMLDivElement>(null)
   const supabase = createClient()
@@ -149,16 +158,13 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
 
   function renderSingleEntry(entry: ActivityLogEntry) {
     const isDeleted = entry.event_type === 'deleted'
-    const isClickable = TABLE_MAP[entry.entity_type] != null && entry.entity_id != null && !isDeleted
+    const entityUrl = entry.entity_id ? getEntityUrl(entry.entity_type, entry.entity_id) : ''
+    const isClickable = !!entityUrl && !isDeleted
     return (
       <div
         key={entry.id}
         className={`flex items-start gap-3 rounded-lg px-3 py-3 hover:bg-muted/40 transition-colors${isClickable ? ' cursor-pointer' : ''}`}
-        onClick={isClickable ? () => setActiveEntity({
-          entityType: entry.entity_type,
-          entityId: entry.entity_id,
-          entityLabel: entry.entity_label ?? null,
-        }) : undefined}
+        onClick={isClickable ? () => router.push(entityUrl) : undefined}
       >
         <ActorChip actorId={entry.actor_id} actorType={entry.actor_type} compact />
         <div className="flex-1 min-w-0">
@@ -297,14 +303,6 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
         {loading && <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />}
       </div>
 
-      {activeEntity && (
-        <EntityPreviewShelf
-          entityType={activeEntity.entityType}
-          entityId={activeEntity.entityId}
-          entityLabel={activeEntity.entityLabel}
-          onClose={() => setActiveEntity(null)}
-        />
-      )}
     </div>
   )
 }
