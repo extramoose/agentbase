@@ -493,7 +493,10 @@ export function TasksClient({
         { event: 'DELETE', schema: 'public', table: 'tasks' },
         (payload) => {
           const deletedId = (payload.old as { id: string }).id
-          setTasks((prev) => prev.filter((t) => t.id !== deletedId))
+          setTasks((prev) => {
+            if (!prev.find((t) => t.id === deletedId)) return prev
+            return prev.filter((t) => t.id !== deletedId)
+          })
           setSelectedTask((prev) => (prev?.id === deletedId ? null : prev))
           setSelectedIds((prev) => {
             if (!prev.has(deletedId)) return prev
