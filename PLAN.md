@@ -40,23 +40,23 @@ AgentBase is a greenfield "Life OS" — a personal productivity platform where h
 **Runtime env vars** (in Vercel / `.env.local` for the Next.js app):
 ```
 NEXT_PUBLIC_SUPABASE_URL        # Supabase project URL
-NEXT_PUBLIC_SUPABASE_ANON_KEY   # Supabase anon (public) key
+NEXT_PUBLIC_SUPABASE_ANON_KEY   # Supabase publishable key (Supabase now calls this "publishable" not "anon")
 NEXT_PUBLIC_APP_DOMAIN          # App domain (default: agentbase.hah.to)
 DEAL_LABEL                      # Optional label override for "Deals" entity
 ```
 
-> ⚠️ **`SUPABASE_SERVICE_ROLE_KEY` must never be in the Next.js runtime environment.** This key bypasses all RLS — if it is present in a deployed runtime environment, any server-side bug becomes a full database compromise. It belongs only in one-time admin scripts run locally. Next.js server components and API routes use the anon key + user session JWT. Admin operations (user management, migrations) are performed via SECURITY DEFINER RPCs or run as local scripts.
+> ⚠️ **`SUPABASE_SECRET_KEY` (formerly "service role key") must never be in the Next.js runtime environment.** This key bypasses all RLS — if it is present in a deployed runtime environment, any server-side bug becomes a full database compromise. It belongs only in one-time admin scripts run locally. Next.js server components and API routes use the publishable key + user session JWT. Admin operations (user management, migrations) are performed via SECURITY DEFINER RPCs or run as local scripts.
 >
 > Add a boot-time assertion in `app/layout.tsx` or a dedicated `lib/env.ts`:
 > ```ts
-> if (process.env.SUPABASE_SERVICE_ROLE_KEY && process.env.NODE_ENV === 'production') {
->   throw new Error('SUPABASE_SERVICE_ROLE_KEY must not be present in production runtime')
+> if (process.env.SUPABASE_SECRET_KEY && process.env.NODE_ENV === 'production') {
+>   throw new Error('SUPABASE_SECRET_KEY must not be present in production runtime')
 > }
 > ```
 
 **Scripts-only env vars** (local `.env.local` only — NOT in Vercel):
 ```
-SUPABASE_SERVICE_ROLE_KEY   # admin scripts only — create-agent-users, generate-jwts
+SUPABASE_SECRET_KEY   # Supabase secret key (formerly "service role key") — admin scripts only: create-agent-users, generate-jwts. NEVER in Vercel runtime.
 SUPABASE_JWT_SECRET         # needed for hand-signing agent JWTs in scripts
 ```
 
@@ -376,7 +376,7 @@ import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
+  process.env.SUPABASE_SECRET_KEY!
 );
 
 async function createAgentUser(email: string, name: string) {
@@ -1253,7 +1253,7 @@ CREATE TABLE idempotency_keys (
 -- from a scheduled Vercel cron or similar.
 ```
 
-No RLS needed — this table is only accessed from API route handlers via the service role, not directly by clients.
+No RLS needed — this table is only accessed from API route handlers via the secret key, not directly by clients.
 
 ### Revoked Agent Tokens
 
@@ -1263,7 +1263,7 @@ CREATE TABLE revoked_agent_tokens (
   revoked_at timestamptz NOT NULL DEFAULT now(),
   reason     text
 );
--- No RLS needed — only accessible via service role / SECURITY DEFINER function
+-- No RLS needed — only accessible via secret key (scripts) or SECURITY DEFINER functions
 ```
 
 ### Notifications (stub — no UI, no triggers in v1)
@@ -2133,7 +2133,7 @@ agentbase/
 - [ ] Deploy initial migration (`00000000000000_initial.sql`) — all tables, RLS, triggers
 - [ ] Set up Google OAuth in Supabase Auth
 - [ ] Build auth pages (`/auth/login`, `/auth/callback`, `/auth/logout`)
-- [ ] Create `.env.example` with all required env vars (see §2 Environment Variables — runtime vars only, no `SUPABASE_SERVICE_ROLE_KEY` or `SUPABASE_JWT_SECRET`)
+- [ ] Create `.env.example` with all required env vars (see §2 Environment Variables — runtime vars only, no `SUPABASE_SECRET_KEY` or `SUPABASE_JWT_SECRET`)
 - [ ] Create agent users (Lucy, Frank) and generate JWTs via scripts
 - [ ] Ship empty `AppShell` with sidebar nav (all items, no content yet)
 - [ ] Add per-actor rate limiting middleware on `/api/commands/*` — simple in-memory or Supabase-based counter. Limit: 60 requests/minute per `actor_id`. Protects against runaway agents burning Vercel/Supabase quotas.
