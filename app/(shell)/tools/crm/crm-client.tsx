@@ -448,7 +448,7 @@ export function CrmClient({
           return (
             <button
               key={t.value}
-              onClick={() => { setTab(t.value); setAdding(false); router.replace('/tools/crm/' + t.value) }}
+              onClick={() => { setTab(t.value); setAdding(false); router.replace('/tools/crm/' + t.value, { scroll: false }) }}
               className={cn(
                 'px-3 py-1.5 text-sm rounded-md transition-colors',
                 tab === t.value
@@ -490,7 +490,7 @@ export function CrmClient({
             sortKey={companySortKey}
             sortDir={companySortDir}
             onSort={(key, dir) => { setCompanySortKey(key); setCompanySortDir(dir) }}
-            onSelect={(c) => { setSelectedCompany(c); router.replace(`/tools/crm/companies/${c.id}${buildQs()}`) }}
+            onSelect={(c) => { setSelectedCompany(c); router.replace(`/tools/crm/companies/${c.id}${buildQs()}`, { scroll: false }) }}
           />
         )}
         {tab === 'people' && (
@@ -499,7 +499,7 @@ export function CrmClient({
             sortKey={peopleSortKey}
             sortDir={peopleSortDir}
             onSort={(key, dir) => { setPeopleSortKey(key); setPeopleSortDir(dir) }}
-            onSelect={(p) => { setSelectedPerson(p); router.replace(`/tools/crm/people/${p.id}${buildQs()}`) }}
+            onSelect={(p) => { setSelectedPerson(p); router.replace(`/tools/crm/people/${p.id}${buildQs()}`, { scroll: false }) }}
           />
         )}
         {tab === 'deals' && (
@@ -508,7 +508,7 @@ export function CrmClient({
             sortKey={dealsSortKey}
             sortDir={dealsSortDir}
             onSort={(key, dir) => { setDealsSortKey(key); setDealsSortDir(dir) }}
-            onSelect={(d) => { setSelectedDeal(d); router.replace(`/tools/crm/deals/${d.id}${buildQs()}`) }}
+            onSelect={(d) => { setSelectedDeal(d); router.replace(`/tools/crm/deals/${d.id}${buildQs()}`, { scroll: false }) }}
           />
         )}
       </div>
@@ -519,7 +519,7 @@ export function CrmClient({
           company={selectedCompany}
           allPeople={people}
           allDeals={deals}
-          onClose={() => { setSelectedCompany(null); router.replace(`/tools/crm/companies${buildQs()}`) }}
+          onClose={() => { setSelectedCompany(null); router.replace(`/tools/crm/companies${buildQs()}`, { scroll: false }) }}
           onUpdate={(id, fields) => {
             setCompanies((prev) => prev.map((c) => (c.id === id ? { ...c, ...fields, updated_at: new Date().toISOString() } as Company : c)))
             setSelectedCompany((prev) => (prev?.id === id ? { ...prev, ...fields, updated_at: new Date().toISOString() } as Company : prev))
@@ -529,7 +529,7 @@ export function CrmClient({
             setSelectedCompany(null)
             setCompanies((prev) => prev.filter((c) => c.id !== id))
             deleteEntity('companies', id)
-            router.replace(`/tools/crm/companies${buildQs()}`)
+            router.replace(`/tools/crm/companies${buildQs()}`, { scroll: false })
           }}
         />
       )}
@@ -538,7 +538,7 @@ export function CrmClient({
           person={selectedPerson}
           allCompanies={companies}
           allDeals={deals}
-          onClose={() => { setSelectedPerson(null); router.replace(`/tools/crm/people${buildQs()}`) }}
+          onClose={() => { setSelectedPerson(null); router.replace(`/tools/crm/people${buildQs()}`, { scroll: false }) }}
           onUpdate={(id, fields) => {
             setPeople((prev) => prev.map((p) => (p.id === id ? { ...p, ...fields, updated_at: new Date().toISOString() } as Person : p)))
             setSelectedPerson((prev) => (prev?.id === id ? { ...prev, ...fields, updated_at: new Date().toISOString() } as Person : prev))
@@ -548,7 +548,7 @@ export function CrmClient({
             setSelectedPerson(null)
             setPeople((prev) => prev.filter((p) => p.id !== id))
             deleteEntity('people', id)
-            router.replace(`/tools/crm/people${buildQs()}`)
+            router.replace(`/tools/crm/people${buildQs()}`, { scroll: false })
           }}
         />
       )}
@@ -557,7 +557,7 @@ export function CrmClient({
           deal={selectedDeal}
           allCompanies={companies}
           allPeople={people}
-          onClose={() => { setSelectedDeal(null); router.replace(`/tools/crm/deals${buildQs()}`) }}
+          onClose={() => { setSelectedDeal(null); router.replace(`/tools/crm/deals${buildQs()}`, { scroll: false }) }}
           onUpdate={(id, fields) => {
             setDeals((prev) => prev.map((d) => (d.id === id ? { ...d, ...fields, updated_at: new Date().toISOString() } as Deal : d)))
             setSelectedDeal((prev) => (prev?.id === id ? { ...prev, ...fields, updated_at: new Date().toISOString() } as Deal : prev))
@@ -567,7 +567,7 @@ export function CrmClient({
             setSelectedDeal(null)
             setDeals((prev) => prev.filter((d) => d.id !== id))
             deleteEntity('deals', id)
-            router.replace(`/tools/crm/deals${buildQs()}`)
+            router.replace(`/tools/crm/deals${buildQs()}`, { scroll: false })
           }}
         />
       )}

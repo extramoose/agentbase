@@ -359,13 +359,13 @@ export function LibraryClient({ initialItems, initialItemId }: { initialItems: L
       ) : viewMode === 'card' ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((item) => (
-            <ItemCard key={item.id} item={item} onClick={() => { setSelectedItem(item); router.replace(`/tools/library/${item.id}${buildQs()}`) }} />
+            <ItemCard key={item.id} item={item} onClick={() => { setSelectedItem(item); router.replace(`/tools/library/${item.id}${buildQs()}`, { scroll: false }) }} />
           ))}
         </div>
       ) : (
         <div className="border border-border rounded-lg overflow-hidden">
           {filtered.map((item, idx) => (
-            <ItemRow key={item.id} item={item} isLast={idx === filtered.length - 1} onClick={() => { setSelectedItem(item); router.replace(`/tools/library/${item.id}${buildQs()}`) }} />
+            <ItemRow key={item.id} item={item} isLast={idx === filtered.length - 1} onClick={() => { setSelectedItem(item); router.replace(`/tools/library/${item.id}${buildQs()}`, { scroll: false }) }} />
           ))}
         </div>
       )}
@@ -374,9 +374,9 @@ export function LibraryClient({ initialItems, initialItemId }: { initialItems: L
       {selectedItem && (
         <LibraryEditShelf
           item={selectedItem}
-          onClose={() => { setSelectedItem(null); router.replace(`/tools/library${buildQs()}`) }}
+          onClose={() => { setSelectedItem(null); router.replace(`/tools/library${buildQs()}`, { scroll: false }) }}
           onUpdate={updateItemField}
-          onDelete={async (id) => { await deleteItem(id); router.replace(`/tools/library${buildQs()}`) }}
+          onDelete={async (id) => { await deleteItem(id); router.replace(`/tools/library${buildQs()}`, { scroll: false }) }}
         />
       )}
 

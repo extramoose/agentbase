@@ -252,7 +252,7 @@ export function MeetingsClient({
       )
       setSelectedId(created.id)
       setMobileDetail(true)
-      router.replace(`/tools/meetings/${created.id}${buildQs()}`)
+      router.replace(`/tools/meetings/${created.id}${buildQs()}`, { scroll: false })
       toast({ type: 'success', message: 'Meeting created' })
     } catch (err) {
       setMeetings((prev) => prev.filter((m) => m.id !== tempId))
@@ -301,7 +301,7 @@ export function MeetingsClient({
       setMeetings((m) => m.filter((x) => x.id !== meetingId))
       setSelectedId(null)
       setMobileDetail(false)
-      router.replace(`/tools/meetings${buildQs()}`)
+      router.replace(`/tools/meetings${buildQs()}`, { scroll: false })
 
       try {
         const res = await fetch('/api/commands/delete-entity', {
@@ -328,7 +328,7 @@ export function MeetingsClient({
   function selectMeeting(id: string) {
     setSelectedId(id)
     setMobileDetail(true)
-    router.replace(`/tools/meetings/${id}${buildQs()}`)
+    router.replace(`/tools/meetings/${id}${buildQs()}`, { scroll: false })
   }
 
   const statusTabs: Array<{ value: MeetingStatus | 'all'; label: string }> = [
