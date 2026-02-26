@@ -36,7 +36,10 @@ export async function middleware(request: NextRequest) {
     request.nextUrl.pathname.startsWith(p),
   )
 
-  if (!user && !isPublic) {
+  // API routes handle their own auth (Bearer token for agents, cookie for humans)
+  const isApiRoute = request.nextUrl.pathname.startsWith('/api/')
+
+  if (!user && !isPublic && !isApiRoute) {
     const url = request.nextUrl.clone()
     url.pathname = '/sign-in'
     return NextResponse.redirect(url)
