@@ -1,3 +1,7 @@
+// Server-side URL unfurling. We fetch URLs on the server because browsers can't
+// read OG meta tags cross-origin (CORS). In-memory cache (200 entries, 5min TTL)
+// avoids re-fetching the same URL on every keystroke. Resets on server restart.
+
 const cache = new Map<string, { data: UnfurlData; expires: number }>()
 const MAX_CACHE = 200
 const TTL_MS = 5 * 60 * 1000

@@ -4,6 +4,12 @@ import { UnauthorizedError, RateLimitError } from './errors'
 import { checkRateLimit } from './rate-limit'
 import { createHash } from 'crypto'
 
+// Every API route calls resolveActorUnified() to determine who's making the request.
+// Two auth paths converge to the same type:
+//   Bearer token → agent (custom API key, hashed and looked up in agents table)
+//   No Bearer    → human (cookie-based Supabase session)
+// This lets agents and browsers share identical API endpoints.
+
 export type ResolvedActor = {
   supabase: SupabaseClient
   actorId: string
@@ -12,8 +18,11 @@ export type ResolvedActor = {
   ownerId: string
 }
 
-// Agent path: Bearer token is a custom API key.
-// Hash it, look up in agents table via SECURITY DEFINER RPC (no secret key needed).
+// Agent path: the token is NOT a Supabase JWT — it's a custom API key.
+// We hash it and look up the hash via a SECURITY DEFINER RPC that's callable
+// by the anon role (no service key needed). The agent's Supabase client is
+// stateless (no session) — it relies on SECURITY DEFINER RPCs for all DB access
+// because auth.uid() is null without a JWT.
 export async function resolveActor(request: Request): Promise<ResolvedActor> {
   const authHeader = request.headers.get('Authorization')
   if (!authHeader?.startsWith('Bearer ')) {
