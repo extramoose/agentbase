@@ -1,7 +1,5 @@
 import { resolveActorUnified } from '@/lib/api/resolve-actor'
-import { requireAuthApi } from '@/lib/auth'
 import { apiError } from '@/lib/api/errors'
-import { createClient } from '@/lib/supabase/server'
 import { z } from 'zod'
 
 const upsertSchema = z.object({
@@ -9,15 +7,19 @@ const upsertSchema = z.object({
   content: z.string(),
 })
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    await requireAuthApi()
+    const { supabase, actorType, tenantId } = await resolveActorUnified(request)
 
-    const supabase = await createClient()
-    const { data, error } = await supabase
-      .from('diary_entries')
-      .select('*')
-      .order('date', { ascending: false })
+    let data, error
+    if (actorType === 'agent') {
+      ;({ data, error } = await supabase.rpc('rpc_list_diary_entries', { p_tenant_id: tenantId }))
+    } else {
+      ;({ data, error } = await supabase
+        .from('diary_entries')
+        .select('*')
+        .order('date', { ascending: false }))
+    }
 
     if (error) return Response.json({ error: error.message }, { status: 400 })
     return Response.json({ data })
