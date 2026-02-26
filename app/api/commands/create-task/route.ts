@@ -16,6 +16,8 @@ const schema = z.object({
   assignee_id: z.string().uuid().optional().nullable(),
   assignee_type: z.enum(['human', 'agent']).optional().nullable(),
   type: z.enum(['bug', 'improvement', 'feature']).optional().nullable(),
+  tags: z.array(z.string()).optional().default([]),
+  due_date: z.string().optional().nullable(),
   idempotency_key: z.string().max(128).optional(),
 })
 
@@ -36,6 +38,8 @@ export async function POST(request: Request) {
       p_assignee_id: input.assignee_id ?? null,
       p_assignee_type: input.assignee_type ?? null,
       p_type: input.type ?? null,
+      p_tags: input.tags.length > 0 ? input.tags : null,
+      p_due_date: input.due_date ?? null,
       p_idempotency_key: input.idempotency_key ?? null,
     })
     if (error) throw error

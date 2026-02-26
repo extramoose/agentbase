@@ -67,10 +67,12 @@ export function AssigneePicker({ value, onChange, className }: AssigneePickerPro
 
   return (
     <div ref={ref} className={cn('relative', className)}>
-      <button
-        type="button"
+      <div
+        role="button"
+        tabIndex={0}
         onClick={() => setOpen(o => !o)}
-        className="flex items-center gap-2 w-full min-h-9 px-2 py-1.5 rounded-md border border-input bg-transparent text-sm hover:bg-accent/50 transition-colors"
+        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen(o => !o) } }}
+        className="flex items-center gap-2 w-full min-h-9 px-2 py-1.5 rounded-md border border-input bg-transparent text-sm hover:bg-accent/50 transition-colors cursor-pointer"
       >
         {selected ? (
           <>
@@ -89,7 +91,7 @@ export function AssigneePicker({ value, onChange, className }: AssigneePickerPro
             <ChevronDown className="h-4 w-4 ml-auto text-muted-foreground" />
           </>
         )}
-      </button>
+      </div>
 
       {open && (
         <div className="absolute z-50 mt-1 w-full rounded-md border border-border bg-popover shadow-md">
