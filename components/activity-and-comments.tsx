@@ -133,7 +133,7 @@ export function ActivityAndComments({ entityType, entityId, currentUserId }: Act
 
   return (
     <div className="p-6 space-y-4">
-      <h3 className="text-sm font-medium text-muted-foreground">Activity</h3>
+      <h3 className="text-sm font-medium text-muted-foreground">History</h3>
 
       {/* Comment form */}
       <div className="space-y-2">
@@ -168,7 +168,7 @@ export function ActivityAndComments({ entityType, entityId, currentUserId }: Act
           ))}
         </div>
       ) : groups.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No activity yet.</p>
+        <p className="text-sm text-muted-foreground">No history yet.</p>
       ) : (
         <div className="space-y-4">
           {groups.map(group => {

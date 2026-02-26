@@ -56,8 +56,8 @@
   --card-foreground: #fafafa;
   --popover: #18181b;
   --popover-foreground: #fafafa;
-  --primary: #6366f1;
-  --primary-foreground: #fafafa;
+  --primary: #111111;
+  --primary-foreground: #ffffff;
   --secondary: #27272a;
   --secondary-foreground: #fafafa;
   --muted: #27272a;
@@ -75,8 +75,8 @@
   --chart-5: oklch(0.645 0.246 16.439);
   --sidebar: #18181b;
   --sidebar-foreground: #fafafa;
-  --sidebar-primary: #6366f1;
-  --sidebar-primary-foreground: #fafafa;
+  --sidebar-primary: #111111;
+  --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: #27272a;
   --sidebar-accent-foreground: #fafafa;
   --sidebar-border: #27272a;
@@ -90,6 +90,52 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* Glossy dark primary button */
+button.bg-primary,
+a.bg-primary {
+  background: linear-gradient(
+    180deg,
+    #2a2a2a 0%,
+    #111111 50%,
+    #0a0a0a 100%
+  );
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.08) inset,
+    0 -1px 0 rgba(0, 0, 0, 0.4) inset,
+    0 2px 4px rgba(0, 0, 0, 0.5),
+    0 1px 2px rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  transition: all 0.1s ease;
+}
+
+button.bg-primary:hover,
+a.bg-primary:hover {
+  background: linear-gradient(
+    180deg,
+    #333333 0%,
+    #1a1a1a 50%,
+    #111111 100%
+  );
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.1) inset,
+    0 -1px 0 rgba(0, 0, 0, 0.4) inset,
+    0 3px 6px rgba(0, 0, 0, 0.5),
+    0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+button.bg-primary:active,
+a.bg-primary:active {
+  background: linear-gradient(
+    180deg,
+    #0a0a0a 0%,
+    #111111 100%
+  );
+  box-shadow:
+    0 1px 0 rgba(0, 0, 0, 0.3) inset,
+    0 1px 2px rgba(0, 0, 0, 0.2);
+  transform: translateY(0.5px);
 }
 
 /* Tiptap / ProseMirror editor styles (replaces @tailwindcss/typography) */
