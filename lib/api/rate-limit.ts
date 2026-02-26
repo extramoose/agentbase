@@ -1,3 +1,7 @@
+// In-memory sliding window rate limiter. Simple and fast, but resets on
+// server restart and doesn't share state across multiple instances.
+// Fine for a single-instance deployment (Vercel serverless recycles anyway).
+
 interface RateLimitEntry {
   count: number
   windowStart: number
