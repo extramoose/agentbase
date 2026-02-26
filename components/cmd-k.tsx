@@ -107,7 +107,7 @@ export function CmdK() {
             subtitle: `Task #${t.ticket_id}`,
             icon: CheckSquare,
             section: 'tasks',
-            action: () => { router.push(`/tools/tasks/${t.id}`); close() },
+            action: () => { router.push(`/tools/tasks/${t.ticket_id}`); close() },
           })
         }
       }
@@ -187,7 +187,7 @@ export function CmdK() {
             .eq('ticket_id', taskNum)
             .single()
           if (data) {
-            router.push(`/tools/tasks/${data.id}`)
+            router.push(`/tools/tasks/${data.ticket_id}`)
           }
           close()
         },
