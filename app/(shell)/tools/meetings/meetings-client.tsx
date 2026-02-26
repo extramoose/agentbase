@@ -235,7 +235,7 @@ export function MeetingsClient({
     setMeetings((prev) => [optimistic, ...prev])
 
     try {
-      const res = await fetch('/api/meetings', {
+      const res = await fetch('/api/commands/create-meeting', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -304,7 +304,11 @@ export function MeetingsClient({
       router.replace(`/tools/meetings${buildQs()}`)
 
       try {
-        const res = await fetch(`/api/meetings/${meetingId}`, { method: 'DELETE' })
+        const res = await fetch('/api/commands/delete-entity', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ table: 'meetings', id: meetingId }),
+        })
         const json = await res.json()
         if (!res.ok) throw new Error(json.error ?? 'Delete failed')
         toast({ type: 'success', message: 'Meeting deleted' })

@@ -235,7 +235,11 @@ export function CrmClient({
   const deleteEntity = useCallback(
     async (table: 'companies' | 'people' | 'deals', id: string) => {
       try {
-        const res = await fetch(`/api/crm/${table}/${id}`, { method: 'DELETE' })
+        const res = await fetch('/api/commands/delete-entity', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ table, id }),
+        })
         const json = await res.json()
         if (!res.ok) throw new Error(json.error ?? 'Delete failed')
         toast({ type: 'success', message: 'Deleted' })
@@ -257,7 +261,7 @@ export function CrmClient({
     setCompanies((prev) => [optimistic, ...prev])
 
     try {
-      const res = await fetch('/api/crm/companies', {
+      const res = await fetch('/api/commands/create-company', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name }),
@@ -281,7 +285,7 @@ export function CrmClient({
     setPeople((prev) => [optimistic, ...prev])
 
     try {
-      const res = await fetch('/api/crm/people', {
+      const res = await fetch('/api/commands/create-person', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name }),
@@ -305,7 +309,7 @@ export function CrmClient({
     setDeals((prev) => [optimistic, ...prev])
 
     try {
-      const res = await fetch('/api/crm/deals', {
+      const res = await fetch('/api/commands/create-deal', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title }),

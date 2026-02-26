@@ -76,7 +76,7 @@ export function DiaryClient({ entry, date }: DiaryClientProps) {
       setSaving(true)
 
       try {
-        const res = await fetch('/api/diary', {
+        const res = await fetch('/api/commands/create-diary-entry', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ date, content }),

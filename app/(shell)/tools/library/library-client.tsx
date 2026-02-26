@@ -213,7 +213,7 @@ export function LibraryClient({ initialItems, initialItemId }: { initialItems: L
       setIsCreating(false)
 
       try {
-        const res = await fetch('/api/library', {
+        const res = await fetch('/api/commands/create-library-item', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(fields),
@@ -265,7 +265,11 @@ export function LibraryClient({ initialItems, initialItemId }: { initialItems: L
       setSelectedItem(null)
 
       try {
-        const res = await fetch(`/api/library/${itemId}`, { method: 'DELETE' })
+        const res = await fetch('/api/commands/delete-entity', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ table: 'library_items', id: itemId }),
+        })
         const json = await res.json()
         if (!res.ok) throw new Error(json.error ?? 'Delete failed')
         toast({ type: 'success', message: 'Item deleted' })
