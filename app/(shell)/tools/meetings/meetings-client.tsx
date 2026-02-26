@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   Plus,
   Trash2,
@@ -106,9 +107,11 @@ const STATUS_BADGE_CLASS: Record<MeetingStatus, string> = {
 
 export function MeetingsClient({
   initialMeetings,
+  initialMeetingId,
 }: {
   initialMeetings: Meeting[]
   currentUser: CurrentUser
+  initialMeetingId?: string
 }) {
   const [meetings, setMeetings] = useState<Meeting[]>(initialMeetings)
   const [search, setSearch] = useState('')
@@ -116,7 +119,20 @@ export function MeetingsClient({
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [mobileDetail, setMobileDetail] = useState(false)
 
+  const router = useRouter()
   const supabase = createClient()
+  const initialHandled = useRef(false)
+
+  // Open detail for initialMeetingId after data is available
+  useEffect(() => {
+    if (!initialMeetingId || initialHandled.current || meetings.length === 0) return
+    initialHandled.current = true
+    const meeting = meetings.find(m => m.id === initialMeetingId)
+    if (meeting) {
+      setSelectedId(meeting.id)
+      setMobileDetail(true)
+    }
+  }, [meetings, initialMeetingId])
 
   // ----- Realtime subscription -----
 
@@ -224,6 +240,7 @@ export function MeetingsClient({
       )
       setSelectedId(created.id)
       setMobileDetail(true)
+      router.replace('/tools/meetings/' + created.id)
       toast({ type: 'success', message: 'Meeting created' })
     } catch (err) {
       setMeetings((prev) => prev.filter((m) => m.id !== tempId))
@@ -272,6 +289,7 @@ export function MeetingsClient({
       setMeetings((m) => m.filter((x) => x.id !== meetingId))
       setSelectedId(null)
       setMobileDetail(false)
+      router.replace('/tools/meetings')
 
       try {
         const res = await fetch(`/api/meetings/${meetingId}`, { method: 'DELETE' })
@@ -294,6 +312,7 @@ export function MeetingsClient({
   function selectMeeting(id: string) {
     setSelectedId(id)
     setMobileDetail(true)
+    router.replace('/tools/meetings/' + id)
   }
 
   const statusTabs: Array<{ value: MeetingStatus | 'all'; label: string }> = [

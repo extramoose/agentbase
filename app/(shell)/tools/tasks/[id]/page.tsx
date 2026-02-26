@@ -1,16 +1,16 @@
 import { requireAuth } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
-import { MeetingsClient } from '../meetings-client'
+import { TasksClient } from '../tasks-client'
 
-export default async function MeetingPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function TaskPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const user = await requireAuth()
   const supabase = await createClient()
 
-  const { data: meetings } = await supabase
-    .from('meetings')
+  const { data: tasks } = await supabase
+    .from('tasks')
     .select('*')
-    .order('date', { ascending: false })
+    .order('sort_order', { ascending: true })
     .order('created_at', { ascending: false })
 
   const { data: profile } = await supabase
@@ -19,5 +19,5 @@ export default async function MeetingPage({ params }: { params: Promise<{ id: st
     .eq('id', user.id)
     .single()
 
-  return <MeetingsClient initialMeetings={meetings ?? []} currentUser={profile} initialMeetingId={id} />
+  return <TasksClient initialTasks={tasks ?? []} currentUser={profile} initialTaskId={id} />
 }

@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   DndContext,
   closestCenter,
@@ -346,9 +347,11 @@ function PriorityGroup({
 
 export function TasksClient({
   initialTasks,
+  initialTaskId,
 }: {
   initialTasks: Task[]
   currentUser: CurrentUser
+  initialTaskId?: string
 }) {
   const [tasks, setTasks] = useState<Task[]>(initialTasks)
   const [search, setSearch] = useState('')
@@ -356,7 +359,17 @@ export function TasksClient({
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [addingToPriority, setAddingToPriority] = useState<Priority | null>(null)
 
+  const router = useRouter()
   const supabase = createClient()
+  const initialHandled = useRef(false)
+
+  // Open shelf for initialTaskId after data is available
+  useEffect(() => {
+    if (!initialTaskId || initialHandled.current || tasks.length === 0) return
+    initialHandled.current = true
+    const task = tasks.find(t => t.id === initialTaskId)
+    if (task) setSelectedTask(task)
+  }, [tasks, initialTaskId])
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
   )
@@ -648,7 +661,10 @@ export function TasksClient({
               key={priority}
               priority={priority}
               tasks={grouped[priority]}
-              onTaskClick={(task) => setSelectedTask(task)}
+              onTaskClick={(task) => {
+                setSelectedTask(task)
+                router.replace('/tools/tasks/' + task.id)
+              }}
               addingTo={addingToPriority === priority}
               onStartAdding={() => setAddingToPriority(priority)}
               onCreateTask={createTask}
@@ -676,7 +692,10 @@ export function TasksClient({
       {selectedTask && (
         <TaskEditShelf
           task={selectedTask}
-          onClose={() => setSelectedTask(null)}
+          onClose={() => {
+            setSelectedTask(null)
+            router.replace('/tools/tasks')
+          }}
           onUpdate={updateTaskField}
         />
       )}
