@@ -1,17 +1,29 @@
 'use client'
 
-import { Suspense, useState } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { Suspense, useState, useEffect } from 'react'
+import { useSearchParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 
 function SignInForm() {
   const searchParams = useSearchParams()
+  const router = useRouter()
   const error = searchParams.get('error')
+  const code = searchParams.get('code')
   const [email, setEmail] = useState('')
   const [sent, setSent] = useState(false)
   const [sending, setSending] = useState(false)
+
+  // Recovery: if a PKCE code lands on this page (Supabase redirect URL misconfigured),
+  // exchange it here instead of showing the sign-in form.
+  useEffect(() => {
+    if (!code) return
+    const supabase = createClient()
+    supabase.auth.exchangeCodeForSession(code).then(({ error }) => {
+      if (!error) router.replace('/')
+    })
+  }, [code, router])
 
   async function handleGoogleSignIn() {
     const supabase = createClient()

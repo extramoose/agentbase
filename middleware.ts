@@ -42,6 +42,7 @@ export async function middleware(request: NextRequest) {
   if (!user && !isPublic && !isApiRoute) {
     const url = request.nextUrl.clone()
     url.pathname = '/sign-in'
+    url.search = ''  // strip query params — prevents ?code= leaking onto /sign-in
     return NextResponse.redirect(url)
   }
 
