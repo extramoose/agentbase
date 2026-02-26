@@ -209,7 +209,7 @@ export function CrmClient({
       supabase.removeChannel(peopleChannel)
       supabase.removeChannel(dealsChannel)
     }
-  }, [supabase])
+  }, [])
 
   // ----- Update via command bus -----
 
@@ -947,7 +947,7 @@ function CompanyEditShelf({
       .then(({ data }) => setLinkedPeopleIds((data ?? []).map((r) => r.person_id)))
     supabase.from('deals_companies').select('deal_id').eq('company_id', company.id)
       .then(({ data }) => setLinkedDealIds((data ?? []).map((r) => r.deal_id)))
-  }, [company.id, supabase])
+  }, [company.id])
 
   function saveFieldImmediate(fields: Record<string, unknown>) {
     onUpdate(company.id, fields)
@@ -1145,7 +1145,7 @@ function PersonEditShelf({
       .then(({ data }) => setLinkedCompanyIds((data ?? []).map((r) => r.company_id)))
     supabase.from('deals_people').select('deal_id').eq('person_id', person.id)
       .then(({ data }) => setLinkedDealIds((data ?? []).map((r) => r.deal_id)))
-  }, [person.id, supabase])
+  }, [person.id])
 
   function saveFieldImmediate(fields: Record<string, unknown>) {
     onUpdate(person.id, fields)
@@ -1356,7 +1356,7 @@ function DealEditShelf({
       .then(({ data }) => setLinkedCompanyIds((data ?? []).map((r) => r.company_id)))
     supabase.from('deals_people').select('person_id').eq('deal_id', deal.id)
       .then(({ data }) => setLinkedPeopleIds((data ?? []).map((r) => r.person_id)))
-  }, [deal.id, supabase])
+  }, [deal.id])
 
   function saveFieldImmediate(fields: Record<string, unknown>) {
     onUpdate(deal.id, fields)

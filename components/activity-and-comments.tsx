@@ -51,7 +51,7 @@ export function ActivityAndComments({ entityType, entityId, currentUserId }: Act
       setLoading(false)
     }
     load()
-  }, [entityType, entityId, supabase])
+  }, [entityType, entityId])
 
   // Realtime subscription
   useEffect(() => {
@@ -72,7 +72,7 @@ export function ActivityAndComments({ entityType, entityId, currentUserId }: Act
       .subscribe()
 
     return () => { supabase.removeChannel(channel) }
-  }, [entityType, entityId, supabase])
+  }, [entityType, entityId])
 
   async function submitComment() {
     if (!comment.trim() || submitting) return

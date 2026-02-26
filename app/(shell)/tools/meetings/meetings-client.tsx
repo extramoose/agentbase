@@ -186,7 +186,7 @@ export function MeetingsClient({
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [supabase])
+  }, [])
 
   // ----- Selected meeting (derived) -----
 
@@ -523,7 +523,7 @@ function MeetingDetail({
 
     supabase.from('people').select('id, name').order('name')
       .then(({ data }) => setAllPeople((data ?? []) as Person[]))
-  }, [meeting.id, supabase])
+  }, [meeting.id])
 
   // Fetch past meetings with same people
   useEffect(() => {
@@ -573,7 +573,7 @@ function MeetingDetail({
     }
 
     fetchPastMeetings()
-  }, [linkedPeopleIds, meeting.id, supabase])
+  }, [linkedPeopleIds, meeting.id])
 
   function saveFieldImmediate(fields: Record<string, unknown>) {
     onUpdate(meeting.id, fields)

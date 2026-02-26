@@ -52,7 +52,7 @@ export function AssigneePicker({ value, onChange, className }: AssigneePickerPro
       setActors([...humans, ...agents])
     }
     load()
-  }, [supabase])
+  }, [])
 
   useEffect(() => {
     function handler(e: MouseEvent) {

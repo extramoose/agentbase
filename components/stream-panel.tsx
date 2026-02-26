@@ -30,7 +30,7 @@ export function StreamPanel({ entityType, entityId, className }: StreamPanelProp
     supabase.auth.getUser().then(({ data }) => {
       setCurrentUserId(data.user?.id ?? null)
     })
-  }, [supabase])
+  }, [])
 
   // Initial load
   useEffect(() => {
@@ -78,7 +78,7 @@ export function StreamPanel({ entityType, entityId, className }: StreamPanelProp
       .subscribe()
 
     return () => { supabase.removeChannel(channel) }
-  }, [entityType, entityId, supabase])
+  }, [entityType, entityId])
 
   async function handleSubmit() {
     if (!input.trim() || submitting) return
