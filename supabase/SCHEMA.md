@@ -307,6 +307,46 @@ Single source of truth for all entity events. Written atomically with entity mut
 
 ---
 
+### `stream_entries`
+Lightweight scratchpad inputs for any entity (never cleared). Powers diary, essays, meetings stream.
+
+| Column | Type | Nullable | Default | Notes |
+|--------|------|----------|---------|-------|
+| id | uuid | NO | `gen_random_uuid()` | |
+| tenant_id | uuid | NO | — | FK → tenants |
+| entity_type | text | NO | — | e.g. `diary`, `essay`, `meeting` |
+| entity_id | uuid | NO | — | Reference to the owning entity |
+| content | text | NO | — | |
+| actor_id | uuid | NO | — | |
+| actor_type | text | NO | — | CHECK: `human \| agent` |
+| created_at | timestamptz | NO | `now()` | |
+
+Indexes: `(entity_type, entity_id, created_at DESC)`, `(tenant_id, created_at DESC)`
+
+---
+
+### `document_versions`
+Synthesized document snapshots for any entity. Each version is immutable.
+
+| Column | Type | Nullable | Default | Notes |
+|--------|------|----------|---------|-------|
+| id | uuid | NO | `gen_random_uuid()` | |
+| tenant_id | uuid | NO | — | FK → tenants |
+| entity_type | text | NO | — | e.g. `diary`, `essay`, `meeting` |
+| entity_id | uuid | NO | — | Reference to the owning entity |
+| version_number | integer | NO | — | UNIQUE with entity_id |
+| content | text | NO | — | Markdown document content |
+| change_summary | text | NO | — | One-sentence summary of changes |
+| context_hint | text | YES | — | e.g. `good_morning`, `update`, `prep` |
+| actor_id | uuid | NO | — | |
+| actor_type | text | NO | — | CHECK: `human \| agent` |
+| created_at | timestamptz | NO | `now()` | |
+
+UNIQUE: `(entity_id, version_number)`
+Indexes: `(entity_type, entity_id, version_number DESC)`, `(tenant_id, created_at DESC)`
+
+---
+
 ### `idempotency_keys`
 
 | Column | Type | Nullable |
@@ -357,12 +397,20 @@ All mutations go through these functions. They atomically write to the entity ta
 | `rpc_delete_entity` | p_table, p_entity_id, p_actor_id, p_actor_type, p_tenant_id | DELETE only — activity_log written by route handler (agents blocked at route level) |
 | `rpc_add_comment` | p_entity_type, p_entity_id, p_entity_label, p_body, p_actor_id, p_tenant_id | Inserts `event_type='commented'` into activity_log |
 
+### Stream & versioning
+| Function | Parameters | Returns |
+|----------|-----------|---------|
+| `rpc_list_stream_entries` | p_tenant_id, p_entity_type, p_entity_id | `SETOF stream_entries` — last 50, oldest first |
+| `rpc_create_stream_entry` | p_tenant_id, p_entity_type, p_entity_id, p_content, p_actor_id, p_actor_type | `stream_entries` row |
+| `rpc_list_document_versions` | p_tenant_id, p_entity_type, p_entity_id | `SETOF document_versions` — latest first |
+
 ### Utility
 | Function | Notes |
 |----------|-------|
 | `handle_new_user()` | Trigger: INSERT into profiles on auth.users INSERT |
 | `set_updated_at()` | Trigger: updates updated_at on entity row changes |
 | `is_tenant_member(uuid)` | Returns bool — used in RLS policies |
+| `is_superadmin()` | Returns bool — used in RLS policies |
 
 ---
 
@@ -381,6 +429,7 @@ All mutations go through these functions. They atomically write to the entity ta
 | `010_task_assignee.sql` | Add `assignee_id` + `assignee_type` to tasks; update `rpc_create_task` + `rpc_update_entity` (uuid cast for `assignee_id`) |
 | `011_delete_permissions.sql` | `rpc_delete_entity` stripped to DELETE-only — activity_log now written by route handlers; agents blocked 403 at route level |
 | `012_task_type.sql` | Add nullable `type` column (`bug \| improvement \| feature`) to tasks; update `rpc_create_task` with `p_type` param |
+| `013_stream_versioning.sql` | `stream_entries` + `document_versions` tables, RLS policies, `rpc_list_stream_entries`, `rpc_create_stream_entry`, `rpc_list_document_versions` RPCs |
 
 ---
 
