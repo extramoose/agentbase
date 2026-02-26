@@ -511,7 +511,7 @@ export function TasksClient({
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [supabase])
+  }, [])
 
   // ----- Filtered & grouped tasks -----
 

@@ -42,7 +42,7 @@ export function EntityPreviewShelf({ entityType, entityId, entityLabel, onClose 
         setEntity(data as Record<string, unknown> | null)
         setLoading(false)
       })
-  }, [entityId, table, supabase])
+  }, [entityId, table])
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {

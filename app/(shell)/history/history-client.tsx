@@ -45,7 +45,6 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
   const [search, setSearch] = useState('')
   const [entityFilter, setEntityFilter] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-  const [hasMore, setHasMore] = useState(initialEntries.length >= 50)
   const [activeEntity, setActiveEntity] = useState<{
     entityType: string
     entityId: string
@@ -54,6 +53,14 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
   const sentinelRef = useRef<HTMLDivElement>(null)
   const supabase = createClient()
+
+  // Refs to decouple loadMore identity from rapidly-changing state.
+  // Without these, loadMore changes identity on every fetch cycle,
+  // the IntersectionObserver re-creates, fires immediately, and loops.
+  const loadingRef = useRef(false)
+  const hasMoreRef = useRef(initialEntries.length >= 50)
+  const entriesRef = useRef(entries)
+  entriesRef.current = entries
 
   function toggleGroup(groupKey: string) {
     setExpandedGroups(prev => {
@@ -64,21 +71,23 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
     })
   }
 
-  // Load more entries
+  // Load more entries — stable identity (only changes on filter/search)
   const loadMore = useCallback(async () => {
-    if (loading || !hasMore) return
+    if (loadingRef.current || !hasMoreRef.current) return
+    loadingRef.current = true
     setLoading(true)
     const { data } = await supabase.rpc('get_activity_log', {
       p_limit: 50,
-      p_offset: entries.length,
+      p_offset: entriesRef.current.length,
       ...(entityFilter ? { p_entity_type: entityFilter } : {}),
       ...(search.trim() ? { p_search: search.trim() } : {}),
     })
     const newEntries = (data ?? []) as ActivityLogEntry[]
     setEntries(prev => [...prev, ...newEntries])
-    setHasMore(newEntries.length >= 50)
+    hasMoreRef.current = newEntries.length >= 50
+    loadingRef.current = false
     setLoading(false)
-  }, [loading, hasMore, entries.length, entityFilter, search, supabase])
+  }, [entityFilter, search])
 
   // Infinite scroll observer
   useEffect(() => {
@@ -96,6 +105,7 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
   useEffect(() => {
     let cancelled = false
     const reload = async () => {
+      loadingRef.current = true
       setLoading(true)
       const { data } = await supabase.rpc('get_activity_log', {
         p_limit: 50,
@@ -106,12 +116,13 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
       if (cancelled) return
       const results = (data ?? []) as ActivityLogEntry[]
       setEntries(results)
-      setHasMore(results.length >= 50)
+      hasMoreRef.current = results.length >= 50
+      loadingRef.current = false
       setLoading(false)
     }
     const timeout = setTimeout(reload, search.trim() ? 300 : 0)
     return () => { cancelled = true; clearTimeout(timeout) }
-  }, [entityFilter, search, supabase])
+  }, [entityFilter, search])
 
   // Realtime subscription — prepend new entries
   useEffect(() => {
@@ -131,7 +142,7 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
       .subscribe()
 
     return () => { supabase.removeChannel(channel) }
-  }, [supabase])
+  }, [])
 
   // Group consecutive same-entity activity items
   const groups = useMemo(() => groupActivityItems(entries), [entries])

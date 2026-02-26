@@ -124,7 +124,7 @@ export function EssaysClient({
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [supabase])
+  }, [])
 
   // Filtered list
   const filtered = useMemo(() => {

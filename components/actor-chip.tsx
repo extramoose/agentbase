@@ -78,7 +78,7 @@ export function ActorChip({ actorId, actorType, compact = false, className }: Ac
     }
 
     resolve()
-  }, [actorId, actorType, actor, supabase])
+  }, [actorId, actorType, actor])
 
   const displayName = actor?.displayName ?? '…'
   const initials = displayName === '…' ? '?' : displayName.slice(0, 2).toUpperCase()

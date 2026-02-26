@@ -73,7 +73,7 @@ export function GroceryClient({
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [supabase])
+  }, [])
 
   // Existing categories for autocomplete
   const existingCategories = useMemo(() => {

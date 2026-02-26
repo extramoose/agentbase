@@ -32,7 +32,7 @@ export function TagCombobox({ selected, onChange, className }: TagComboboxProps)
   useEffect(() => {
     supabase.from('tags').select('name').order('name')
       .then(({ data }) => setAllTags((data ?? []).map(t => t.name)))
-  }, [supabase])
+  }, [])
 
   // Filter suggestions as user types
   useEffect(() => {

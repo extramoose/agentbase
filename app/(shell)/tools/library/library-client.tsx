@@ -168,7 +168,7 @@ export function LibraryClient({ initialItems, initialItemId }: { initialItems: L
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [supabase])
+  }, [])
 
   // ===== Filtered items =====
   const filtered = useMemo(() => {
