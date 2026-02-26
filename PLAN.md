@@ -101,7 +101,7 @@ Each semantic action:
 
 **Why idempotency matters for OpenClaw:** OpenClaw agents run in Docker containers and retry HTTP requests on network timeouts and flakes. Without idempotency, a timeout between the request leaving the agent and the server committing the transaction results in a duplicate entity (task, comment, meeting) when the agent retries. The `idempotency_key` field prevents this.
 
-**Idempotency:** Agents are Docker containers hitting HTTP endpoints. Network retries will happen. All create commands accept an optional `idempotency_key` field (UUID or string, max 128 chars). The implementation uses an `idempotency_keys` table (see §5): before inserting, check if the key exists — if yes, return the stored response; if no, proceed with the insert and store `(key, response)` in the table. A Postgres cron job or TTL trigger purges entries older than 24 hours. Idempotency keys are optional — browser callers don't need them. Only agents should send them.
+**Idempotency:** Agents are Docker containers hitting HTTP endpoints. Network retries will happen. All create commands accept an optional `idempotency_key` field (UUID or string, max 128 chars). The idempotency check runs **inside the SECURITY DEFINER RPC** (e.g. `rpc_create_task`) — not in the route handler. The RPC checks whether the key exists in `idempotency_keys`: if yes, it returns the stored response immediately without re-executing; if no, it performs the entity insert, writes to `activity_log`, and stores `(key, response)` in `idempotency_keys` — all in the same atomic transaction. The API route handler never touches `idempotency_keys` directly and does not need the secret key. A pg_cron job or Vercel cron purges entries older than 24 hours. Idempotency keys are optional — browser callers don't need them. Only agents should send them.
 
 **Rate limiting:** All command handlers run behind per-actor rate limiting middleware (see Phase 1 in §10). Limit: 60 requests/minute per `actor_id`. This protects against runaway agents burning Vercel/Supabase quotas.
 
@@ -1259,7 +1259,7 @@ CREATE TABLE idempotency_keys (
 -- from a scheduled Vercel cron or similar.
 ```
 
-No RLS needed — this table is only accessed from API route handlers via the secret key, not directly by clients.
+No RLS needed — this table is accessed exclusively from SECURITY DEFINER RPC functions (e.g. `rpc_create_task`). The idempotency check, entity insert, and `idempotency_keys` write all happen in the same atomic transaction inside the RPC. The API route handler calls `supabase.rpc(...)` using the publishable key + caller session — no secret key required at runtime.
 
 ### Agent Token Revocation
 
