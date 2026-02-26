@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   Plus,
   Trash2,
@@ -78,7 +79,7 @@ function domainFromUrl(url: string | null): string | null {
 // Main component
 // ---------------------------------------------------------------------------
 
-export function LibraryClient({ initialItems }: { initialItems: LibraryItem[] }) {
+export function LibraryClient({ initialItems, initialItemId }: { initialItems: LibraryItem[]; initialItemId?: string }) {
   const [items, setItems] = useState<LibraryItem[]>(initialItems)
   const [search, setSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState<ItemType | 'all'>('all')
@@ -91,7 +92,17 @@ export function LibraryClient({ initialItems }: { initialItems: LibraryItem[] })
   const [selectedItem, setSelectedItem] = useState<LibraryItem | null>(null)
   const [isCreating, setIsCreating] = useState(false)
 
+  const router = useRouter()
   const supabase = createClient()
+  const initialHandled = useRef(false)
+
+  // Open shelf for initialItemId after data is available
+  useEffect(() => {
+    if (!initialItemId || initialHandled.current || items.length === 0) return
+    initialHandled.current = true
+    const item = items.find(i => i.id === initialItemId)
+    if (item) setSelectedItem(item)
+  }, [items, initialItemId])
 
   // Persist view mode
   useEffect(() => {
@@ -323,13 +334,13 @@ export function LibraryClient({ initialItems }: { initialItems: LibraryItem[] })
       ) : viewMode === 'card' ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((item) => (
-            <ItemCard key={item.id} item={item} onClick={() => setSelectedItem(item)} />
+            <ItemCard key={item.id} item={item} onClick={() => { setSelectedItem(item); router.replace('/tools/library/' + item.id) }} />
           ))}
         </div>
       ) : (
         <div className="border border-border rounded-lg overflow-hidden">
           {filtered.map((item, idx) => (
-            <ItemRow key={item.id} item={item} isLast={idx === filtered.length - 1} onClick={() => setSelectedItem(item)} />
+            <ItemRow key={item.id} item={item} isLast={idx === filtered.length - 1} onClick={() => { setSelectedItem(item); router.replace('/tools/library/' + item.id) }} />
           ))}
         </div>
       )}
@@ -338,9 +349,9 @@ export function LibraryClient({ initialItems }: { initialItems: LibraryItem[] })
       {selectedItem && (
         <LibraryEditShelf
           item={selectedItem}
-          onClose={() => setSelectedItem(null)}
+          onClose={() => { setSelectedItem(null); router.replace('/tools/library') }}
           onUpdate={updateItemField}
-          onDelete={deleteItem}
+          onDelete={async (id) => { await deleteItem(id); router.replace('/tools/library') }}
         />
       )}
 
