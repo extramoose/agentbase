@@ -19,7 +19,7 @@ AgentBase is a greenfield "Life OS" — a personal productivity platform where h
 
 | Layer | Choice | Why |
 |-------|--------|-----|
-| Framework | **Next.js 15** (App Router) | Server components, API routes, middleware — all in one. App Router is the current standard. |
+| Framework | **Next.js 16** (App Router) | Server components, API routes, middleware — all in one. Turbopack is stable and default in v16 (no flag needed). Minimum Node.js 20.9+, React 19, TypeScript 5.1+. |
 | Database / Auth / Realtime | **Supabase** (Postgres + Auth + Realtime) | Proven in HAH Toolbox. RLS, realtime subscriptions, Google OAuth all built in. Self-hostable. |
 | Styling | **Tailwind CSS v4** | Utility-first, consistent with HAH Toolbox. v4 for CSS-first config and improved performance. |
 | Component library | **shadcn/ui** (used to its full extent) | Copy-paste components, fully customizable, Tailwind-native. No runtime dependency. |
@@ -2124,7 +2124,7 @@ agentbase/
 
 **Goal:** Empty app that boots, authenticates, and has the full DB schema deployed.
 
-- [ ] Initialize Next.js 15 with App Router, TypeScript strict, pnpm
+- [ ] Initialize Next.js 16 with App Router, TypeScript strict, pnpm (`pnpm create next-app@latest` then upgrade to next@16)
 - [ ] Install and configure Tailwind CSS v4 + shadcn/ui
 - [ ] Set up Supabase project (or configure for existing)
 - [ ] Create all Supabase client helpers (`lib/supabase/client.ts`, `server.ts`, `middleware.ts`)
