@@ -6,7 +6,7 @@ import { ActorChip } from '@/components/actor-chip'
 import { SearchFilterBar } from '@/components/search-filter-bar'
 import { Badge } from '@/components/ui/badge'
 import { formatDistanceToNow } from 'date-fns'
-import { ChevronRight, Loader2 } from 'lucide-react'
+import { Loader2, Minus, Plus } from 'lucide-react'
 import {
   formatActivityEvent,
   groupActivityItems,
@@ -169,6 +169,11 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
             >
               {formatEntityType(entry.entity_type)}
             </Badge>
+            {entry.entity_label && !['created', 'deleted'].includes(entry.event_type) && (
+              <span className="text-xs font-medium text-muted-foreground truncate max-w-[160px]" title={entry.entity_label}>
+                {entry.entity_label}
+              </span>
+            )}
             <span className={`text-sm ${isDeleted ? 'text-red-400' : 'text-foreground'}`}>
               {formatActivityEvent(entry)}
             </span>
@@ -245,6 +250,10 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
                   className="flex items-start gap-3 rounded-lg px-3 py-3 hover:bg-muted/40 transition-colors cursor-pointer"
                   onClick={() => toggleGroup(groupKey)}
                 >
+                  {isExpanded
+                    ? <Minus className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-1" />
+                    : <Plus className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-1" />
+                  }
                   <ActorChip actorId={group.firstItem.actor_id} actorType={group.firstItem.actor_type} compact />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -254,6 +263,11 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
                       >
                         {formatEntityType(group.entityType)}
                       </Badge>
+                      {group.firstItem.entity_label && !['created', 'deleted'].includes(headline.event_type) && (
+                        <span className="text-xs font-medium text-muted-foreground truncate max-w-[160px]" title={group.firstItem.entity_label}>
+                          {group.firstItem.entity_label}
+                        </span>
+                      )}
                       <span className={`text-sm ${headline.event_type === 'deleted' ? 'text-red-400' : 'text-foreground'}`}>
                         {formatActivityEvent(headline)}
                       </span>
@@ -265,7 +279,6 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
                   <span suppressHydrationWarning className="text-xs text-muted-foreground whitespace-nowrap shrink-0">
                     {formatDistanceToNow(new Date(group.latestItem.created_at), { addSuffix: true })}
                   </span>
-                  <ChevronRight className={`h-4 w-4 text-muted-foreground shrink-0 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
                 </div>
 
                 {isExpanded && (

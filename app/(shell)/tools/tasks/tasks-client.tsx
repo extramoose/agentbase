@@ -4,12 +4,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
   DndContext,
+  DragOverlay,
   closestCenter,
   PointerSensor,
   useSensor,
   useSensors,
   useDroppable,
   type DragEndEvent,
+  type DragStartEvent,
 } from '@dnd-kit/core'
 import {
   SortableContext,
@@ -192,7 +194,7 @@ function SortableTaskRow({
         onChange={onToggle}
         onClick={(e) => e.stopPropagation()}
         className={cn(
-          'h-4 w-4 rounded border-zinc-600 bg-transparent accent-blue-500 shrink-0 cursor-pointer',
+          'cb-dark h-4 w-4 shrink-0',
           selectionActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
         )}
       />
@@ -424,6 +426,7 @@ export function TasksClient({
   const [addingToPriority, setAddingToPriority] = useState<Priority | null>(null)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [mounted, setMounted] = useState(false)
+  const [activeDragId, setActiveDragId] = useState<string | null>(null)
 
   const supabase = createClient()
   const initialHandled = useRef(false)
@@ -633,8 +636,13 @@ export function TasksClient({
 
   // ----- Drag reorder / cross-group priority change -----
 
+  const handleDragStart = useCallback((event: DragStartEvent) => {
+    setActiveDragId(String(event.active.id))
+  }, [])
+
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
+      setActiveDragId(null)
       const { active, over } = event
       if (!over || active.id === over.id) return
 
@@ -873,7 +881,7 @@ export function TasksClient({
             checked={selectedIds.size > 0 && selectedIds.size === filteredTasks.length}
             ref={(el) => { if (el) el.indeterminate = selectedIds.size > 0 && selectedIds.size < filteredTasks.length }}
             onChange={toggleSelectAll}
-            className="h-4 w-4 rounded border-zinc-600 bg-transparent accent-blue-500 cursor-pointer"
+            className="cb-dark h-4 w-4"
           />
           <span className="text-xs text-muted-foreground">
             {selectedIds.size > 0 ? `${selectedIds.size} of ${filteredTasks.length} selected` : 'Select all'}
@@ -887,6 +895,7 @@ export function TasksClient({
           <DndContext
             sensors={sensors}
             collisionDetection={closestCenter}
+            onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
           >
             {displayPriorities.map((priority) => (
@@ -905,6 +914,25 @@ export function TasksClient({
                 onToggleSelection={toggleSelection}
               />
             ))}
+            <DragOverlay dropAnimation={null}>
+              {activeDragId && (() => {
+                const t = filteredTasks.find(x => x.id === activeDragId)
+                if (!t) return null
+                return (
+                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-card border border-border shadow-lg opacity-90">
+                    <GripVertical className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-xs text-muted-foreground w-12 shrink-0">#{t.ticket_id}</span>
+                    <span className="shrink-0" title={PRIORITY_CONFIG[t.priority].label}>
+                      <PriorityIcon priority={t.priority} />
+                    </span>
+                    <span className="flex-1 text-sm font-medium truncate">{t.title}</span>
+                    <Badge variant="secondary" className={cn('text-xs shrink-0', STATUS_CONFIG[t.status].className)}>
+                      {STATUS_CONFIG[t.status].label}
+                    </Badge>
+                  </div>
+                )
+              })()}
+            </DragOverlay>
           </DndContext>
         ) : (
           displayPriorities.map((priority) => {
@@ -940,7 +968,7 @@ export function TasksClient({
                           onChange={() => toggleSelection(task.id)}
                           onClick={(e) => e.stopPropagation()}
                           className={cn(
-                            'h-4 w-4 rounded border-zinc-600 bg-transparent accent-blue-500 shrink-0 cursor-pointer',
+                            'cb-dark h-4 w-4 shrink-0',
                             selectedIds.size > 0 ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
                           )}
                         />
