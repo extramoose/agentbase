@@ -11,6 +11,7 @@ import { toast } from '@/hooks/use-toast'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { RichTextEditor } from '@/components/rich-text-editor'
+import { UnfurlInput } from '@/components/unfurl-input'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 
@@ -1010,15 +1011,12 @@ function CompanyEditShelf({
         </div>
 
         <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="text-xs text-muted-foreground font-medium mb-1 block">Domain</label>
-            <Input
-              value={domain}
-              onChange={(e) => { setDomain(e.target.value); saveField({ domain: e.target.value || null }) }}
-              placeholder="example.com"
-              className="text-sm"
-            />
-          </div>
+          <UnfurlInput
+            label="Domain"
+            value={domain}
+            onChange={(v) => { setDomain(v); saveField({ domain: v || null }) }}
+            placeholder="example.com"
+          />
           <div>
             <label className="text-xs text-muted-foreground font-medium mb-1 block">Industry</label>
             <Input

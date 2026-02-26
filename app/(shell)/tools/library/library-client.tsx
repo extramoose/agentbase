@@ -24,6 +24,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { RichTextEditor } from '@/components/rich-text-editor'
+import { UnfurlInput } from '@/components/unfurl-input'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import { stripMarkdown } from '@/lib/strip-markdown'
@@ -581,18 +582,15 @@ function LibraryEditShelf({
 
         {/* URL */}
         {showUrl && (
-          <div>
-            <label className="text-xs text-muted-foreground font-medium mb-1 block">URL</label>
-            <Input
-              value={url}
-              onChange={(e) => {
-                setUrl(e.target.value)
-                saveField({ url: e.target.value || null })
-              }}
-              placeholder="https://..."
-              className="text-sm"
-            />
-          </div>
+          <UnfurlInput
+            label="URL"
+            value={url}
+            onChange={(v) => {
+              setUrl(v)
+              saveField({ url: v || null })
+            }}
+            placeholder="https://..."
+          />
         )}
 
         {/* Source */}
