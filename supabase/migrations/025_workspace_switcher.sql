@@ -17,7 +17,7 @@ STABLE AS $$
     ) THEN (SELECT active_tenant_id FROM profiles WHERE id = auth.uid())
     ELSE NULL END,
     -- Fall back to first membership
-    (SELECT tenant_id FROM tenant_members WHERE user_id = auth.uid() ORDER BY created_at LIMIT 1)
+    (SELECT tenant_id FROM tenant_members WHERE user_id = auth.uid() ORDER BY joined_at LIMIT 1)
   )
 $$;
 
