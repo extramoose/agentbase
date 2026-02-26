@@ -1,9 +1,14 @@
 'use client'
 
+import { Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 
-export default function SignInPage() {
+function SignInForm() {
+  const searchParams = useSearchParams()
+  const error = searchParams.get('error')
+
   async function handleGoogleSignIn() {
     const supabase = createClient()
     await supabase.auth.signInWithOAuth({
@@ -23,6 +28,11 @@ export default function SignInPage() {
             Your multi-agent Life OS
           </p>
         </div>
+        {error && (
+          <p className="text-sm text-destructive text-center">
+            Sign in failed. Please try again.
+          </p>
+        )}
         <Button onClick={handleGoogleSignIn} className="w-full" size="lg">
           <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
             <path
@@ -46,5 +56,13 @@ export default function SignInPage() {
         </Button>
       </div>
     </div>
+  )
+}
+
+export default function SignInPage() {
+  return (
+    <Suspense>
+      <SignInForm />
+    </Suspense>
   )
 }
