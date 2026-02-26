@@ -186,6 +186,21 @@ One entry per day per tenant. `UNIQUE (tenant_id, date)`.
 
 ---
 
+### `essays`
+Timeless living documents. No phases, no dates — a single document per essay that evolves over time.
+
+| Column | Type | Nullable | Default | Notes |
+|--------|------|----------|---------|-------|
+| id | uuid | NO | `gen_random_uuid()` | |
+| tenant_id | uuid | NO | — | FK → tenants |
+| title | text | NO | — | |
+| body | text | NO | `''` | Markdown |
+| tags | text[] | NO | `'{}'` | |
+| created_at | timestamptz | NO | `now()` | |
+| updated_at | timestamptz | NO | `now()` | |
+
+---
+
 ### `grocery_items`
 
 | Column | Type | Nullable | Default |
@@ -389,6 +404,8 @@ All mutations go through these functions. They atomically write to the entity ta
 | `rpc_create_company` | tenant_id, actor_id, actor_type, name, domain, industry, notes, tags | jsonb |
 | `rpc_create_person` | tenant_id, actor_id, actor_type, name, email, phone, title, notes, tags | jsonb |
 | `rpc_create_deal` | tenant_id, actor_id, actor_type, title, status, value, notes, tags | jsonb |
+| `rpc_create_essay` | tenant_id, title, actor_id, actor_type | essays row |
+| `rpc_list_essays` | tenant_id | `SETOF essays` — ordered by updated_at DESC |
 
 ### Generic update/delete/comment
 | Function | Parameters | Notes |
@@ -430,6 +447,7 @@ All mutations go through these functions. They atomically write to the entity ta
 | `011_delete_permissions.sql` | `rpc_delete_entity` stripped to DELETE-only — activity_log now written by route handlers; agents blocked 403 at route level |
 | `012_task_type.sql` | Add nullable `type` column (`bug \| improvement \| feature`) to tasks; update `rpc_create_task` with `p_type` param |
 | `013_stream_versioning.sql` | `stream_entries` + `document_versions` tables, RLS policies, `rpc_list_stream_entries`, `rpc_create_stream_entry`, `rpc_list_document_versions` RPCs |
+| `014_essays.sql` | `essays` table, RLS policy, `rpc_create_essay`, `rpc_list_essays` |
 
 ---
 

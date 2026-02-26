@@ -1,4 +1,3 @@
-// Stub — full implementation in #218
 import { resolveActorUnified } from '@/lib/api/resolve-actor'
 import { apiError } from '@/lib/api/errors'
 import { chatCompletion } from '@/lib/ai'
@@ -55,23 +54,26 @@ export async function POST(
 
     const latestVersion = Array.isArray(latestVersions) ? latestVersions[0] : null
 
-    // 3. Build prompt — placeholder, real prompts in #218
+    // 3. Fetch essay for title context
+    const { data: essay } = await supabase
+      .from('essays')
+      .select('title')
+      .eq('id', entityId)
+      .single()
+
     const streamText = (streamEntries as Array<{ content: string; created_at: string }> ?? [])
       .map(e => `[${e.created_at}] ${e.content}`)
       .join('\n')
 
-    const previousContent = latestVersion ? (latestVersion as { content: string }).content : ''
+    const currentDoc = latestVersion ? (latestVersion as { content: string }).content : ''
 
     // 4. LLM call for document content
+    const systemPrompt = 'You are helping Hunter develop his thinking on a topic over time.'
+    const userPrompt = `Essay title: ${essay?.title ?? 'Untitled'}\n\nCurrent document:\n${currentDoc || '(none)'}\n\nNew stream entries:\n${streamText || '(none)'}\n\nProduce an updated, improved version of the essay incorporating the new inputs. Preserve the voice and structure, improve the substance.`
+
     const content = await chatCompletion([
-      {
-        role: 'system',
-        content: 'You are synthesizing an essay from stream entries. Combine them into a coherent document.',
-      },
-      {
-        role: 'user',
-        content: `Previous version:\n${previousContent || '(none)'}\n\nStream entries:\n${streamText || '(none)'}`,
-      },
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt },
     ])
 
     // 5. Separate LLM call for change_summary
@@ -82,7 +84,7 @@ export async function POST(
       },
       {
         role: 'user',
-        content: `Previous:\n${previousContent || '(none)'}\n\nNew:\n${content}`,
+        content: `Previous:\n${currentDoc || '(none)'}\n\nNew:\n${content}`,
       },
     ])
 
