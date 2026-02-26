@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import {
   Plus,
   Trash2,
@@ -81,8 +81,11 @@ function domainFromUrl(url: string | null): string | null {
 // ---------------------------------------------------------------------------
 
 export function LibraryClient({ initialItems, initialItemId }: { initialItems: LibraryItem[]; initialItemId?: string }) {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+
   const [items, setItems] = useState<LibraryItem[]>(initialItems)
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = useState(searchParams.get('q') ?? '')
   const [typeFilter, setTypeFilter] = useState<ItemType | 'all'>('all')
   const [viewMode, setViewMode] = useState<'card' | 'list'>(() => {
     if (typeof window !== 'undefined') {
@@ -93,9 +96,26 @@ export function LibraryClient({ initialItems, initialItemId }: { initialItems: L
   const [selectedItem, setSelectedItem] = useState<LibraryItem | null>(null)
   const [isCreating, setIsCreating] = useState(false)
 
-  const router = useRouter()
   const supabase = createClient()
   const initialHandled = useRef(false)
+
+  // Build query string from current search state
+  const buildQs = useCallback(() => {
+    const params = new URLSearchParams()
+    if (search) params.set('q', search)
+    const qs = params.toString()
+    return qs ? `?${qs}` : ''
+  }, [search])
+
+  // Sync search state → URL query params (skip initial render)
+  const isFirstRender = useRef(true)
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false
+      return
+    }
+    router.replace(`${window.location.pathname}${buildQs()}`, { scroll: false })
+  }, [buildQs, router])
 
   // Open shelf for initialItemId after data is available
   useEffect(() => {
@@ -335,13 +355,13 @@ export function LibraryClient({ initialItems, initialItemId }: { initialItems: L
       ) : viewMode === 'card' ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((item) => (
-            <ItemCard key={item.id} item={item} onClick={() => { setSelectedItem(item); router.replace('/tools/library/' + item.id) }} />
+            <ItemCard key={item.id} item={item} onClick={() => { setSelectedItem(item); router.replace(`/tools/library/${item.id}${buildQs()}`) }} />
           ))}
         </div>
       ) : (
         <div className="border border-border rounded-lg overflow-hidden">
           {filtered.map((item, idx) => (
-            <ItemRow key={item.id} item={item} isLast={idx === filtered.length - 1} onClick={() => { setSelectedItem(item); router.replace('/tools/library/' + item.id) }} />
+            <ItemRow key={item.id} item={item} isLast={idx === filtered.length - 1} onClick={() => { setSelectedItem(item); router.replace(`/tools/library/${item.id}${buildQs()}`) }} />
           ))}
         </div>
       )}
@@ -350,9 +370,9 @@ export function LibraryClient({ initialItems, initialItemId }: { initialItems: L
       {selectedItem && (
         <LibraryEditShelf
           item={selectedItem}
-          onClose={() => { setSelectedItem(null); router.replace('/tools/library') }}
+          onClose={() => { setSelectedItem(null); router.replace(`/tools/library${buildQs()}`) }}
           onUpdate={updateItemField}
-          onDelete={async (id) => { await deleteItem(id); router.replace('/tools/library') }}
+          onDelete={async (id) => { await deleteItem(id); router.replace(`/tools/library${buildQs()}`) }}
         />
       )}
 
