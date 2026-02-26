@@ -18,7 +18,7 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { GripVertical, Plus, ChevronDown, ChevronRight, AlertCircle, ArrowUp, Minus, ArrowDown } from 'lucide-react'
+import { GripVertical, Plus, ChevronDown, ChevronRight, AlertCircle, ArrowUp, Minus, ArrowDown, Trash2, X } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { EditShelf } from '@/components/edit-shelf'
 import { SearchFilterBar } from '@/components/search-filter-bar'
@@ -148,9 +148,15 @@ function groupByPriority(tasks: Task[]): Record<Priority, Task[]> {
 function SortableTaskRow({
   task,
   onClick,
+  selected,
+  onToggle,
+  selectionActive,
 }: {
   task: Task
   onClick: () => void
+  selected: boolean
+  onToggle: () => void
+  selectionActive: boolean
 }) {
   const {
     attributes,
@@ -179,6 +185,18 @@ function SortableTaskRow({
       className="group flex items-center gap-2 px-3 py-1.5 rounded-md hover:bg-accent/40 cursor-pointer border border-transparent hover:border-border transition-colors"
       onClick={onClick}
     >
+      {/* Selection checkbox */}
+      <input
+        type="checkbox"
+        checked={selected}
+        onChange={onToggle}
+        onClick={(e) => e.stopPropagation()}
+        className={cn(
+          'h-4 w-4 rounded border-zinc-600 bg-transparent accent-blue-500 shrink-0 cursor-pointer',
+          selectionActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+        )}
+      />
+
       {/* Drag handle */}
       <button
         ref={setActivatorNodeRef}
@@ -269,6 +287,8 @@ function PriorityGroup({
   addingTo,
   onStartAdding,
   onCreateTask,
+  selectedIds,
+  onToggleSelection,
 }: {
   priority: Priority
   tasks: Task[]
@@ -276,6 +296,8 @@ function PriorityGroup({
   addingTo: boolean
   onStartAdding: () => void
   onCreateTask: (title: string, priority: Priority) => void
+  selectedIds: Set<string>
+  onToggleSelection: (id: string) => void
 }) {
   const [collapsed, setCollapsed] = useState(false)
   const [newTitle, setNewTitle] = useState('')
@@ -345,6 +367,9 @@ function PriorityGroup({
                 key={task.id}
                 task={task}
                 onClick={() => onTaskClick(task)}
+                selected={selectedIds.has(task.id)}
+                onToggle={() => onToggleSelection(task.id)}
+                selectionActive={selectedIds.size > 0}
               />
             ))}
           </SortableContext>
@@ -382,6 +407,7 @@ export function TasksClient({
   const [typeFilter, setTypeFilter] = useState<TaskType | 'all'>('all')
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [addingToPriority, setAddingToPriority] = useState<Priority | null>(null)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [mounted, setMounted] = useState(false)
 
   const router = useRouter()
@@ -435,6 +461,12 @@ export function TasksClient({
           const deletedId = (payload.old as { id: string }).id
           setTasks((prev) => prev.filter((t) => t.id !== deletedId))
           setSelectedTask((prev) => (prev?.id === deletedId ? null : prev))
+          setSelectedIds((prev) => {
+            if (!prev.has(deletedId)) return prev
+            const next = new Set(prev)
+            next.delete(deletedId)
+            return next
+          })
         }
       )
       .subscribe()
@@ -624,6 +656,90 @@ export function TasksClient({
     setAddingToPriority('medium')
   }
 
+  // ----- Selection helpers -----
+
+  const toggleSelection = useCallback((id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }, [])
+
+  const toggleSelectAll = useCallback(() => {
+    setSelectedIds((prev) => {
+      if (prev.size === filteredTasks.length) return new Set()
+      return new Set(filteredTasks.map((t) => t.id))
+    })
+  }, [filteredTasks])
+
+  // ----- Delete task -----
+
+  const deleteTask = useCallback(async (id: string) => {
+    setTasks((prev) => prev.filter((t) => t.id !== id))
+    setSelectedTask(null)
+    router.replace('/tools/tasks')
+    try {
+      const res = await fetch(`/api/tasks/${id}`, { method: 'DELETE' })
+      if (!res.ok) {
+        const json = await res.json()
+        throw new Error(json.error ?? 'Failed to delete')
+      }
+      toast({ type: 'success', message: 'Task deleted' })
+    } catch (err) {
+      toast({ type: 'error', message: err instanceof Error ? err.message : 'Failed to delete' })
+    }
+  }, [router])
+
+  // ----- Batch actions -----
+
+  const batchUpdate = useCallback(async (fields: Record<string, unknown>) => {
+    const ids = Array.from(selectedIds)
+    setTasks((prev) =>
+      prev.map((t) => (ids.includes(t.id) ? { ...t, ...fields, updated_at: new Date().toISOString() } : t))
+    )
+    try {
+      const res = await fetch('/api/commands/batch-update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ table: 'tasks', ids, fields }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? 'Batch update failed')
+      toast({ type: 'success', message: `Updated ${ids.length} tasks` })
+    } catch (err) {
+      toast({ type: 'error', message: err instanceof Error ? err.message : 'Batch update failed' })
+    }
+  }, [selectedIds])
+
+  const batchDelete = useCallback(async () => {
+    const ids = Array.from(selectedIds)
+    if (!window.confirm(`Delete ${ids.length} task${ids.length === 1 ? '' : 's'}? This cannot be undone.`)) return
+
+    setTasks((prev) => prev.filter((t) => !ids.includes(t.id)))
+    setSelectedIds(new Set())
+    try {
+      const results = await Promise.all(ids.map((id) => fetch(`/api/tasks/${id}`, { method: 'DELETE' })))
+      const failed = results.filter((r) => !r.ok)
+      if (failed.length > 0) throw new Error(`${failed.length} deletes failed`)
+      toast({ type: 'success', message: `Deleted ${ids.length} task${ids.length === 1 ? '' : 's'}` })
+    } catch (err) {
+      toast({ type: 'error', message: err instanceof Error ? err.message : 'Delete failed' })
+    }
+  }, [selectedIds])
+
+  // ----- Escape to clear selection -----
+
+  useEffect(() => {
+    if (selectedIds.size === 0) return
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setSelectedIds(new Set())
+    }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [selectedIds.size])
+
   // ----- Visible priority groups -----
 
   const visiblePriorities = PRIORITY_ORDER.filter(
@@ -704,6 +820,22 @@ export function TasksClient({
         </div>
       </div>
 
+      {/* Select-all row */}
+      {filteredTasks.length > 0 && (
+        <div className="flex items-center gap-2 px-4 py-1.5 mb-1">
+          <input
+            type="checkbox"
+            checked={selectedIds.size > 0 && selectedIds.size === filteredTasks.length}
+            ref={(el) => { if (el) el.indeterminate = selectedIds.size > 0 && selectedIds.size < filteredTasks.length }}
+            onChange={toggleSelectAll}
+            className="h-4 w-4 rounded border-zinc-600 bg-transparent accent-blue-500 cursor-pointer"
+          />
+          <span className="text-xs text-muted-foreground">
+            {selectedIds.size > 0 ? `${selectedIds.size} of ${filteredTasks.length} selected` : 'Select all'}
+          </span>
+        </div>
+      )}
+
       {/* Priority groups */}
       <div className="flex-1 overflow-y-auto">
         {mounted ? (
@@ -724,6 +856,8 @@ export function TasksClient({
                 addingTo={addingToPriority === priority}
                 onStartAdding={() => setAddingToPriority(priority)}
                 onCreateTask={createTask}
+                selectedIds={selectedIds}
+                onToggleSelection={toggleSelection}
               />
             ))}
           </DndContext>
@@ -755,6 +889,16 @@ export function TasksClient({
                           router.replace('/tools/tasks/' + task.id)
                         }}
                       >
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(task.id)}
+                          onChange={() => toggleSelection(task.id)}
+                          onClick={(e) => e.stopPropagation()}
+                          className={cn(
+                            'h-4 w-4 rounded border-zinc-600 bg-transparent accent-blue-500 shrink-0 cursor-pointer',
+                            selectedIds.size > 0 ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                          )}
+                        />
                         <span className="w-4 shrink-0" />
                         <span className="text-xs text-muted-foreground w-12 shrink-0">#{task.ticket_id}</span>
                         {task.type && (
@@ -814,6 +958,75 @@ export function TasksClient({
         )}
       </div>
 
+      {/* Floating batch action bar */}
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] bg-zinc-800 border border-zinc-700 rounded-xl shadow-2xl px-4 py-3 flex items-center gap-3">
+          <span className="text-sm text-zinc-300 font-medium whitespace-nowrap">
+            {selectedIds.size} selected
+          </span>
+
+          <select
+            defaultValue=""
+            onChange={(e) => {
+              if (e.target.value) {
+                batchUpdate({ status: e.target.value })
+                e.target.value = ''
+              }
+            }}
+            className="h-8 rounded-md border border-zinc-600 bg-zinc-700 px-2 text-sm text-zinc-200"
+          >
+            <option value="" disabled>Status</option>
+            {(Object.keys(STATUS_CONFIG) as Status[]).map((s) => (
+              <option key={s} value={s}>{STATUS_CONFIG[s].label}</option>
+            ))}
+          </select>
+
+          <select
+            defaultValue=""
+            onChange={(e) => {
+              if (e.target.value) {
+                batchUpdate({ priority: e.target.value })
+                e.target.value = ''
+              }
+            }}
+            className="h-8 rounded-md border border-zinc-600 bg-zinc-700 px-2 text-sm text-zinc-200"
+          >
+            <option value="" disabled>Priority</option>
+            {PRIORITY_ORDER.map((p) => (
+              <option key={p} value={p}>{PRIORITY_CONFIG[p].label}</option>
+            ))}
+          </select>
+
+          <select
+            defaultValue=""
+            onChange={(e) => {
+              if (e.target.value === 'unassign') {
+                batchUpdate({ assignee_id: null, assignee_type: null })
+                e.target.value = ''
+              }
+            }}
+            className="h-8 rounded-md border border-zinc-600 bg-zinc-700 px-2 text-sm text-zinc-200"
+          >
+            <option value="" disabled>Assignee</option>
+            <option value="unassign">Unassign</option>
+          </select>
+
+          <button
+            onClick={batchDelete}
+            className="h-8 px-3 rounded-md bg-red-500/20 text-red-400 text-sm font-medium hover:bg-red-500/30 transition-colors"
+          >
+            Delete
+          </button>
+
+          <button
+            onClick={() => setSelectedIds(new Set())}
+            className="h-8 w-8 flex items-center justify-center rounded-md hover:bg-zinc-700 transition-colors text-zinc-400"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
       {/* EditShelf */}
       {selectedTask && (
         <TaskEditShelf
@@ -823,6 +1036,7 @@ export function TasksClient({
             router.replace('/tools/tasks')
           }}
           onUpdate={updateTaskField}
+          onDelete={deleteTask}
         />
       )}
     </div>
@@ -837,10 +1051,12 @@ function TaskEditShelf({
   task,
   onClose,
   onUpdate,
+  onDelete,
 }: {
   task: Task
   onClose: () => void
   onUpdate: (id: string, fields: Record<string, unknown>) => Promise<void>
+  onDelete: (id: string) => Promise<void>
 }) {
   const [title, setTitle] = useState(task.title)
   const [body, setBody] = useState(task.body ?? '')
@@ -883,6 +1099,19 @@ function TaskEditShelf({
       title={task.title}
       entityType="tasks"
       entityId={task.id}
+      headerRight={
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={async () => {
+            if (!window.confirm('Delete this task? This cannot be undone.')) return
+            await onDelete(task.id)
+          }}
+          className="text-muted-foreground hover:text-red-400"
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
+      }
     >
       <div className="space-y-5">
         {/* Ticket number */}
