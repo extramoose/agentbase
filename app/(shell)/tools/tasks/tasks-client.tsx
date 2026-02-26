@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import {
   DndContext,
   closestCenter,
@@ -401,18 +401,52 @@ export function TasksClient({
   currentUser: CurrentUser
   initialTaskId?: string
 }) {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+
   const [tasks, setTasks] = useState<Task[]>(initialTasks)
-  const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState<Status | 'all'>('all')
-  const [typeFilter, setTypeFilter] = useState<TaskType | 'all'>('all')
+  const [search, setSearch] = useState(searchParams.get('q') ?? '')
+  const [statusFilter, setStatusFilter] = useState<Status | 'all'>(
+    () => {
+      const s = searchParams.get('status')
+      const valid: Array<Status | 'all'> = ['todo', 'in_progress', 'done', 'blocked', 'all']
+      return valid.includes(s as Status | 'all') ? (s as Status | 'all') : 'all'
+    }
+  )
+  const [typeFilter, setTypeFilter] = useState<TaskType | 'all'>(
+    () => {
+      const t = searchParams.get('type')
+      const valid: Array<TaskType | 'all'> = ['bug', 'improvement', 'feature', 'all']
+      return valid.includes(t as TaskType | 'all') ? (t as TaskType | 'all') : 'all'
+    }
+  )
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [addingToPriority, setAddingToPriority] = useState<Priority | null>(null)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [mounted, setMounted] = useState(false)
 
-  const router = useRouter()
   const supabase = createClient()
   const initialHandled = useRef(false)
+
+  // Build query string from current filter state
+  const buildQs = useCallback(() => {
+    const params = new URLSearchParams()
+    if (search) params.set('q', search)
+    if (statusFilter !== 'all') params.set('status', statusFilter)
+    if (typeFilter !== 'all') params.set('type', typeFilter)
+    const qs = params.toString()
+    return qs ? `?${qs}` : ''
+  }, [search, statusFilter, typeFilter])
+
+  // Sync filter/search state → URL query params (skip initial render)
+  const isFirstRender = useRef(true)
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false
+      return
+    }
+    router.replace(`${window.location.pathname}${buildQs()}`, { scroll: false })
+  }, [buildQs, router])
 
   // Open shelf for initialTaskId after data is available
   useEffect(() => {
@@ -679,7 +713,7 @@ export function TasksClient({
   const deleteTask = useCallback(async (id: string) => {
     setTasks((prev) => prev.filter((t) => t.id !== id))
     setSelectedTask(null)
-    router.replace('/tools/tasks')
+    router.replace(`/tools/tasks${buildQs()}`)
     try {
       const res = await fetch(`/api/tasks/${id}`, { method: 'DELETE' })
       if (!res.ok) {
@@ -690,7 +724,7 @@ export function TasksClient({
     } catch (err) {
       toast({ type: 'error', message: err instanceof Error ? err.message : 'Failed to delete' })
     }
-  }, [router])
+  }, [router, buildQs])
 
   // ----- Batch actions -----
 
@@ -851,7 +885,7 @@ export function TasksClient({
                 tasks={grouped[priority]}
                 onTaskClick={(task) => {
                   setSelectedTask(task)
-                  router.replace('/tools/tasks/' + task.id)
+                  router.replace(`/tools/tasks/${task.id}${buildQs()}`)
                 }}
                 addingTo={addingToPriority === priority}
                 onStartAdding={() => setAddingToPriority(priority)}
@@ -886,7 +920,7 @@ export function TasksClient({
                         className="group flex items-center gap-2 px-3 py-1.5 rounded-md hover:bg-accent/40 cursor-pointer border border-transparent hover:border-border transition-colors"
                         onClick={() => {
                           setSelectedTask(task)
-                          router.replace('/tools/tasks/' + task.id)
+                          router.replace(`/tools/tasks/${task.id}${buildQs()}`)
                         }}
                       >
                         <input
@@ -1033,7 +1067,7 @@ export function TasksClient({
           task={selectedTask}
           onClose={() => {
             setSelectedTask(null)
-            router.replace('/tools/tasks')
+            router.replace(`/tools/tasks${buildQs()}`)
           }}
           onUpdate={updateTaskField}
           onDelete={deleteTask}

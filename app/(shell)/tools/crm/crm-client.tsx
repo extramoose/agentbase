@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Building2, Plus, Trash2, User, Handshake, Link2, X } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { EditShelf } from '@/components/edit-shelf'
@@ -92,6 +92,9 @@ export function CrmClient({
   initialSection?: string
   initialId?: string
 }) {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+
   const [companies, setCompanies] = useState<Company[]>(initialCompanies)
   const [people, setPeople] = useState<Person[]>(initialPeople)
   const [deals, setDeals] = useState<Deal[]>(initialDeals)
@@ -99,14 +102,31 @@ export function CrmClient({
   const validTabs: Tab[] = ['companies', 'people', 'deals']
   const resolvedTab = validTabs.includes(initialSection as Tab) ? (initialSection as Tab) : 'people'
   const [tab, setTab] = useState<Tab>(resolvedTab)
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = useState(searchParams.get('q') ?? '')
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null)
   const [selectedPerson, setSelectedPerson] = useState<Person | null>(null)
   const [selectedDeal, setSelectedDeal] = useState<Deal | null>(null)
 
-  const router = useRouter()
   const supabase = createClient()
   const initialHandled = useRef(false)
+
+  // Build query string from current search state
+  const buildQs = useCallback(() => {
+    const params = new URLSearchParams()
+    if (search) params.set('q', search)
+    const qs = params.toString()
+    return qs ? `?${qs}` : ''
+  }, [search])
+
+  // Sync search state → URL query params (skip initial render)
+  const isFirstRender = useRef(true)
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false
+      return
+    }
+    router.replace(`${window.location.pathname}${buildQs()}`, { scroll: false })
+  }, [buildQs, router])
 
   // Open shelf for initialId after data is available
   useEffect(() => {
@@ -466,7 +486,7 @@ export function CrmClient({
             sortKey={companySortKey}
             sortDir={companySortDir}
             onSort={(key, dir) => { setCompanySortKey(key); setCompanySortDir(dir) }}
-            onSelect={(c) => { setSelectedCompany(c); router.replace('/tools/crm/companies/' + c.id) }}
+            onSelect={(c) => { setSelectedCompany(c); router.replace(`/tools/crm/companies/${c.id}${buildQs()}`) }}
           />
         )}
         {tab === 'people' && (
@@ -475,7 +495,7 @@ export function CrmClient({
             sortKey={peopleSortKey}
             sortDir={peopleSortDir}
             onSort={(key, dir) => { setPeopleSortKey(key); setPeopleSortDir(dir) }}
-            onSelect={(p) => { setSelectedPerson(p); router.replace('/tools/crm/people/' + p.id) }}
+            onSelect={(p) => { setSelectedPerson(p); router.replace(`/tools/crm/people/${p.id}${buildQs()}`) }}
           />
         )}
         {tab === 'deals' && (
@@ -484,7 +504,7 @@ export function CrmClient({
             sortKey={dealsSortKey}
             sortDir={dealsSortDir}
             onSort={(key, dir) => { setDealsSortKey(key); setDealsSortDir(dir) }}
-            onSelect={(d) => { setSelectedDeal(d); router.replace('/tools/crm/deals/' + d.id) }}
+            onSelect={(d) => { setSelectedDeal(d); router.replace(`/tools/crm/deals/${d.id}${buildQs()}`) }}
           />
         )}
       </div>
@@ -495,7 +515,7 @@ export function CrmClient({
           company={selectedCompany}
           allPeople={people}
           allDeals={deals}
-          onClose={() => { setSelectedCompany(null); router.replace('/tools/crm/companies') }}
+          onClose={() => { setSelectedCompany(null); router.replace(`/tools/crm/companies${buildQs()}`) }}
           onUpdate={(id, fields) => {
             setCompanies((prev) => prev.map((c) => (c.id === id ? { ...c, ...fields, updated_at: new Date().toISOString() } as Company : c)))
             setSelectedCompany((prev) => (prev?.id === id ? { ...prev, ...fields, updated_at: new Date().toISOString() } as Company : prev))
@@ -505,7 +525,7 @@ export function CrmClient({
             setSelectedCompany(null)
             setCompanies((prev) => prev.filter((c) => c.id !== id))
             deleteEntity('companies', id)
-            router.replace('/tools/crm/companies')
+            router.replace(`/tools/crm/companies${buildQs()}`)
           }}
         />
       )}
@@ -514,7 +534,7 @@ export function CrmClient({
           person={selectedPerson}
           allCompanies={companies}
           allDeals={deals}
-          onClose={() => { setSelectedPerson(null); router.replace('/tools/crm/people') }}
+          onClose={() => { setSelectedPerson(null); router.replace(`/tools/crm/people${buildQs()}`) }}
           onUpdate={(id, fields) => {
             setPeople((prev) => prev.map((p) => (p.id === id ? { ...p, ...fields, updated_at: new Date().toISOString() } as Person : p)))
             setSelectedPerson((prev) => (prev?.id === id ? { ...prev, ...fields, updated_at: new Date().toISOString() } as Person : prev))
@@ -524,7 +544,7 @@ export function CrmClient({
             setSelectedPerson(null)
             setPeople((prev) => prev.filter((p) => p.id !== id))
             deleteEntity('people', id)
-            router.replace('/tools/crm/people')
+            router.replace(`/tools/crm/people${buildQs()}`)
           }}
         />
       )}
@@ -533,7 +553,7 @@ export function CrmClient({
           deal={selectedDeal}
           allCompanies={companies}
           allPeople={people}
-          onClose={() => { setSelectedDeal(null); router.replace('/tools/crm/deals') }}
+          onClose={() => { setSelectedDeal(null); router.replace(`/tools/crm/deals${buildQs()}`) }}
           onUpdate={(id, fields) => {
             setDeals((prev) => prev.map((d) => (d.id === id ? { ...d, ...fields, updated_at: new Date().toISOString() } as Deal : d)))
             setSelectedDeal((prev) => (prev?.id === id ? { ...prev, ...fields, updated_at: new Date().toISOString() } as Deal : prev))
@@ -543,7 +563,7 @@ export function CrmClient({
             setSelectedDeal(null)
             setDeals((prev) => prev.filter((d) => d.id !== id))
             deleteEntity('deals', id)
-            router.replace('/tools/crm/deals')
+            router.replace(`/tools/crm/deals${buildQs()}`)
           }}
         />
       )}

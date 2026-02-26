@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import { requireAuth } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { CrmClient } from '../crm-client'
@@ -14,11 +15,13 @@ export default async function CrmSectionPage({ params }: { params: Promise<{ sec
   ])
 
   return (
-    <CrmClient
-      initialCompanies={companies ?? []}
-      initialPeople={people ?? []}
-      initialDeals={deals ?? []}
-      initialSection={section}
-    />
+    <Suspense fallback={null}>
+      <CrmClient
+        initialCompanies={companies ?? []}
+        initialPeople={people ?? []}
+        initialDeals={deals ?? []}
+        initialSection={section}
+      />
+    </Suspense>
   )
 }

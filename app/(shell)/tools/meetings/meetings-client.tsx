@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import {
   Plus,
   Trash2,
@@ -113,15 +113,35 @@ export function MeetingsClient({
   currentUser: CurrentUser
   initialMeetingId?: string
 }) {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+
   const [meetings, setMeetings] = useState<Meeting[]>(initialMeetings)
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = useState(searchParams.get('q') ?? '')
   const [statusFilter, setStatusFilter] = useState<MeetingStatus | 'all'>('all')
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [mobileDetail, setMobileDetail] = useState(false)
 
-  const router = useRouter()
   const supabase = createClient()
   const initialHandled = useRef(false)
+
+  // Build query string from current search state
+  const buildQs = useCallback(() => {
+    const params = new URLSearchParams()
+    if (search) params.set('q', search)
+    const qs = params.toString()
+    return qs ? `?${qs}` : ''
+  }, [search])
+
+  // Sync search state → URL query params (skip initial render)
+  const isFirstRender = useRef(true)
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false
+      return
+    }
+    router.replace(`${window.location.pathname}${buildQs()}`, { scroll: false })
+  }, [buildQs, router])
 
   // Open detail for initialMeetingId after data is available
   useEffect(() => {
@@ -240,7 +260,7 @@ export function MeetingsClient({
       )
       setSelectedId(created.id)
       setMobileDetail(true)
-      router.replace('/tools/meetings/' + created.id)
+      router.replace(`/tools/meetings/${created.id}${buildQs()}`)
       toast({ type: 'success', message: 'Meeting created' })
     } catch (err) {
       setMeetings((prev) => prev.filter((m) => m.id !== tempId))
@@ -249,7 +269,7 @@ export function MeetingsClient({
         message: err instanceof Error ? err.message : 'Failed to create meeting',
       })
     }
-  }, [])
+  }, [router, buildQs])
 
   // ----- Update meeting field via command bus -----
 
@@ -289,7 +309,7 @@ export function MeetingsClient({
       setMeetings((m) => m.filter((x) => x.id !== meetingId))
       setSelectedId(null)
       setMobileDetail(false)
-      router.replace('/tools/meetings')
+      router.replace(`/tools/meetings${buildQs()}`)
 
       try {
         const res = await fetch(`/api/meetings/${meetingId}`, { method: 'DELETE' })
@@ -304,7 +324,7 @@ export function MeetingsClient({
         })
       }
     },
-    [meetings]
+    [meetings, router, buildQs]
   )
 
   // ----- Select meeting -----
@@ -312,7 +332,7 @@ export function MeetingsClient({
   function selectMeeting(id: string) {
     setSelectedId(id)
     setMobileDetail(true)
-    router.replace('/tools/meetings/' + id)
+    router.replace(`/tools/meetings/${id}${buildQs()}`)
   }
 
   const statusTabs: Array<{ value: MeetingStatus | 'all'; label: string }> = [

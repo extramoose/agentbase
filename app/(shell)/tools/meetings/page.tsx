@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import { requireAuth } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { MeetingsClient } from './meetings-client'
@@ -18,5 +19,9 @@ export default async function MeetingsPage() {
     .eq('id', user.id)
     .single()
 
-  return <MeetingsClient initialMeetings={meetings ?? []} currentUser={profile} />
+  return (
+    <Suspense fallback={null}>
+      <MeetingsClient initialMeetings={meetings ?? []} currentUser={profile} />
+    </Suspense>
+  )
 }

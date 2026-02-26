@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import { requireAuth } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { TasksClient } from '../tasks-client'
@@ -19,5 +20,9 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
     .eq('id', user.id)
     .single()
 
-  return <TasksClient initialTasks={tasks ?? []} currentUser={profile} initialTaskId={id} />
+  return (
+    <Suspense fallback={null}>
+      <TasksClient initialTasks={tasks ?? []} currentUser={profile} initialTaskId={id} />
+    </Suspense>
+  )
 }
