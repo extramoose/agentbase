@@ -1,5 +1,7 @@
 'use client'
 
+import { ANON_AVATAR_URL } from '@/lib/constants'
+
 import { useEffect, useState, useCallback } from 'react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
@@ -140,7 +142,7 @@ export function UsersClient({ currentUserId }: UsersClientProps) {
                     <div className="flex items-center gap-3">
                       <div className="relative group">
                         <Avatar className="h-8 w-8">
-                          <AvatarImage src={member.avatar_url ?? undefined} alt={displayName} />
+                          <AvatarImage src={member.avatar_url ?? ANON_AVATAR_URL} alt={displayName} />
                           <AvatarFallback className="text-xs">{initials}</AvatarFallback>
                         </Avatar>
                         {!isEditingAvatar && (

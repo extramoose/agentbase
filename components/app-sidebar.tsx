@@ -1,5 +1,7 @@
 'use client'
 
+import { ANON_AVATAR_URL } from '@/lib/constants'
+
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
@@ -128,9 +130,7 @@ export function AppSidebar({ profile }: { profile: UserProfile | null }) {
 
       <div className="flex items-center gap-3 p-4">
         <Avatar className="h-8 w-8">
-          {profile?.avatar_url && (
-            <AvatarImage src={profile.avatar_url} alt={profile.full_name ?? 'User'} />
-          )}
+          <AvatarImage src={profile?.avatar_url ?? ANON_AVATAR_URL} alt={profile?.full_name ?? 'User'} />
           <AvatarFallback>{initials}</AvatarFallback>
         </Avatar>
         <div className="flex-1 truncate">
