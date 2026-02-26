@@ -62,7 +62,6 @@ export function AssigneePicker({ value, onChange, className }: AssigneePickerPro
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
-  const selected = value ? actors.find(a => a.id === value.id) ?? null : null
   const filtered = actors.filter(a => a.name.toLowerCase().includes(search.toLowerCase()))
 
   return (
@@ -74,9 +73,9 @@ export function AssigneePicker({ value, onChange, className }: AssigneePickerPro
         onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen(o => !o) } }}
         className="flex items-center gap-2 w-full min-h-9 px-2 py-1.5 rounded-md border border-input bg-transparent text-sm hover:bg-accent/50 transition-colors cursor-pointer"
       >
-        {selected ? (
+        {value ? (
           <>
-            <ActorChip actorId={selected.id} actorType={selected.type} />
+            <ActorChip actorId={value.id} actorType={value.type} />
             <button
               type="button"
               onClick={e => { e.stopPropagation(); onChange(null) }}
