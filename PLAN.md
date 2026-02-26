@@ -35,6 +35,31 @@ AgentBase is a greenfield "Life OS" — a personal productivity platform where h
 - **Multi-tenancy (new):** HAH Toolbox is single-user. AgentBase scopes all data by `user_id` via RLS from day one.
 - **Componentized edit shelf (new):** HAH Toolbox's task shelf is a monolithic 900+ line component. AgentBase has a universal `<EditShelf>` with a pluggable content slot and a shared `<ActivityAndComments>` section.
 
+### Environment Variables
+
+**Runtime env vars** (in Vercel / `.env.local` for the Next.js app):
+```
+NEXT_PUBLIC_SUPABASE_URL        # Supabase project URL
+NEXT_PUBLIC_SUPABASE_ANON_KEY   # Supabase anon (public) key
+NEXT_PUBLIC_APP_DOMAIN          # App domain (default: agentbase.hah.to)
+DEAL_LABEL                      # Optional label override for "Deals" entity
+```
+
+> ⚠️ **`SUPABASE_SERVICE_ROLE_KEY` must never be in the Next.js runtime environment.** This key bypasses all RLS — if it is present in a deployed runtime environment, any server-side bug becomes a full database compromise. It belongs only in one-time admin scripts run locally. Next.js server components and API routes use the anon key + user session JWT. Admin operations (user management, migrations) are performed via SECURITY DEFINER RPCs or run as local scripts.
+>
+> Add a boot-time assertion in `app/layout.tsx` or a dedicated `lib/env.ts`:
+> ```ts
+> if (process.env.SUPABASE_SERVICE_ROLE_KEY && process.env.NODE_ENV === 'production') {
+>   throw new Error('SUPABASE_SERVICE_ROLE_KEY must not be present in production runtime')
+> }
+> ```
+
+**Scripts-only env vars** (local `.env.local` only — NOT in Vercel):
+```
+SUPABASE_SERVICE_ROLE_KEY   # admin scripts only — create-agent-users, generate-jwts
+SUPABASE_JWT_SECRET         # needed for hand-signing agent JWTs in scripts
+```
+
 ---
 
 ## 3. Architecture Overview
@@ -49,7 +74,7 @@ Named mutations that emit typed history events. Each has its own API route handl
 
 ```
 POST /api/commands/{action}
-Authorization: Bearer <session-cookie-or-agent-jwt>
+Authorization: Bearer <jwt>
 Content-Type: application/json
 
 { ...action-specific payload }
@@ -63,6 +88,8 @@ Each semantic action:
 3. Performs the DB mutation
 4. Writes a typed event to `activity_log` in the same transaction
 5. Returns `{ success: true, data: {...}, event: {...} }`
+
+**Why idempotency matters for OpenClaw:** OpenClaw agents run in Docker containers and retry HTTP requests on network timeouts and flakes. Without idempotency, a timeout between the request leaving the agent and the server committing the transaction results in a duplicate entity (task, comment, meeting) when the agent retries. The `idempotency_key` field prevents this.
 
 **Idempotency:** Agents are Docker containers hitting HTTP endpoints. Network retries will happen. All create commands accept an optional `idempotency_key` field (UUID or string, max 128 chars). The implementation uses an `idempotency_keys` table (see §5): before inserting, check if the key exists — if yes, return the stored response; if no, proceed with the insert and store `(key, response)` in the table. A Postgres cron job or TTL trigger purges entries older than 24 hours. Idempotency keys are optional — browser callers don't need them. Only agents should send them.
 
@@ -78,7 +105,7 @@ Schema-agnostic patch for any entity. New fields on any entity just work without
 
 ```
 PATCH /api/commands/update
-Authorization: Bearer <session-cookie-or-agent-jwt>
+Authorization: Bearer <jwt>
 Content-Type: application/json
 
 {
@@ -95,48 +122,52 @@ Content-Type: application/json
 
 #### Auth Resolution in API Routes
 
+**CSRF posture: Bearer-only on all mutation endpoints.** The command bus requires `Authorization: Bearer <jwt>` on ALL `/api/commands/*` routes — even for browser callers. Browsers get their Supabase session JWT via `supabase.auth.getSession()` and send it as a Bearer token. Session cookies are never used to authorize mutations. This eliminates CSRF entirely — cross-site requests cannot inject the Bearer token. `resolveActor()` only reads the `Authorization` header, never cookies, for command endpoints. (Cookies are still used for server-component data fetching via Supabase SSR — that is read-only and not a CSRF risk.)
+
 Every API route handler:
-1. Reads the `Authorization` header
-2. If it's a Supabase session cookie → creates a Supabase client with the cookie (same as browser)
-3. If it's a `Bearer <jwt>` → verifies the JWT, creates a Supabase client with the JWT
-4. In both cases, `auth.uid()` resolves correctly for RLS and trigger attribution
+1. Reads the `Authorization: Bearer <jwt>` header (required — no cookie fallback for command endpoints)
+2. Verifies the JWT via the Supabase Auth API (`supabase.auth.getUser()`) — no local JWT secret needed at runtime
+3. Creates a Supabase client authenticated as the caller
+4. `auth.uid()` resolves correctly for RLS and trigger attribution
 
 ```typescript
 // lib/api/auth.ts
-import { createClient } from "@/lib/supabase/server";
-import { createClient as createServiceClient } from "@supabase/supabase-js";
-import { jwtVerify } from "jose";
+import { createClient } from "@supabase/supabase-js";
 
 export async function resolveActor(request: Request) {
   const authHeader = request.headers.get("authorization");
 
-  // Case 1: Agent JWT (Bearer token)
-  if (authHeader?.startsWith("Bearer ")) {
-    const token = authHeader.slice(7);
-    // Verify it's a valid JWT signed with our secret
-    const secret = new TextEncoder().encode(process.env.SUPABASE_JWT_SECRET!);
-    const { payload } = await jwtVerify(token, secret);
-    // Create a Supabase client that authenticates as this user
-    const supabase = createServiceClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      { global: { headers: { Authorization: `Bearer ${token}` } } }
-    );
-    return {
-      supabase,
-      actorId: payload.sub as string,
-      actorType: "agent" as const,
-    };
+  // All command endpoints require Bearer token — no cookie fallback
+  if (!authHeader?.startsWith("Bearer ")) {
+    throw new Error("Missing Authorization: Bearer header");
   }
 
-  // Case 2: Browser session (cookie-based)
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error("Unauthorized");
+  const token = authHeader.slice(7);
+
+  // Create a Supabase client authenticated with the caller's JWT
+  // JWT is verified server-side by Supabase Auth (no local secret needed)
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { global: { headers: { Authorization: `Bearer ${token}` } } }
+  );
+
+  // Verify the token and get the user
+  const { data: { user }, error } = await supabase.auth.getUser();
+  if (error || !user) throw new Error("Unauthorized");
+
+  // Check if this is an agent (has an entry in agent_owners)
+  const { data: agentMapping } = await supabase
+    .from("agent_owners")
+    .select("owner_id")
+    .eq("agent_id", user.id)
+    .single();
+
   return {
     supabase,
     actorId: user.id,
-    actorType: "human" as const,
+    actorType: agentMapping ? "agent" as const : "human" as const,
+    ownerId: agentMapping?.owner_id ?? user.id,
   };
 }
 ```
@@ -266,7 +297,8 @@ CREATE POLICY "Users insert own" ON {table}
 
 -- Users can only update their own data
 CREATE POLICY "Users update own" ON {table}
-  FOR UPDATE USING (auth.uid() = user_id);
+  FOR UPDATE USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
 
 -- Users can only delete their own data
 CREATE POLICY "Users delete own" ON {table}
@@ -418,13 +450,7 @@ Because agents are real `authenticated` users, `auth.uid()` resolves to their UU
 
 **Policies that reference agent UUIDs directly (none needed):** The `agent_owners` join handles all access control. No hardcoded UUIDs in policies.
 
-**activity_log writes:** Agents need INSERT on `activity_log`:
-```sql
-CREATE POLICY "Authenticated users insert activity" ON activity_log
-  FOR INSERT WITH CHECK (auth.uid() = actor_id);
-```
-
-This works for both humans and agents because `actor_id` is always `auth.uid()` of the caller.
+**activity_log writes:** The INSERT policy on `activity_log` allows inserts where `auth.uid() = actor_id`. In practice, all writes go through SECURITY DEFINER RPC functions (e.g. `rpc_create_task`) — clients never insert into `activity_log` directly. The RPC sets `user_id` server-side by looking up entity ownership, so clients cannot supply or tamper with `user_id`. There are no UPDATE or DELETE policies on `activity_log` — it is append-only and immutable.
 
 ---
 
@@ -657,6 +683,10 @@ CREATE POLICY "Tasks owner or agent update" ON tasks
   FOR UPDATE USING (
     user_id = auth.uid()
     OR user_id IN (SELECT owner_id FROM agent_owners WHERE agent_id = auth.uid())
+  )
+  WITH CHECK (
+    user_id = auth.uid()
+    OR user_id IN (SELECT owner_id FROM agent_owners WHERE agent_id = auth.uid())
   );
 CREATE POLICY "Tasks owner or agent delete" ON tasks
   FOR DELETE USING (
@@ -707,6 +737,10 @@ CREATE POLICY "Meetings owner or agent insert" ON meetings
   );
 CREATE POLICY "Meetings owner or agent update" ON meetings
   FOR UPDATE USING (
+    user_id = auth.uid()
+    OR user_id IN (SELECT owner_id FROM agent_owners WHERE agent_id = auth.uid())
+  )
+  WITH CHECK (
     user_id = auth.uid()
     OR user_id IN (SELECT owner_id FROM agent_owners WHERE agent_id = auth.uid())
   );
@@ -798,6 +832,10 @@ CREATE POLICY "Library owner or agent update" ON library_items
   FOR UPDATE USING (
     user_id = auth.uid()
     OR user_id IN (SELECT owner_id FROM agent_owners WHERE agent_id = auth.uid())
+  )
+  WITH CHECK (
+    user_id = auth.uid()
+    OR user_id IN (SELECT owner_id FROM agent_owners WHERE agent_id = auth.uid())
   );
 CREATE POLICY "Library owner or agent delete" ON library_items
   FOR DELETE USING (
@@ -842,6 +880,10 @@ CREATE POLICY "Diary owner or agent update" ON diary_entries
   FOR UPDATE USING (
     user_id = auth.uid()
     OR user_id IN (SELECT owner_id FROM agent_owners WHERE agent_id = auth.uid())
+  )
+  WITH CHECK (
+    user_id = auth.uid()
+    OR user_id IN (SELECT owner_id FROM agent_owners WHERE agent_id = auth.uid())
   );
 CREATE POLICY "Admins read all diary" ON diary_entries
   FOR SELECT USING (
@@ -880,6 +922,10 @@ CREATE POLICY "Grocery owner or agent insert" ON grocery_items
   );
 CREATE POLICY "Grocery owner or agent update" ON grocery_items
   FOR UPDATE USING (
+    user_id = auth.uid()
+    OR user_id IN (SELECT owner_id FROM agent_owners WHERE agent_id = auth.uid())
+  )
+  WITH CHECK (
     user_id = auth.uid()
     OR user_id IN (SELECT owner_id FROM agent_owners WHERE agent_id = auth.uid())
   );
@@ -921,6 +967,10 @@ CREATE POLICY "Companies owner or agent insert" ON companies
   );
 CREATE POLICY "Companies owner or agent update" ON companies
   FOR UPDATE USING (
+    user_id = auth.uid()
+    OR user_id IN (SELECT owner_id FROM agent_owners WHERE agent_id = auth.uid())
+  )
+  WITH CHECK (
     user_id = auth.uid()
     OR user_id IN (SELECT owner_id FROM agent_owners WHERE agent_id = auth.uid())
   );
@@ -967,6 +1017,10 @@ CREATE POLICY "People owner or agent insert" ON people
   );
 CREATE POLICY "People owner or agent update" ON people
   FOR UPDATE USING (
+    user_id = auth.uid()
+    OR user_id IN (SELECT owner_id FROM agent_owners WHERE agent_id = auth.uid())
+  )
+  WITH CHECK (
     user_id = auth.uid()
     OR user_id IN (SELECT owner_id FROM agent_owners WHERE agent_id = auth.uid())
   );
@@ -1038,6 +1092,10 @@ CREATE POLICY "Deals owner or agent insert" ON deals
   );
 CREATE POLICY "Deals owner or agent update" ON deals
   FOR UPDATE USING (
+    user_id = auth.uid()
+    OR user_id IN (SELECT owner_id FROM agent_owners WHERE agent_id = auth.uid())
+  )
+  WITH CHECK (
     user_id = auth.uid()
     OR user_id IN (SELECT owner_id FROM agent_owners WHERE agent_id = auth.uid())
   );
@@ -1132,9 +1190,16 @@ CREATE POLICY "Admins read all activity" ON activity_log
     EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'superadmin'))
   );
 
+-- activity_log has NO UPDATE policy and NO DELETE policy — it is append-only.
+-- Rows are immutable once written. Only SECURITY DEFINER RPCs insert into this table.
+
 CREATE POLICY "Authenticated insert activity" ON activity_log
   FOR INSERT WITH CHECK (auth.uid() = actor_id);
+```
 
+**activity_log is append-only and write-protected.** The INSERT policy allows inserts only from SECURITY DEFINER RPC functions — not from direct client calls. `activity_log.user_id` is always derived server-side: for human actors, it is the entity owner's `user_id` (looked up from the entity being mutated); for agent actors, it is looked up from `agent_owners` where `agent_user_id = auth.uid()`. Clients cannot supply `user_id` directly. The table has no UPDATE or DELETE policies — activity events are immutable once written.
+
+```sql
 -- RPC for paginated activity log (SECURITY DEFINER for reliable access)
 CREATE OR REPLACE FUNCTION get_activity_log(
   p_entity_type text DEFAULT NULL,
@@ -1509,7 +1574,7 @@ export async function PATCH(request: Request) {
 **Request:**
 ```json
 PATCH /api/commands/update
-Authorization: Bearer <session-cookie>
+Authorization: Bearer <jwt>
 
 {
   "table": "meetings",
@@ -1551,6 +1616,10 @@ Authorization: Bearer <session-cookie>
 | meetings_people | Via meeting | Via meeting | Via meeting | Via meeting | — | — |
 | meetings_companies | Via meeting | Via meeting | Via meeting | Via meeting | — | — |
 | activity_log | Own (`user_id`) | Insert (own actor_id) | Via owner | Insert (own actor_id) | All | — |
+
+### UPDATE Policies: USING + WITH CHECK
+
+**UPDATE policies require both USING and WITH CHECK.** `USING` controls which rows a user can target. `WITH CHECK` controls what the row can look like after the update. Without `WITH CHECK`, an authenticated user who owns a row can change its `user_id`, transferring ownership to another tenant — creating cross-tenant data injection. Every UPDATE policy in AgentBase sets both clauses to `user_id = auth.uid()`.
 
 ### The Agent Access Pattern (Used Everywhere)
 
@@ -2090,7 +2159,7 @@ agentbase/
 - [ ] Deploy initial migration (`00000000000000_initial.sql`) — all tables, RLS, triggers
 - [ ] Set up Google OAuth in Supabase Auth
 - [ ] Build auth pages (`/auth/login`, `/auth/callback`, `/auth/logout`)
-- [ ] Create `.env.example` with all required env vars
+- [ ] Create `.env.example` with all required env vars (see §2 Environment Variables — runtime vars only, no `SUPABASE_SERVICE_ROLE_KEY` or `SUPABASE_JWT_SECRET`)
 - [ ] Create agent users (Lucy, Frank) and generate JWTs via scripts
 - [ ] Ship empty `AppShell` with sidebar nav (all items, no content yet)
 - [ ] Add per-actor rate limiting middleware on `/api/commands/*` — simple in-memory or Supabase-based counter. Limit: 60 requests/minute per `actor_id`. Protects against runaway agents burning Vercel/Supabase quotas.
@@ -2292,3 +2361,6 @@ Current design: grocery list is per-user + agent. Sharing between multiple human
 
 ### L-8: Field-level validation on generic update route
 The `PATCH /api/commands/update` route validates table name and protected fields (user_id, actor_id) but doesn't validate field values — Postgres CHECK constraints are the only guard. Future work: add optional per-table validation schemas (e.g. zod) that the generic route checks before writing. Not a v1 concern — CHECK constraints catch bad data at the DB level.
+
+### L-9: Artifacts table for OpenClaw tool traces
+OpenClaw agents generate tool outputs — screenshots, DOM dumps, search results, file reads. Currently, `activity_log.payload` can hold small JSON blobs, but large binary or text artifacts would bloat the log. Future work: add an `artifacts` table with object storage pointers (Supabase Storage or S3-compatible), and allow `activity_log.payload` to reference artifact IDs instead of embedding content inline. Design the schema now if agents start generating large outputs.
