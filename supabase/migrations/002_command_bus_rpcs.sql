@@ -135,3 +135,17 @@ BEGIN
   RETURN v_result;
 END;
 $$;
+
+-- ---------------------------------------------------------------------------
+-- get_my_profile
+-- Returns the current user's profile row. SECURITY DEFINER bypasses RLS
+-- to avoid auth.uid() context issues in server components.
+-- ---------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION get_my_profile()
+RETURNS profiles
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+STABLE AS $$
+  SELECT * FROM profiles WHERE id = auth.uid()
+$$;

@@ -34,12 +34,8 @@ export async function getUserProfile(): Promise<UserProfile | null> {
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) return null
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', user.id)
-    .single()
-  return profile as UserProfile | null
+  const { data: profile } = await supabase.rpc('get_my_profile')
+  return (profile ?? null) as UserProfile | null
 }
 
 export async function requireAuth() {
