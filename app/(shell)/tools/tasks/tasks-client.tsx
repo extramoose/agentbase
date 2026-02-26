@@ -358,6 +358,7 @@ export function TasksClient({
   const [statusFilter, setStatusFilter] = useState<Status | 'all'>('all')
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [addingToPriority, setAddingToPriority] = useState<Priority | null>(null)
+  const [mounted, setMounted] = useState(false)
 
   const router = useRouter()
   const supabase = createClient()
@@ -370,6 +371,10 @@ export function TasksClient({
     const task = tasks.find(t => t.id === initialTaskId)
     if (task) setSelectedTask(task)
   }, [tasks, initialTaskId])
+
+  // Hydration guard — defer dnd-kit tree to avoid SSR ID mismatch
+  useEffect(() => setMounted(true), [])
+
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
   )
@@ -651,26 +656,92 @@ export function TasksClient({
 
       {/* Priority groups */}
       <div className="flex-1 overflow-y-auto">
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          onDragEnd={handleDragEnd}
-        >
-          {displayPriorities.map((priority) => (
-            <PriorityGroup
-              key={priority}
-              priority={priority}
-              tasks={grouped[priority]}
-              onTaskClick={(task) => {
-                setSelectedTask(task)
-                router.replace('/tools/tasks/' + task.id)
-              }}
-              addingTo={addingToPriority === priority}
-              onStartAdding={() => setAddingToPriority(priority)}
-              onCreateTask={createTask}
-            />
-          ))}
-        </DndContext>
+        {mounted ? (
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            {displayPriorities.map((priority) => (
+              <PriorityGroup
+                key={priority}
+                priority={priority}
+                tasks={grouped[priority]}
+                onTaskClick={(task) => {
+                  setSelectedTask(task)
+                  router.replace('/tools/tasks/' + task.id)
+                }}
+                addingTo={addingToPriority === priority}
+                onStartAdding={() => setAddingToPriority(priority)}
+                onCreateTask={createTask}
+              />
+            ))}
+          </DndContext>
+        ) : (
+          displayPriorities.map((priority) => {
+            const cfg = PRIORITY_CONFIG[priority]
+            const groupTasks = grouped[priority]
+            return (
+              <div key={priority} className="mb-4">
+                <div className="flex items-center gap-2 py-1.5 px-1 w-full text-left">
+                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                  <span className={cn('text-sm font-medium flex items-center gap-1.5', cfg.color)}>
+                    <PriorityIcon priority={priority} className="h-3.5 w-3.5" />
+                    {cfg.label}
+                  </span>
+                  <span className="text-xs text-muted-foreground">({groupTasks.length})</span>
+                </div>
+                <div className="ml-1">
+                  {groupTasks.map((task) => {
+                    const statusCfg = STATUS_CONFIG[task.status]
+                    const visibleTags = task.tags.slice(0, 2)
+                    const extraTagCount = task.tags.length - 2
+                    return (
+                      <div
+                        key={task.id}
+                        className="group flex items-center gap-2 px-3 py-1.5 rounded-md hover:bg-accent/40 cursor-pointer border border-transparent hover:border-border transition-colors"
+                        onClick={() => {
+                          setSelectedTask(task)
+                          router.replace('/tools/tasks/' + task.id)
+                        }}
+                      >
+                        <span className="w-4 shrink-0" />
+                        <span className="text-xs text-muted-foreground w-12 shrink-0">#{task.ticket_id}</span>
+                        <span className="shrink-0" title={PRIORITY_CONFIG[task.priority].label}>
+                          <PriorityIcon priority={task.priority} />
+                        </span>
+                        <span className="flex-1 text-sm font-medium truncate">{task.title}</span>
+                        <Badge variant="secondary" className={cn('text-xs shrink-0', statusCfg.className)}>
+                          {statusCfg.label}
+                        </Badge>
+                        {task.assignee_id ? (
+                          <ActorChip actorId={task.assignee_id} actorType={task.assignee_type as 'human' | 'agent'} compact />
+                        ) : (
+                          <span className="text-xs text-muted-foreground shrink-0">Unassigned</span>
+                        )}
+                        {task.due_date && (
+                          <span className="text-xs text-muted-foreground shrink-0">
+                            {new Date(task.due_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                          </span>
+                        )}
+                        {visibleTags.length > 0 && (
+                          <div className="flex gap-1 shrink-0">
+                            {visibleTags.map((tag) => (
+                              <Badge key={tag} variant="outline" className="text-xs px-1.5 py-0">{tag}</Badge>
+                            ))}
+                            {extraTagCount > 0 && (
+                              <span className="text-xs text-muted-foreground">+{extraTagCount}</span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )
+          })
+        )}
 
         {filteredTasks.length === 0 && !addingToPriority && (
           <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
