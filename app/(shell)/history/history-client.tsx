@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { formatDistanceToNow } from 'date-fns'
 import { Loader2 } from 'lucide-react'
 import { formatActivityEvent } from '@/lib/format-activity'
+import { EntityPreviewShelf, TABLE_MAP } from '@/components/entity-preview-shelf'
 
 type ActivityEntry = {
   id: string
@@ -54,6 +55,11 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
   const [entityFilter, setEntityFilter] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [hasMore, setHasMore] = useState(initialEntries.length >= 50)
+  const [activeEntity, setActiveEntity] = useState<{
+    entityType: string
+    entityId: string
+    entityLabel: string | null
+  } | null>(null)
   const sentinelRef = useRef<HTMLDivElement>(null)
   const supabase = createClient()
 
@@ -172,10 +178,17 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
             No activity found.
           </p>
         ) : (
-          filteredEntries.map(entry => (
+          filteredEntries.map(entry => {
+            const isClickable = TABLE_MAP[entry.entity_type] != null && entry.entity_id != null
+            return (
             <div
               key={entry.id}
-              className="flex items-start gap-3 rounded-lg px-3 py-3 hover:bg-muted/40 transition-colors"
+              className={`flex items-start gap-3 rounded-lg px-3 py-3 hover:bg-muted/40 transition-colors${isClickable ? ' cursor-pointer' : ''}`}
+              onClick={isClickable ? () => setActiveEntity({
+                entityType: entry.entity_type,
+                entityId: entry.entity_id,
+                entityLabel: entry.entity_label ?? null,
+              }) : undefined}
             >
               <ActorChip actorId={entry.actor_id} actorType={entry.actor_type} compact />
               <div className="flex-1 min-w-0">
@@ -200,7 +213,7 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
                 {formatDistanceToNow(new Date(entry.created_at), { addSuffix: true })}
               </span>
             </div>
-          ))
+          )})
         )}
       </div>
 
@@ -208,6 +221,15 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
       <div ref={sentinelRef} className="flex justify-center py-4">
         {loading && <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />}
       </div>
+
+      {activeEntity && (
+        <EntityPreviewShelf
+          entityType={activeEntity.entityType}
+          entityId={activeEntity.entityId}
+          entityLabel={activeEntity.entityLabel}
+          onClose={() => setActiveEntity(null)}
+        />
+      )}
     </div>
   )
 }

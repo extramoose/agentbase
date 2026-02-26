@@ -45,9 +45,10 @@ function TagChip({ tag, variant }: { tag: string; variant: 'added' | 'removed' }
 export function formatActivityEvent(event: {
   event_type: string
   entity_type: string
+  entity_label?: string | null
   payload?: Record<string, unknown> | null
 }): React.ReactNode {
-  const { event_type, payload } = event
+  const { event_type, entity_label, payload } = event
 
   switch (event_type) {
     case 'status_changed': {
@@ -114,9 +115,9 @@ export function formatActivityEvent(event: {
     case 'field_updated':
       return <>updated {formatLabel(String(payload?.field ?? 'field'))}</>
     case 'created':
-      return <>created</>
+      return entity_label ? <>created &ldquo;{entity_label}&rdquo;</> : <>created</>
     case 'deleted':
-      return <>deleted</>
+      return entity_label ? <>deleted &ldquo;{entity_label}&rdquo;</> : <>deleted</>
     case 'commented':
       return <>commented</>
     case 'updated':
