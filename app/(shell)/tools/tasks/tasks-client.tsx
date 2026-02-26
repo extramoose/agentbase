@@ -25,6 +25,7 @@ import { createClient } from '@/lib/supabase/client'
 import { EditShelf } from '@/components/edit-shelf'
 import { SearchFilterBar } from '@/components/search-filter-bar'
 import { TagCombobox } from '@/components/tag-combobox'
+import { EntityLinksSection } from '@/components/entity-links-section'
 import { toast } from '@/hooks/use-toast'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -1443,6 +1444,9 @@ function TaskEditShelf({
             }}
           />
         </div>
+
+        {/* Links */}
+        <EntityLinksSection entityType="tasks" entityId={task.id} editMode />
       </div>
     </EditShelf>
   )
