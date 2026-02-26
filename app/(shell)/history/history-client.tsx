@@ -177,7 +177,7 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
               key={entry.id}
               className="flex items-start gap-3 rounded-lg px-3 py-3 hover:bg-muted/40 transition-colors"
             >
-              <ActorChip actorId={entry.actor_id} compact />
+              <ActorChip actorId={entry.actor_id} actorType={entry.actor_type} compact />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <Badge

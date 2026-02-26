@@ -148,7 +148,7 @@ export function ActivityAndComments({ entityType, entityId, currentUserId }: Act
         <div className="space-y-4">
           {entries.map(entry => (
             <div key={entry.id} className="flex gap-3">
-              <ActorChip actorId={entry.actor_id} compact />
+              <ActorChip actorId={entry.actor_id} actorType={entry.actor_type} compact />
               <div className="flex-1 min-w-0">
                 {entry.event_type === 'commented' ? (
                   <div className="rounded-lg bg-muted/40 px-3 py-2 text-sm">
