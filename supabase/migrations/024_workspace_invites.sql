@@ -1,7 +1,7 @@
 CREATE TABLE IF NOT EXISTS workspace_invites (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-  token text NOT NULL UNIQUE DEFAULT encode(gen_random_bytes(24), 'base64url'),
+  token text NOT NULL UNIQUE DEFAULT encode(gen_random_bytes(32), 'hex'),
   created_by uuid NOT NULL REFERENCES auth.users(id),
   created_at timestamptz NOT NULL DEFAULT now(),
   accepted_by uuid REFERENCES auth.users(id),
