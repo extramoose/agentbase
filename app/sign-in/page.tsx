@@ -27,9 +27,13 @@ function SignInForm() {
 
   async function handleGoogleSignIn() {
     const supabase = createClient()
+    const inviteToken = searchParams.get('invite_token')
+    const callbackUrl = inviteToken
+      ? `${window.location.origin}/auth/callback?next=/invite/${inviteToken}`
+      : `${window.location.origin}/auth/callback`
     await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: `${window.location.origin}/auth/callback` },
+      options: { redirectTo: callbackUrl },
     })
   }
 
@@ -38,9 +42,13 @@ function SignInForm() {
     if (!email.trim()) return
     setSending(true)
     const supabase = createClient()
+    const inviteToken = searchParams.get('invite_token')
+    const emailCallback = inviteToken
+      ? `${window.location.origin}/auth/callback?next=/invite/${inviteToken}`
+      : `${window.location.origin}/auth/callback`
     await supabase.auth.signInWithOtp({
       email,
-      options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+      options: { emailRedirectTo: emailCallback },
     })
     setSent(true)
     setSending(false)
