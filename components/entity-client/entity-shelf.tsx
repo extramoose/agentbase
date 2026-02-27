@@ -12,6 +12,10 @@ interface EntityShelfProps<T extends BaseEntity> {
   entityType: EntityType
   onClose: () => void
   children: React.ReactNode
+  /** Optional title shown in the shelf header */
+  title?: string
+  /** Optional content rendered to the right of the title (e.g. delete button) */
+  headerRight?: React.ReactNode
 }
 
 export function EntityShelf<T extends BaseEntity>({
@@ -19,6 +23,8 @@ export function EntityShelf<T extends BaseEntity>({
   entityType,
   onClose,
   children,
+  title,
+  headerRight,
 }: EntityShelfProps<T>) {
   // Close on Escape
   useEffect(() => {
@@ -48,11 +54,14 @@ export function EntityShelf<T extends BaseEntity>({
         {/* Header */}
         <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-border shrink-0">
           <h2 className="text-base font-semibold truncate">
-            {entityType === 'task' && entity.seq_id ? `#${entity.seq_id}` : ''}
+            {title ?? (entityType === 'task' && entity.seq_id ? `#${entity.seq_id}` : '')}
           </h2>
-          <Button variant="ghost" size="icon" onClick={onClose} className="shrink-0">
-            <X className="h-4 w-4" />
-          </Button>
+          <div className="flex items-center gap-2 shrink-0">
+            {headerRight}
+            <Button variant="ghost" size="icon" onClick={onClose} className="shrink-0">
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
 
         {/* Scrollable content */}
