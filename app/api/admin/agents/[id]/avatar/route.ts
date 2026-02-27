@@ -14,11 +14,11 @@ const EXT_MAP: Record<string, string> = {
 
 export async function POST(
   request: Request,
-  { params }: { params: Promise<{ agentId: string }> },
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     await requireAdminApi()
-    const { agentId } = await params
+    const { id } = await params
     const supabase = await createClient()
 
     const formData = await request.formData()
@@ -34,7 +34,7 @@ export async function POST(
     }
 
     const ext = EXT_MAP[file.type] ?? 'png'
-    const path = `agents/${agentId}/avatar.${ext}`
+    const path = `agents/${id}/avatar.${ext}`
 
     const { error: uploadError } = await supabase.storage
       .from('avatars')
@@ -53,7 +53,7 @@ export async function POST(
     await supabase
       .from('agents')
       .update({ avatar_url: publicUrl })
-      .eq('id', agentId)
+      .eq('id', id)
 
     return Response.json({ success: true, avatarUrl: publicUrl })
   } catch (err) {
