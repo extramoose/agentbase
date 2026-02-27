@@ -5,7 +5,7 @@ import { X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ActivityAndComments } from '@/components/activity-and-comments'
 import { cn } from '@/lib/utils'
-import { type BaseEntity, type EntityType } from '@/types/entities'
+import { type BaseEntity, type EntityType, ENTITY_TABLE } from '@/types/entities'
 
 interface EntityShelfProps<T extends BaseEntity> {
   entity: T
@@ -64,7 +64,7 @@ export function EntityShelf<T extends BaseEntity>({
           {/* ActivityAndComments — always at bottom, noCollapse */}
           <div className="border-t border-border">
             <ActivityAndComments
-              entityType={entityType}
+              entityType={ENTITY_TABLE[entityType]}
               entityId={entity.id}
               noCollapse
             />

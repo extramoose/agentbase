@@ -20,9 +20,12 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { GripVertical, Plus, ChevronDown, ChevronRight, AlertCircle, ArrowUp, Minus, ArrowDown, X } from 'lucide-react'
+import { GripVertical, Plus, ChevronDown, ChevronRight, AlertCircle, ArrowUp, Minus, ArrowDown, X, Trash2, Calendar } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { SearchFilterBar } from '@/components/search-filter-bar'
+import { EntityShelf } from '@/components/entity-client/entity-shelf'
+import { EntityGrid } from '@/components/entity-client/entity-grid'
+import { ViewToggle } from '@/components/entity-client/view-toggle'
 import { toast } from '@/hooks/use-toast'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -30,8 +33,11 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { ActorChip } from '@/components/actor-chip'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
+import { AssigneePicker } from '@/components/assignee-picker'
+import { TagCombobox } from '@/components/tag-combobox'
+import { RichTextEditor } from '@/components/rich-text-editor'
 import { cn } from '@/lib/utils'
-import { TaskModal } from './task-modal'
+import { type BaseEntity } from '@/types/entities'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -42,22 +48,18 @@ type Status = 'backlog' | 'todo' | 'in_progress' | 'blocked' | 'done' | 'cancell
 
 type TaskType = 'bug' | 'improvement' | 'feature'
 
-type Task = {
-  id: string
+type View = 'grid' | 'table'
+
+interface Task extends BaseEntity {
   ticket_id: number
   title: string
   body: string | null
   status: Status
   priority: Priority
   type: TaskType | null
-  tags: string[]
   due_date: string | null
-  assignee_id: string | null
-  assignee_type: 'human' | 'agent' | null
   sort_order: number
   source_meeting_id: string | null
-  created_at: string
-  updated_at: string
 }
 
 type CurrentUser = {
@@ -153,6 +155,84 @@ function groupByPriority(tasks: Task[]): Record<Priority, Task[]> {
     groups[t.priority].push(t)
   }
   return groups
+}
+
+// ---------------------------------------------------------------------------
+// Task grid card (for grid view)
+// ---------------------------------------------------------------------------
+
+function TaskGridCard({ task, onClick }: { task: Task; onClick: () => void }) {
+  const statusCfg = STATUS_CONFIG[task.status]
+  const visibleTags = (task.tags ?? []).slice(0, 3)
+  const extraTagCount = (task.tags ?? []).length - 3
+
+  return (
+    <div
+      onClick={onClick}
+      className="group rounded-lg border border-border bg-card p-4 cursor-pointer hover:border-primary/40 hover:shadow-md transition-all space-y-3"
+    >
+      {/* Title */}
+      <h3 className={cn(
+        'text-sm font-medium leading-tight line-clamp-2',
+        task.status === 'cancelled' && 'line-through text-muted-foreground/60',
+      )}>
+        {task.title}
+      </h3>
+
+      {/* Status + Priority row */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <Badge
+          variant="secondary"
+          className={cn('text-xs', statusCfg.className)}
+        >
+          {statusCfg.label}
+        </Badge>
+        <span className="shrink-0" title={PRIORITY_CONFIG[task.priority].label}>
+          <PriorityIcon priority={task.priority} className="h-3.5 w-3.5" />
+        </span>
+        {task.type && (
+          <span className={cn('rounded px-1.5 py-0.5 text-xs font-medium', TASK_TYPE_CONFIG[task.type].className)}>
+            {task.type}
+          </span>
+        )}
+      </div>
+
+      {/* Bottom row: assignee, due date, tags */}
+      <div className="flex items-center gap-2 flex-wrap text-xs text-muted-foreground">
+        {task.assignee_id ? (
+          <ActorChip actorId={task.assignee_id} actorType={task.assignee_type as 'human' | 'agent'} compact />
+        ) : (
+          <span className="text-xs text-muted-foreground">Unassigned</span>
+        )}
+
+        {task.due_date && (
+          <span className="flex items-center gap-1">
+            <Calendar className="h-3 w-3" />
+            {new Date(task.due_date).toLocaleDateString(undefined, {
+              month: 'short',
+              day: 'numeric',
+            })}
+          </span>
+        )}
+
+        {visibleTags.length > 0 && (
+          <div className="flex gap-1">
+            {visibleTags.map((tag) => (
+              <Badge key={tag} variant="outline" className="text-xs px-1.5 py-0">
+                {tag}
+              </Badge>
+            ))}
+            {extraTagCount > 0 && (
+              <span className="text-xs text-muted-foreground">+{extraTagCount}</span>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Ticket ID */}
+      <p className="text-xs text-muted-foreground">#{task.ticket_id}</p>
+    </div>
+  )
 }
 
 // ---------------------------------------------------------------------------
@@ -406,6 +486,248 @@ function PriorityGroup({
 }
 
 // ---------------------------------------------------------------------------
+// Shelf content (editable fields for a task — rendered inside EntityShelf)
+// ---------------------------------------------------------------------------
+
+function TaskShelfContent({
+  task,
+  onClose,
+}: {
+  task: Task
+  onClose: () => void
+}) {
+  const [title, setTitle] = useState(task.title)
+  const [status, setStatus] = useState<Status>(task.status)
+  const [priority, setPriority] = useState<Priority>(task.priority)
+  const [taskType, setTaskType] = useState<TaskType | null>(task.type)
+  const [assigneeId, setAssigneeId] = useState<string | null>(task.assignee_id)
+  const [assigneeType, setAssigneeType] = useState<string | null>(task.assignee_type)
+  const [dueDate, setDueDate] = useState(task.due_date ?? '')
+  const [tags, setTags] = useState<string[]>(task.tags ?? [])
+  const [body, setBody] = useState(task.body ?? '')
+
+  // Reset local state when task prop changes
+  useEffect(() => {
+    setTitle(task.title)
+    setStatus(task.status)
+    setPriority(task.priority)
+    setTaskType(task.type)
+    setAssigneeId(task.assignee_id)
+    setAssigneeType(task.assignee_type)
+    setDueDate(task.due_date ?? '')
+    setTags(task.tags ?? [])
+    setBody(task.body ?? '')
+  }, [task.id, task.title, task.status, task.priority, task.type, task.assignee_id, task.assignee_type, task.due_date, task.tags, task.body])
+
+  async function saveField(fields: Record<string, unknown>) {
+    try {
+      const res = await fetch('/api/commands/update', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ table: 'tasks', id: task.id, fields }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? 'Update failed')
+    } catch (err) {
+      toast({
+        type: 'error',
+        message: err instanceof Error ? err.message : 'Update failed',
+      })
+    }
+  }
+
+  async function handleDelete() {
+    if (!window.confirm('Delete this task? This cannot be undone.')) return
+    try {
+      const res = await fetch('/api/commands/delete-entity', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ table: 'tasks', id: task.id }),
+      })
+      if (!res.ok) {
+        const json = await res.json()
+        throw new Error(json.error ?? 'Delete failed')
+      }
+      onClose()
+    } catch (err) {
+      toast({
+        type: 'error',
+        message: err instanceof Error ? err.message : 'Delete failed',
+      })
+    }
+  }
+
+  return (
+    <div className="space-y-5">
+      {/* Title */}
+      <div>
+        <label className="text-xs text-muted-foreground font-medium mb-1 block">
+          Title
+        </label>
+        <Input
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          onBlur={(e) => saveField({ title: e.target.value })}
+          className="text-base font-medium"
+        />
+      </div>
+
+      {/* Status + Priority row */}
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="text-xs text-muted-foreground font-medium mb-1 block">
+            Status
+          </label>
+          <select
+            value={status}
+            onChange={(e) => {
+              const val = e.target.value as Status
+              setStatus(val)
+              saveField({ status: val })
+            }}
+            className="w-full h-9 rounded-md border border-input bg-transparent px-3 text-sm focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] outline-none"
+          >
+            {STATUS_ORDER.map((s) => (
+              <option key={s} value={s}>
+                {STATUS_CONFIG[s].label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="text-xs text-muted-foreground font-medium mb-1 block">
+            Priority
+          </label>
+          <select
+            value={priority}
+            onChange={(e) => {
+              const val = e.target.value as Priority
+              setPriority(val)
+              saveField({ priority: val })
+            }}
+            className="w-full h-9 rounded-md border border-input bg-transparent px-3 text-sm focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] outline-none"
+          >
+            {PRIORITY_ORDER.map((p) => (
+              <option key={p} value={p}>
+                {PRIORITY_CONFIG[p].label}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* Type */}
+      <div>
+        <label className="text-xs text-muted-foreground font-medium mb-1 block">
+          Type
+        </label>
+        <div className="flex gap-1.5">
+          {([null, 'bug', 'improvement', 'feature'] as const).map((t) => {
+            const isSelected = taskType === t
+            return (
+              <button
+                key={t ?? 'none'}
+                onClick={() => {
+                  setTaskType(t)
+                  saveField({ type: t })
+                }}
+                className={cn(
+                  'rounded px-2.5 py-1.5 text-xs font-medium transition-colors',
+                  isSelected
+                    ? t === null
+                      ? 'bg-zinc-700 text-zinc-200 border border-zinc-600'
+                      : TASK_TYPE_CONFIG[t].className
+                    : 'bg-zinc-800 text-zinc-400 border border-zinc-700'
+                )}
+              >
+                {t === null ? 'None' : t.charAt(0).toUpperCase() + t.slice(1)}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Assignee */}
+      <div>
+        <label className="text-xs text-muted-foreground font-medium mb-1 block">
+          Assignee
+        </label>
+        <AssigneePicker
+          value={assigneeId ? { id: assigneeId, type: assigneeType as 'human' | 'agent' } : null}
+          onChange={(actor) => {
+            setAssigneeId(actor?.id ?? null)
+            setAssigneeType(actor?.type ?? null)
+            saveField({
+              assignee_id: actor?.id ?? null,
+              assignee_type: actor?.type ?? null,
+            })
+          }}
+        />
+      </div>
+
+      {/* Description */}
+      <div>
+        <label className="text-xs text-muted-foreground font-medium mb-1 block">
+          Description
+        </label>
+        <RichTextEditor
+          value={body}
+          onBlur={(md) => {
+            setBody(md)
+            saveField({ body: md })
+          }}
+          placeholder="Add details..."
+          minHeight="120px"
+        />
+      </div>
+
+      {/* Due date */}
+      <div>
+        <label className="text-xs text-muted-foreground font-medium mb-1 block">
+          Due date
+        </label>
+        <Input
+          type="date"
+          value={dueDate}
+          onChange={(e) => {
+            setDueDate(e.target.value)
+            saveField({ due_date: e.target.value || null })
+          }}
+          className="text-sm"
+        />
+      </div>
+
+      {/* Tags */}
+      <div>
+        <label className="text-xs text-muted-foreground font-medium mb-1 block">
+          Tags
+        </label>
+        <TagCombobox
+          selected={tags}
+          onChange={(newTags) => {
+            setTags(newTags)
+            saveField({ tags: newTags })
+          }}
+        />
+      </div>
+
+      {/* Delete */}
+      <div className="pt-2 border-t border-border">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={handleDelete}
+          className="text-muted-foreground hover:text-red-400"
+        >
+          <Trash2 className="h-4 w-4 mr-1" />
+          Delete task
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Main client component
 // ---------------------------------------------------------------------------
 
@@ -445,6 +767,15 @@ export function TasksClient({
   )
   const [workspaceMembers, setWorkspaceMembers] = useState<WorkspaceMember[]>([])
   const [selectedTask, setSelectedTask] = useState<Task | null>(initialSelectedTask ?? null)
+  const [view, setView] = useState<View>(
+    () => {
+      const v = searchParams.get('view')
+      return v === 'grid' ? 'grid' : 'table'
+    }
+  )
+  const [selectedTag, setSelectedTag] = useState<string | null>(
+    () => searchParams.get('tag') ?? null
+  )
 
   const supabase = createClient()
 
@@ -455,9 +786,11 @@ export function TasksClient({
     if (statusFilter !== 'all') params.set('status', statusFilter)
     if (typeFilter !== 'all') params.set('type', typeFilter)
     if (assigneeFilter) params.set('assignee', assigneeFilter)
+    if (selectedTag) params.set('tag', selectedTag)
+    if (view === 'grid') params.set('view', 'grid')
     const qs = params.toString()
     return qs ? `?${qs}` : ''
-  }, [search, statusFilter, typeFilter, assigneeFilter])
+  }, [search, statusFilter, typeFilter, assigneeFilter, selectedTag, view])
 
   // Sync filter/search state → URL query params (skip initial render)
   const isFirstRender = useRef(true)
@@ -498,28 +831,52 @@ export function TasksClient({
     fetchMembers()
   }, [])
 
-  // ----- Shelf open/close with URL sync -----
+  // ----- Collect all tags from tasks -----
+  const allTags = useMemo(() => {
+    const tagSet = new Set<string>()
+    for (const t of tasks) {
+      for (const tag of t.tags ?? []) tagSet.add(tag)
+    }
+    return Array.from(tagSet).sort()
+  }, [tasks])
+
+  // ----- Shelf open/close with URL sync (?id=seq_id via pushState) -----
 
   const handleTaskClick = useCallback((task: Task) => {
     setSelectedTask(task)
-    window.history.pushState(null, '', `/tools/tasks/${task.ticket_id}`)
+    const params = new URLSearchParams(window.location.search)
+    params.set('id', String(task.seq_id ?? task.ticket_id))
+    const qs = params.toString()
+    window.history.pushState(null, '', `${window.location.pathname}${qs ? `?${qs}` : ''}`)
   }, [])
 
   const handleShelfClose = useCallback(() => {
     setSelectedTask(null)
-    window.history.pushState(null, '', `/tools/tasks${buildQs()}`)
-  }, [buildQs])
+    const params = new URLSearchParams(window.location.search)
+    params.delete('id')
+    const qs = params.toString()
+    window.history.pushState(null, '', `${window.location.pathname}${qs ? `?${qs}` : ''}`)
+  }, [])
 
   // Handle browser back/forward button
   useEffect(() => {
     const handler = () => {
-      if (!window.location.pathname.match(/\/tools\/tasks\/\d+/)) {
-        setSelectedTask(null)
+      const idParam = new URLSearchParams(window.location.search).get('id')
+      if (idParam) {
+        const n = Number(idParam)
+        if (!Number.isNaN(n)) {
+          const task = tasks.find((t) => (t.seq_id ?? t.ticket_id) === n)
+          if (task) {
+            setSelectedTask(task)
+            return
+          }
+        }
       }
+      setSelectedTask(null)
     }
     window.addEventListener('popstate', handler)
     return () => window.removeEventListener('popstate', handler)
-  }, [])
+  }, [tasks])
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
@@ -547,6 +904,8 @@ export function TasksClient({
         (payload) => {
           const updated = payload.new as Task
           setTasks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)))
+          // Also update selectedTask if it's the one being updated
+          setSelectedTask((prev) => (prev && prev.id === updated.id ? updated : prev))
         }
       )
       .on(
@@ -564,6 +923,8 @@ export function TasksClient({
             next.delete(deletedId)
             return next
           })
+          // Close shelf if the deleted task was open
+          setSelectedTask((prev) => (prev && prev.id === deletedId ? null : prev))
         }
       )
       .subscribe()
@@ -571,6 +932,7 @@ export function TasksClient({
     return () => {
       supabase.removeChannel(channel)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // ----- Filtered & grouped tasks -----
@@ -578,20 +940,23 @@ export function TasksClient({
   const filteredTasks = useMemo(() => {
     let result = tasks
 
-    // Hide overflow statuses (backlog, cancelled) unless explicitly selected
-    if (statusFilter !== 'cancelled') {
-      result = result.filter((t) => t.status !== 'cancelled')
-    }
-    if (statusFilter !== 'backlog') {
-      result = result.filter((t) => t.status !== 'backlog')
-    }
-    if (statusFilter !== 'blocked') {
-      result = result.filter((t) => t.status !== 'blocked')
-    }
+    // Status filtering only in table view
+    if (view === 'table') {
+      // Hide overflow statuses (backlog, cancelled) unless explicitly selected
+      if (statusFilter !== 'cancelled') {
+        result = result.filter((t) => t.status !== 'cancelled')
+      }
+      if (statusFilter !== 'backlog') {
+        result = result.filter((t) => t.status !== 'backlog')
+      }
+      if (statusFilter !== 'blocked') {
+        result = result.filter((t) => t.status !== 'blocked')
+      }
 
-    // Status filter
-    if (statusFilter !== 'all') {
-      result = result.filter((t) => t.status === statusFilter)
+      // Status filter
+      if (statusFilter !== 'all') {
+        result = result.filter((t) => t.status === statusFilter)
+      }
     }
 
     // Type filter
@@ -614,12 +979,17 @@ export function TasksClient({
       )
     }
 
+    // Tag filter
+    if (selectedTag) {
+      result = result.filter((t) => (t.tags ?? []).includes(selectedTag))
+    }
+
     return result
-  }, [tasks, statusFilter, typeFilter, search, assigneeFilter])
+  }, [tasks, view, statusFilter, typeFilter, search, assigneeFilter, selectedTag])
 
   const grouped = useMemo(() => groupByPriority(filteredTasks), [filteredTasks])
 
-  // Count tasks per status, respecting type + assignee + search filters (but NOT status)
+  // Count tasks per status, respecting type + assignee + search + tag filters (but NOT status)
   const statusCounts = useMemo(() => {
     let base = tasks
     if (typeFilter !== 'all') {
@@ -636,6 +1006,9 @@ export function TasksClient({
           (t.tags ?? []).some((tag) => tag.toLowerCase().includes(q))
       )
     }
+    if (selectedTag) {
+      base = base.filter((t) => (t.tags ?? []).includes(selectedTag))
+    }
     return {
       all: base.length,
       backlog: base.filter((t) => t.status === 'backlog').length,
@@ -645,7 +1018,7 @@ export function TasksClient({
       done: base.filter((t) => t.status === 'done').length,
       cancelled: base.filter((t) => t.status === 'cancelled').length,
     } as Record<Status | 'all', number>
-  }, [tasks, typeFilter, assigneeFilter, search])
+  }, [tasks, typeFilter, assigneeFilter, search, selectedTag])
 
   // ----- Create task -----
 
@@ -655,6 +1028,8 @@ export function TasksClient({
       const tempId = `temp-${Date.now()}`
       const optimistic: Task = {
         id: tempId,
+        seq_id: null,
+        tenant_id: '',
         ticket_id: 0,
         title,
         body: null,
@@ -867,6 +1242,12 @@ export function TasksClient({
     return () => document.removeEventListener('keydown', handler)
   }, [selectedIds.size])
 
+  // ----- Tag change handler -----
+
+  const handleTagChange = useCallback((tag: string | null) => {
+    setSelectedTag(tag)
+  }, [])
+
   // ----- Visible priority groups -----
 
   const visiblePriorities = PRIORITY_ORDER.filter(
@@ -891,7 +1272,11 @@ export function TasksClient({
             search={search}
             onSearchChange={setSearch}
             placeholder="Search tasks..."
+            tags={allTags}
+            selectedTag={selectedTag}
+            onTagChange={handleTagChange}
           />
+          <ViewToggle onChange={setView} />
           <Button size="sm" onClick={handleNewTask}>
             <Plus className="h-4 w-4 mr-1" />
             <span className="hidden sm:inline">New Task</span>
@@ -900,263 +1285,302 @@ export function TasksClient({
         </div>
       </div>
 
-      {/* Status filter tabs */}
-      <div className="flex gap-1 mb-4 border-b border-border pb-2 overflow-x-auto">
-        {STATUS_TABS.map((tab) => (
-          <button
-            key={tab.value}
-            onClick={() => setStatusFilter(tab.value)}
-            className={cn(
-              'px-3 py-1.5 text-sm rounded-md transition-colors',
-              statusFilter === tab.value
-                ? 'bg-muted text-foreground font-medium'
-                : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
-            )}
-          >
-            {tab.label}
-            <span className="ml-1.5 text-xs text-muted-foreground">
-              {statusCounts[tab.value]}
-            </span>
-          </button>
-        ))}
-
-        {/* Overflow: Backlog + Cancelled */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button
-              className={cn(
-                'px-3 py-1.5 text-sm rounded-md transition-colors flex items-center gap-1',
-                STATUS_OVERFLOW.some((o) => o.value === statusFilter)
-                  ? 'bg-muted text-foreground font-medium'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
-              )}
-            >
-              {STATUS_OVERFLOW.find((o) => o.value === statusFilter)?.label ?? '···'}
-              <ChevronDown className="w-3 h-3" />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start">
-            {STATUS_OVERFLOW.map((item) => (
-              <DropdownMenuItem
-                key={item.value}
-                onClick={() => setStatusFilter(item.value)}
-                className={cn(statusFilter === item.value && 'font-medium')}
+      {/* Table view: tabs + priority groups + drag */}
+      {view === 'table' && (
+        <>
+          {/* Status filter tabs */}
+          <div className="flex gap-1 mb-4 border-b border-border pb-2 overflow-x-auto">
+            {STATUS_TABS.map((tab) => (
+              <button
+                key={tab.value}
+                onClick={() => setStatusFilter(tab.value)}
+                className={cn(
+                  'px-3 py-1.5 text-sm rounded-md transition-colors',
+                  statusFilter === tab.value
+                    ? 'bg-muted text-foreground font-medium'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                )}
               >
-                {item.label}
-                <span className="ml-auto pl-4 text-xs text-muted-foreground">
-                  {statusCounts[item.value]}
+                {tab.label}
+                <span className="ml-1.5 text-xs text-muted-foreground">
+                  {statusCounts[tab.value]}
                 </span>
-              </DropdownMenuItem>
+              </button>
             ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
 
-        {/* Assignee face pile + type filter chips */}
-        <div className="sm:ml-auto flex items-center gap-1 flex-wrap">
-          {workspaceMembers.length > 0 && (
-            <>
-              <div className="flex -space-x-1">
-                {workspaceMembers.map((m) => (
-                  <button
-                    key={m.id}
-                    onClick={() => setAssigneeFilter(assigneeFilter === m.id ? null : m.id)}
-                    title={m.name}
-                    className="relative rounded-full transition-transform hover:z-10 hover:scale-110"
+            {/* Overflow: Backlog + Blocked + Cancelled */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  className={cn(
+                    'px-3 py-1.5 text-sm rounded-md transition-colors flex items-center gap-1',
+                    STATUS_OVERFLOW.some((o) => o.value === statusFilter)
+                      ? 'bg-muted text-foreground font-medium'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                  )}
+                >
+                  {STATUS_OVERFLOW.find((o) => o.value === statusFilter)?.label ?? '···'}
+                  <ChevronDown className="w-3 h-3" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                {STATUS_OVERFLOW.map((item) => (
+                  <DropdownMenuItem
+                    key={item.value}
+                    onClick={() => setStatusFilter(item.value)}
+                    className={cn(statusFilter === item.value && 'font-medium')}
                   >
-                    <Avatar className={cn(
-                      'h-6 w-6 ring-2 transition-colors',
-                      assigneeFilter === m.id
-                        ? 'ring-primary'
-                        : 'ring-background hover:ring-muted-foreground/40'
-                    )}>
-                      <AvatarImage src={m.avatarUrl ?? undefined} alt={m.name} />
-                      <AvatarFallback className="text-[9px]">{m.name.slice(0, 2).toUpperCase()}</AvatarFallback>
-                    </Avatar>
-                  </button>
+                    {item.label}
+                    <span className="ml-auto pl-4 text-xs text-muted-foreground">
+                      {statusCounts[item.value]}
+                    </span>
+                  </DropdownMenuItem>
                 ))}
-              </div>
-              <div className="w-px h-5 bg-border mx-1" />
-            </>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Assignee face pile + type filter chips */}
+            <div className="sm:ml-auto flex items-center gap-1 flex-wrap">
+              {workspaceMembers.length > 0 && (
+                <>
+                  <div className="flex -space-x-1">
+                    {workspaceMembers.map((m) => (
+                      <button
+                        key={m.id}
+                        onClick={() => setAssigneeFilter(assigneeFilter === m.id ? null : m.id)}
+                        title={m.name}
+                        className="relative rounded-full transition-transform hover:z-10 hover:scale-110"
+                      >
+                        <Avatar className={cn(
+                          'h-6 w-6 ring-2 transition-colors',
+                          assigneeFilter === m.id
+                            ? 'ring-primary'
+                            : 'ring-background hover:ring-muted-foreground/40'
+                        )}>
+                          <AvatarImage src={m.avatarUrl ?? undefined} alt={m.name} />
+                          <AvatarFallback className="text-[9px]">{m.name.slice(0, 2).toUpperCase()}</AvatarFallback>
+                        </Avatar>
+                      </button>
+                    ))}
+                  </div>
+                  <div className="w-px h-5 bg-border mx-1" />
+                </>
+              )}
+
+              {TASK_TYPE_TABS.map((tab) => (
+                <button
+                  key={tab.value}
+                  onClick={() => setTypeFilter(tab.value)}
+                  className={cn(
+                    'px-2.5 py-1 text-xs rounded-md transition-colors',
+                    typeFilter === tab.value
+                      ? tab.value === 'all'
+                        ? 'bg-muted text-foreground font-medium'
+                        : cn('font-medium', TASK_TYPE_CONFIG[tab.value].className)
+                      : 'bg-zinc-800 text-zinc-500'
+                  )}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Select-all row */}
+          {filteredTasks.length > 0 && (
+            <div className="flex items-center gap-2 px-4 py-1.5 mb-1">
+              <input
+                type="checkbox"
+                checked={selectedIds.size > 0 && selectedIds.size === filteredTasks.length}
+                ref={(el) => { if (el) el.indeterminate = selectedIds.size > 0 && selectedIds.size < filteredTasks.length }}
+                onChange={toggleSelectAll}
+                className="cb-dark h-4 w-4"
+              />
+              <span className="text-xs text-muted-foreground">
+                {selectedIds.size > 0 ? `${selectedIds.size} of ${filteredTasks.length} selected` : 'Select all'}
+              </span>
+            </div>
           )}
 
-          {TASK_TYPE_TABS.map((tab) => (
-            <button
-              key={tab.value}
-              onClick={() => setTypeFilter(tab.value)}
-              className={cn(
-                'px-2.5 py-1 text-xs rounded-md transition-colors',
-                typeFilter === tab.value
-                  ? tab.value === 'all'
-                    ? 'bg-muted text-foreground font-medium'
-                    : cn('font-medium', TASK_TYPE_CONFIG[tab.value].className)
-                  : 'bg-zinc-800 text-zinc-500'
-              )}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-      </div>
+          {/* Priority groups */}
+          <div className="flex-1 overflow-y-auto">
+            {mounted ? (
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragStart={handleDragStart}
+                onDragEnd={handleDragEnd}
+              >
+                {displayPriorities.map((priority) => (
+                  <PriorityGroup
+                    key={priority}
+                    priority={priority}
+                    tasks={grouped[priority]}
+                    onTaskClick={handleTaskClick}
+                    addingTo={addingToPriority === priority}
+                    onStartAdding={() => setAddingToPriority(priority)}
+                    onCreateTask={createTask}
+                    selectedIds={selectedIds}
+                    onToggleSelection={toggleSelection}
+                  />
+                ))}
+                <DragOverlay dropAnimation={null}>
+                  {activeDragId && (() => {
+                    const t = filteredTasks.find(x => x.id === activeDragId)
+                    if (!t) return null
+                    return (
+                      <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-card border border-border shadow-lg opacity-90">
+                        <GripVertical className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-xs text-muted-foreground w-12 shrink-0">#{t.ticket_id}</span>
+                        <span className="shrink-0" title={PRIORITY_CONFIG[t.priority].label}>
+                          <PriorityIcon priority={t.priority} />
+                        </span>
+                        <span className="flex-1 text-sm font-medium truncate">{t.title}</span>
+                        <Badge variant="secondary" className={cn('text-xs shrink-0', STATUS_CONFIG[t.status].className)}>
+                          {STATUS_CONFIG[t.status].label}
+                        </Badge>
+                      </div>
+                    )
+                  })()}
+                </DragOverlay>
+              </DndContext>
+            ) : (
+              displayPriorities.map((priority) => {
+                const cfg = PRIORITY_CONFIG[priority]
+                const groupTasks = grouped[priority]
+                return (
+                  <div key={priority} className="mb-4">
+                    <div className="flex items-center gap-2 py-1.5 px-1 w-full text-left">
+                      <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                      <span className={cn('text-sm font-medium flex items-center gap-1.5', cfg.color)}>
+                        <PriorityIcon priority={priority} className="h-3.5 w-3.5" />
+                        {cfg.label}
+                      </span>
+                      <span className="text-xs text-muted-foreground">({groupTasks.length})</span>
+                    </div>
+                    <div className="ml-1">
+                      {groupTasks.map((task) => {
+                        const statusCfg = STATUS_CONFIG[task.status]
+                        const visibleTags = (task.tags ?? []).slice(0, 2)
+                        const extraTagCount = (task.tags ?? []).length - 2
+                        return (
+                          <div
+                            key={task.id}
+                            className="group flex items-center gap-2 px-3 py-1.5 rounded-md hover:bg-accent/40 cursor-pointer border border-transparent hover:border-border transition-colors"
+                            onClick={() => handleTaskClick(task)}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={selectedIds.has(task.id)}
+                              onChange={() => toggleSelection(task.id)}
+                              onClick={(e) => e.stopPropagation()}
+                              className={cn(
+                                'cb-dark h-4 w-4 shrink-0',
+                                selectedIds.size > 0 ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                              )}
+                            />
+                            <span className="w-4 shrink-0" />
+                            <span className="text-xs text-muted-foreground w-12 shrink-0">#{task.ticket_id}</span>
+                            {task.type && (
+                              <span className={cn('rounded px-1.5 py-0.5 text-xs font-medium shrink-0', TASK_TYPE_CONFIG[task.type].className)}>
+                                {task.type}
+                              </span>
+                            )}
+                            <span className="shrink-0" title={PRIORITY_CONFIG[task.priority].label}>
+                              <PriorityIcon priority={task.priority} />
+                            </span>
+                            <span className={cn('flex-1 text-sm font-medium truncate', task.status === 'cancelled' && 'line-through text-muted-foreground/60')}>{task.title}</span>
+                            <Badge variant="secondary" className={cn('text-xs shrink-0 hidden sm:inline-flex', statusCfg.className)}>
+                              {statusCfg.label}
+                            </Badge>
+                            <span className="hidden sm:inline-flex">
+                              {task.assignee_id ? (
+                                <ActorChip actorId={task.assignee_id} actorType={task.assignee_type as 'human' | 'agent'} compact />
+                              ) : (
+                                <span className="text-xs text-muted-foreground shrink-0">Unassigned</span>
+                              )}
+                            </span>
+                            {task.due_date && (
+                              <span className="text-xs text-muted-foreground shrink-0 hidden md:inline">
+                                {new Date(task.due_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                              </span>
+                            )}
+                            {visibleTags.length > 0 && (
+                              <div className="hidden md:flex gap-1 shrink-0">
+                                {visibleTags.map((tag) => (
+                                  <Badge key={tag} variant="outline" className="text-xs px-1.5 py-0">{tag}</Badge>
+                                ))}
+                                {extraTagCount > 0 && (
+                                  <span className="text-xs text-muted-foreground">+{extraTagCount}</span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )
+              })
+            )}
 
-      {/* Select-all row */}
-      {filteredTasks.length > 0 && (
-        <div className="flex items-center gap-2 px-4 py-1.5 mb-1">
-          <input
-            type="checkbox"
-            checked={selectedIds.size > 0 && selectedIds.size === filteredTasks.length}
-            ref={(el) => { if (el) el.indeterminate = selectedIds.size > 0 && selectedIds.size < filteredTasks.length }}
-            onChange={toggleSelectAll}
-            className="cb-dark h-4 w-4"
-          />
-          <span className="text-xs text-muted-foreground">
-            {selectedIds.size > 0 ? `${selectedIds.size} of ${filteredTasks.length} selected` : 'Select all'}
-          </span>
+            {filteredTasks.length === 0 && !addingToPriority && (
+              <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+                <p className="text-sm">No tasks found</p>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="mt-2"
+                  onClick={handleNewTask}
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Create one
+                </Button>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* Grid view */}
+      {view === 'grid' && (
+        <div className="flex-1 overflow-y-auto">
+          {filteredTasks.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+              <p className="text-sm">No tasks found</p>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="mt-2"
+                onClick={handleNewTask}
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                Create one
+              </Button>
+            </div>
+          ) : (
+            <EntityGrid>
+              {filteredTasks.map((task) => (
+                <TaskGridCard
+                  key={task.id}
+                  task={task}
+                  onClick={() => handleTaskClick(task)}
+                />
+              ))}
+            </EntityGrid>
+          )}
         </div>
       )}
 
-      {/* Priority groups */}
-      <div className="flex-1 overflow-y-auto">
-        {mounted ? (
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragStart={handleDragStart}
-            onDragEnd={handleDragEnd}
-          >
-            {displayPriorities.map((priority) => (
-              <PriorityGroup
-                key={priority}
-                priority={priority}
-                tasks={grouped[priority]}
-                onTaskClick={handleTaskClick}
-                addingTo={addingToPriority === priority}
-                onStartAdding={() => setAddingToPriority(priority)}
-                onCreateTask={createTask}
-                selectedIds={selectedIds}
-                onToggleSelection={toggleSelection}
-              />
-            ))}
-            <DragOverlay dropAnimation={null}>
-              {activeDragId && (() => {
-                const t = filteredTasks.find(x => x.id === activeDragId)
-                if (!t) return null
-                return (
-                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-card border border-border shadow-lg opacity-90">
-                    <GripVertical className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-xs text-muted-foreground w-12 shrink-0">#{t.ticket_id}</span>
-                    <span className="shrink-0" title={PRIORITY_CONFIG[t.priority].label}>
-                      <PriorityIcon priority={t.priority} />
-                    </span>
-                    <span className="flex-1 text-sm font-medium truncate">{t.title}</span>
-                    <Badge variant="secondary" className={cn('text-xs shrink-0', STATUS_CONFIG[t.status].className)}>
-                      {STATUS_CONFIG[t.status].label}
-                    </Badge>
-                  </div>
-                )
-              })()}
-            </DragOverlay>
-          </DndContext>
-        ) : (
-          displayPriorities.map((priority) => {
-            const cfg = PRIORITY_CONFIG[priority]
-            const groupTasks = grouped[priority]
-            return (
-              <div key={priority} className="mb-4">
-                <div className="flex items-center gap-2 py-1.5 px-1 w-full text-left">
-                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                  <span className={cn('text-sm font-medium flex items-center gap-1.5', cfg.color)}>
-                    <PriorityIcon priority={priority} className="h-3.5 w-3.5" />
-                    {cfg.label}
-                  </span>
-                  <span className="text-xs text-muted-foreground">({groupTasks.length})</span>
-                </div>
-                <div className="ml-1">
-                  {groupTasks.map((task) => {
-                    const statusCfg = STATUS_CONFIG[task.status]
-                    const visibleTags = (task.tags ?? []).slice(0, 2)
-                    const extraTagCount = (task.tags ?? []).length - 2
-                    return (
-                      <div
-                        key={task.id}
-                        className="group flex items-center gap-2 px-3 py-1.5 rounded-md hover:bg-accent/40 cursor-pointer border border-transparent hover:border-border transition-colors"
-                        onClick={() => handleTaskClick(task)}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={selectedIds.has(task.id)}
-                          onChange={() => toggleSelection(task.id)}
-                          onClick={(e) => e.stopPropagation()}
-                          className={cn(
-                            'cb-dark h-4 w-4 shrink-0',
-                            selectedIds.size > 0 ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
-                          )}
-                        />
-                        <span className="w-4 shrink-0" />
-                        <span className="text-xs text-muted-foreground w-12 shrink-0">#{task.ticket_id}</span>
-                        {task.type && (
-                          <span className={cn('rounded px-1.5 py-0.5 text-xs font-medium shrink-0', TASK_TYPE_CONFIG[task.type].className)}>
-                            {task.type}
-                          </span>
-                        )}
-                        <span className="shrink-0" title={PRIORITY_CONFIG[task.priority].label}>
-                          <PriorityIcon priority={task.priority} />
-                        </span>
-                        <span className={cn('flex-1 text-sm font-medium truncate', task.status === 'cancelled' && 'line-through text-muted-foreground/60')}>{task.title}</span>
-                        <Badge variant="secondary" className={cn('text-xs shrink-0 hidden sm:inline-flex', statusCfg.className)}>
-                          {statusCfg.label}
-                        </Badge>
-                        <span className="hidden sm:inline-flex">
-                          {task.assignee_id ? (
-                            <ActorChip actorId={task.assignee_id} actorType={task.assignee_type as 'human' | 'agent'} compact />
-                          ) : (
-                            <span className="text-xs text-muted-foreground shrink-0">Unassigned</span>
-                          )}
-                        </span>
-                        {task.due_date && (
-                          <span className="text-xs text-muted-foreground shrink-0 hidden md:inline">
-                            {new Date(task.due_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                          </span>
-                        )}
-                        {visibleTags.length > 0 && (
-                          <div className="hidden md:flex gap-1 shrink-0">
-                            {visibleTags.map((tag) => (
-                              <Badge key={tag} variant="outline" className="text-xs px-1.5 py-0">{tag}</Badge>
-                            ))}
-                            {extraTagCount > 0 && (
-                              <span className="text-xs text-muted-foreground">+{extraTagCount}</span>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            )
-          })
-        )}
-
-
-
-        {filteredTasks.length === 0 && !addingToPriority && (
-          <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-            <p className="text-sm">No tasks found</p>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="mt-2"
-              onClick={handleNewTask}
-            >
-              <Plus className="h-4 w-4 mr-1" />
-              Create one
-            </Button>
-          </div>
-        )}
-      </div>
-
-      {/* Task detail shelf */}
+      {/* Task detail shelf (EntityShelf from S1) */}
       {selectedTask && (
-        <TaskModal task={selectedTask} onClose={handleShelfClose} />
+        <EntityShelf
+          entity={selectedTask}
+          entityType="task"
+          onClose={handleShelfClose}
+        >
+          <TaskShelfContent task={selectedTask} onClose={handleShelfClose} />
+        </EntityShelf>
       )}
 
       {/* Floating batch action bar */}
@@ -1231,4 +1655,3 @@ export function TasksClient({
     </div>
   )
 }
-
