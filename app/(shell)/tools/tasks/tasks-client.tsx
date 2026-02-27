@@ -105,6 +105,7 @@ const STATUS_TABS: Array<{ value: Status | 'all'; label: string }> = [
 
 const STATUS_OVERFLOW: Array<{ value: Status; label: string }> = [
   { value: 'backlog', label: 'Backlog' },
+  { value: 'blocked', label: 'Blocked' },
   { value: 'cancelled', label: 'Cancelled' },
 ]
 
@@ -580,6 +581,9 @@ export function TasksClient({
     }
     if (statusFilter !== 'backlog') {
       result = result.filter((t) => t.status !== 'backlog')
+    }
+    if (statusFilter !== 'blocked') {
+      result = result.filter((t) => t.status !== 'blocked')
     }
 
     // Status filter
