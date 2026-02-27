@@ -9,14 +9,9 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   images: {
-    dangerouslyAllowSVG: true,
-    contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
     remotePatterns: [
-      { protocol: 'https', hostname: '*.googleusercontent.com' },
-      { protocol: 'https', hostname: 'lh3.googleusercontent.com' },
-      { protocol: 'https', hostname: 'api.dicebear.com' },
       { protocol: 'https', hostname: '*.supabase.co' },
-      { protocol: 'https', hostname: 'i.postimg.cc' },
+      { protocol: 'https', hostname: 'lh3.googleusercontent.com' },
     ],
   },
   async headers() {

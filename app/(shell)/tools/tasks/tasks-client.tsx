@@ -30,7 +30,6 @@ import { Badge } from '@/components/ui/badge'
 import { ActorChip } from '@/components/actor-chip'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import { cn } from '@/lib/utils'
-import { ANON_AVATAR_URL } from '@/lib/constants'
 import { TaskModal } from './task-modal'
 
 // ---------------------------------------------------------------------------
@@ -946,7 +945,7 @@ export function TasksClient({
                         ? 'ring-primary'
                         : 'ring-background hover:ring-muted-foreground/40'
                     )}>
-                      <AvatarImage src={m.avatarUrl ?? ANON_AVATAR_URL} alt={m.name} />
+                      <AvatarImage src={m.avatarUrl ?? undefined} alt={m.name} />
                       <AvatarFallback className="text-[9px]">{m.name.slice(0, 2).toUpperCase()}</AvatarFallback>
                     </Avatar>
                   </button>
