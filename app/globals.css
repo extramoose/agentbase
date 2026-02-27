@@ -92,51 +92,6 @@
   }
 }
 
-/* Glossy dark primary button */
-button.bg-primary,
-a.bg-primary {
-  background: linear-gradient(
-    180deg,
-    #2a2a2a 0%,
-    #111111 50%,
-    #0a0a0a 100%
-  );
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.08) inset,
-    0 -1px 0 rgba(0, 0, 0, 0.4) inset,
-    0 2px 4px rgba(0, 0, 0, 0.5),
-    0 1px 2px rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  transition: all 0.1s ease;
-}
-
-button.bg-primary:hover,
-a.bg-primary:hover {
-  background: linear-gradient(
-    180deg,
-    #333333 0%,
-    #1a1a1a 50%,
-    #111111 100%
-  );
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.1) inset,
-    0 -1px 0 rgba(0, 0, 0, 0.4) inset,
-    0 3px 6px rgba(0, 0, 0, 0.5),
-    0 1px 2px rgba(0, 0, 0, 0.3);
-}
-
-button.bg-primary:active,
-a.bg-primary:active {
-  background: linear-gradient(
-    180deg,
-    #0a0a0a 0%,
-    #111111 100%
-  );
-  box-shadow:
-    0 1px 0 rgba(0, 0, 0, 0.3) inset,
-    0 1px 2px rgba(0, 0, 0, 0.2);
-  transform: translateY(0.5px);
-}
 
 /* Tiptap / ProseMirror editor styles (replaces @tailwindcss/typography) */
 .ProseMirror {
