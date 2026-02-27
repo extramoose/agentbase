@@ -82,6 +82,8 @@ function domainFromUrl(url: string | null): string | null {
 
 export function LibraryClient({ initialItems, initialItemId }: { initialItems: LibraryItem[]; initialItemId?: string }) {
   const router = useRouter()
+  const routerRef = useRef(router)
+  useEffect(() => { routerRef.current = router })
   const searchParams = useSearchParams()
 
   const [items, setItems] = useState<LibraryItem[]>(initialItems)
@@ -114,8 +116,8 @@ export function LibraryClient({ initialItems, initialItemId }: { initialItems: L
       isFirstRender.current = false
       return
     }
-    router.replace(`${window.location.pathname}${buildQs()}`, { scroll: false })
-  }, [buildQs, router])
+    routerRef.current.replace(`${window.location.pathname}${buildQs()}`, { scroll: false })
+  }, [buildQs])
 
   // Open shelf for initialItemId after data is available
   useEffect(() => {

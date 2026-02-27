@@ -411,6 +411,8 @@ export function TasksClient({
   currentUser: CurrentUser
 }) {
   const router = useRouter()
+  const routerRef = useRef(router)
+  useEffect(() => { routerRef.current = router })
   const searchParams = useSearchParams()
 
   const [tasks, setTasks] = useState<Task[]>(initialTasks)
@@ -456,8 +458,8 @@ export function TasksClient({
       isFirstRender.current = false
       return
     }
-    router.replace(`${window.location.pathname}${buildQs()}`, { scroll: false })
-  }, [buildQs, router])
+    routerRef.current.replace(`${window.location.pathname}${buildQs()}`, { scroll: false })
+  }, [buildQs])
 
   // Hydration guard — defer dnd-kit tree to avoid SSR ID mismatch
   useEffect(() => setMounted(true), [])

@@ -43,6 +43,8 @@ export function EssaysClient({
   initialEssayId?: string
 }) {
   const router = useRouter()
+  const routerRef = useRef(router)
+  useEffect(() => { routerRef.current = router })
   const searchParams = useSearchParams()
   const supabase = createClient()
 
@@ -75,8 +77,8 @@ export function EssaysClient({
       isFirstRender.current = false
       return
     }
-    router.replace(`${window.location.pathname}${buildQs()}`, { scroll: false })
-  }, [buildQs, router])
+    routerRef.current.replace(`${window.location.pathname}${buildQs()}`, { scroll: false })
+  }, [buildQs])
 
   // Open essay for initialEssayId
   useEffect(() => {
