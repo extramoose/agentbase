@@ -440,7 +440,9 @@ export function TasksClient({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [mounted, setMounted] = useState(false)
   const [activeDragId, setActiveDragId] = useState<string | null>(null)
-  const [assigneeFilter, setAssigneeFilter] = useState<string | null>(null)
+  const [assigneeFilter, setAssigneeFilter] = useState<string | null>(
+    () => searchParams.get('assignee') ?? null
+  )
   const [workspaceMembers, setWorkspaceMembers] = useState<WorkspaceMember[]>([])
   const [selectedTask, setSelectedTask] = useState<Task | null>(initialSelectedTask ?? null)
 
@@ -452,9 +454,10 @@ export function TasksClient({
     if (search) params.set('q', search)
     if (statusFilter !== 'all') params.set('status', statusFilter)
     if (typeFilter !== 'all') params.set('type', typeFilter)
+    if (assigneeFilter) params.set('assignee', assigneeFilter)
     const qs = params.toString()
     return qs ? `?${qs}` : ''
-  }, [search, statusFilter, typeFilter])
+  }, [search, statusFilter, typeFilter, assigneeFilter])
 
   // Sync filter/search state → URL query params (skip initial render)
   const isFirstRender = useRef(true)
