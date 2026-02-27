@@ -169,20 +169,32 @@ components/
 
 ```
 /tools/tasks                    → task list, default tab=todo
-/tools/tasks?id=42              → task list + task #42 shelf open
+/tools/tasks?id=42              → task list + task #42 shelf open  ← SHAREABLE
 /tools/tasks?status=in_progress → filtered list
 /tools/library                  → library list, grid view
-/tools/library?id=7             → library list + item #7 shelf open
+/tools/library?id=7             → library list + item #7 shelf open ← SHAREABLE
 /tools/library?type=note        → filtered by subtype
+/tools/crm/deals                → deals list (DEFAULT crm route)
+/tools/crm/deals?id=2           → deals list + deal #2 shelf open  ← SHAREABLE
 /tools/crm/companies            → companies list
 /tools/crm/companies?id=3       → companies list + company #3 shelf
 /tools/crm/people               → people list
 /tools/crm/people?id=5          → people list + person #5 shelf
-/tools/crm/deals                → deals list (DEFAULT crm tab)
-/tools/crm/deals?id=2           → deals list + deal #2 shelf
+/history                        → global activity feed
 ```
 
-Shelf open/close uses `pushState`/`popstate` — NOT intercepting routes (broken in Next.js 16 for numeric IDs).
+### Shelf param vs filter params
+- `?id=` is the shelf param — identifies which entity has the shelf open
+- Filter params (`?status=`, `?q=`, `?assignee=`, `?tag=`, `?type=`) are independent
+- When navigating from History → entity, the destination URL is the canonical entity URL: `/tools/tasks?id=42`
+- The recipient of a shared link lands on the entity list with the shelf open — their filters are their own business
+- Filter params are NOT preserved across History-to-entity navigation (clean link)
+
+### History navigation
+Clicking any entity reference in History navigates to `/tools/[entity-type]?id=[seq_id]`. The user leaves History and lands on the entity's home page with the shelf open. This is the correct pattern — History is navigation, not a persistent frame.
+
+### Implementation
+Shelf open/close uses `window.history.pushState` / `popstate` listener — NOT intercepting routes (broken in Next.js 16 for numeric IDs). Filter params use `window.history.replaceState` (no new history entry).
 
 ---
 
@@ -200,7 +212,7 @@ History
 Admin
 ```
 
-**Grocery: removed from nav during refactor.** DB and API stay. UI removed. Will be revisited later.
+**Grocery: full removal.** Nav link, all UI pages (`app/(shell)/tools/grocery/`), and all API routes (`app/api/grocery/`) deleted entirely. DB table and migrations stay dormant — no data loss, no migration needed. Revisit later if needed.
 
 ---
 
@@ -303,7 +315,7 @@ Close these tickets when their session completes.
 - Preserves ALL current behavior (tab bar, overflow menu, drag-reorder, batch edit, face pile, real-time, URL state)
 - ADDS: grid view (card layout matching Library card style)
 - ADDS: tag filter chip in SearchFilterBar
-- Grocery removed from nav (delete nav link only — leave DB/API)
+- Grocery fully removed: nav link + all UI pages (`app/(shell)/tools/grocery/`) + all API routes (`app/api/grocery/`) deleted. DB table stays.
 - All #tasks-related tickets in the absorbed list closed
 - `npx tsc --noEmit` must pass
 
