@@ -2,8 +2,7 @@ import { resolveActorUnified } from '@/lib/api/resolve-actor'
 import { apiError } from '@/lib/api/errors'
 import { z } from 'zod'
 
-const ALLOWED_ENTITY_TYPES = ['tasks', 'library_items',
-  'grocery_items', 'companies', 'people', 'deals'] as const
+const ALLOWED_ENTITY_TYPES = ['tasks', 'library_items', 'companies', 'people', 'deals'] as const
 
 const schema = z.object({
   source_type: z.enum(ALLOWED_ENTITY_TYPES),
