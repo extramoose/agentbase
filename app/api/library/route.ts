@@ -1,22 +1,32 @@
 import { resolveActorUnified } from '@/lib/api/resolve-actor'
 import { apiError } from '@/lib/api/errors'
+import { parseListParams, applySearch, applyPagination, filterInMemory, paginateInMemory } from '@/lib/api/list-query'
 
 export async function GET(request: Request) {
   try {
     const { supabase, actorType, tenantId } = await resolveActorUnified(request)
+    const { page, limit, q } = parseListParams(request)
 
     let data, error
     if (actorType === 'agent') {
+      // DB-level search for agent path requires a migration (future work)
       ;({ data, error } = await supabase.rpc('rpc_list_library_items', { p_tenant_id: tenantId }))
+      if (!error && data) {
+        data = filterInMemory(data, q, ['name', 'notes', 'url'])
+        data = paginateInMemory(data, page, limit)
+      }
     } else {
-      ;({ data, error } = await supabase
+      let query = supabase
         .from('library_items')
         .select('*')
-        .order('created_at', { ascending: false }))
+      query = applySearch(query, q, ['name', 'notes', 'url'])
+      query = query.order('created_at', { ascending: false })
+      query = applyPagination(query, page, limit)
+      ;({ data, error } = await query)
     }
 
     if (error) return Response.json({ error: error.message }, { status: 400 })
-    return Response.json({ data })
+    return Response.json({ data, total: data?.length ?? 0, page, limit })
   } catch (err) {
     return apiError(err)
   }
