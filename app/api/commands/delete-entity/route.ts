@@ -2,8 +2,7 @@ import { resolveActorUnified } from '@/lib/api/resolve-actor'
 import { apiError } from '@/lib/api/errors'
 import { z } from 'zod'
 
-const ALLOWED_TABLES = ['tasks', 'library_items', 'companies', 'people', 'deals',
-  'grocery_items'] as const
+const ALLOWED_TABLES = ['tasks', 'library_items', 'companies', 'people', 'deals'] as const
 
 const schema = z.object({
   table: z.enum(ALLOWED_TABLES),
@@ -22,7 +21,7 @@ export async function POST(request: Request) {
     const { table, id } = schema.parse(body)
 
     // Capture label before delete (best effort)
-    const labelCol = ['grocery_items', 'companies', 'people'].includes(table) ? 'name' : 'title'
+    const labelCol = [, 'companies', 'people'].includes(table) ? 'name' : 'title'
     const { data: entity } = await supabase.from(table).select(`id, ${labelCol}`).eq('id', id).single()
     const label = entity ? (entity as Record<string, string>)[labelCol] ?? id : id
 

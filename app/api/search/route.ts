@@ -2,7 +2,7 @@ import { resolveActorUnified } from '@/lib/api/resolve-actor'
 import { apiError } from '@/lib/api/errors'
 import { filterInMemory, paginateInMemory } from '@/lib/api/list-query'
 
-const ALL_TYPES = ['tasks', 'people', 'companies', 'deals', 'library', 'grocery'] as const
+const ALL_TYPES = ['tasks', 'people', 'companies', 'deals', 'library'] as const
 type SearchType = (typeof ALL_TYPES)[number]
 
 const SEARCH_COLUMNS: Record<SearchType, string[]> = {
@@ -11,7 +11,6 @@ const SEARCH_COLUMNS: Record<SearchType, string[]> = {
   companies: ['name', 'website', 'notes'],
   deals: ['name', 'notes'],
   library: ['title', 'url', 'excerpt', 'body'],
-  grocery: ['name', 'category'],
 }
 
 const TABLE_NAMES: Record<SearchType, string> = {
@@ -20,7 +19,6 @@ const TABLE_NAMES: Record<SearchType, string> = {
   companies: 'companies',
   deals: 'deals',
   library: 'library_items',
-  grocery: 'grocery_items',
 }
 
 const RPC_NAMES: Record<SearchType, string> = {
@@ -29,7 +27,6 @@ const RPC_NAMES: Record<SearchType, string> = {
   companies: 'rpc_list_companies',
   deals: 'rpc_list_deals',
   library: 'rpc_list_library_items',
-  grocery: 'rpc_list_grocery_items',
 }
 
 export async function GET(request: Request) {

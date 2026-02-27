@@ -8,7 +8,7 @@ import { MarkdownRenderer } from '@/components/markdown-renderer'
 const TABLE_MAP: Record<string, string> = {
   tasks: 'tasks',
   library_items: 'library_items',
-  grocery_items: 'grocery_items',
+  
   companies: 'companies',
   people: 'people',
   deals: 'deals',
@@ -123,12 +123,6 @@ function EntityFields({ entityType, entity }: { entityType: string; entity: Reco
       { label: 'URL', value: entity.url },
       { label: 'Body', value: entity.body },
       { label: 'Tags', value: Array.isArray(entity.tags) ? (entity.tags as string[]).join(', ') : null },
-    )
-  } else if (entityType === 'grocery_items') {
-    rows.push(
-      { label: 'Category', value: entity.category },
-      { label: 'Quantity', value: entity.quantity },
-      { label: 'Checked', value: entity.checked ? 'Yes' : 'No' },
     )
   }
 

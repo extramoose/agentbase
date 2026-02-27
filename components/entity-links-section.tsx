@@ -13,7 +13,6 @@ import { cn } from '@/lib/utils'
 const ENTITY_COLORS: Record<string, string> = {
   tasks:          'bg-blue-500/20 text-blue-400',
   library_items:  'bg-yellow-500/20 text-yellow-400',
-  grocery_items:  'bg-orange-500/20 text-orange-400',
   companies:      'bg-red-500/20 text-red-400',
   people:         'bg-pink-500/20 text-pink-400',
   deals:          'bg-emerald-500/20 text-emerald-400',

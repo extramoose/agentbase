@@ -39,7 +39,7 @@ const ENTITY_COLORS: Record<string, string> = {
 
 const ENTITY_TYPES = [
   'tasks', 'library_items',
-  'grocery_items', 'companies', 'people', 'deals',
+  'companies', 'people', 'deals',
 ] as const
 
 function formatEntityType(type: string): string {

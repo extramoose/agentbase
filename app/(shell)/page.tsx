@@ -2,13 +2,12 @@ import { requireAuth } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import {
-  CheckSquare, BookOpen, ShoppingCart, Users, Clock
+  CheckSquare, BookOpen, Users, Clock
 } from 'lucide-react'
 
 const TOOLS = [
   { href: '/tools/tasks',    label: 'Tasks',    icon: CheckSquare, desc: 'Manage your work queue' },
   { href: '/tools/library',  label: 'Library',  icon: BookOpen,    desc: 'Save links, notes & ideas' },
-  { href: '/tools/grocery',  label: 'Grocery',  icon: ShoppingCart, desc: 'Shared grocery list' },
   { href: '/tools/crm',      label: 'CRM',      icon: Users,       desc: 'Companies, people & deals' },
   { href: '/history',        label: 'History',  icon: Clock,       desc: 'All recent activity' },
 ]

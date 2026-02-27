@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import {
-  CheckSquare, BookOpen, ShoppingCart, Users, Clock,
+  CheckSquare, BookOpen, Users, Clock,
   ArrowRight, Building2, User, Loader2, Hash
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -21,7 +21,6 @@ type SearchResult = {
 const NAV_ITEMS = [
   { id: 'tasks',    label: 'Tasks',    icon: CheckSquare, href: '/tools/tasks' },
   { id: 'library',  label: 'Library',  icon: BookOpen,    href: '/tools/library' },
-  { id: 'grocery',  label: 'Grocery',  icon: ShoppingCart, href: '/tools/grocery' },
   { id: 'crm',      label: 'CRM',      icon: Users,       href: '/tools/crm' },
   { id: 'history',  label: 'History',  icon: Clock,       href: '/history' },
 ]

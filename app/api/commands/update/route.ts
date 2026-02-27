@@ -4,8 +4,7 @@ import { resolveActorUnified } from '@/lib/api/resolve-actor'
 import { apiError } from '@/lib/api/errors'
 
 const ALLOWED_TABLES = [
-  'tasks', 'library_items',
-  'grocery_items', 'companies', 'people', 'deals',
+  'tasks', 'library_items', 'companies', 'people', 'deals',
 ] as const
 
 const schema = z.object({
