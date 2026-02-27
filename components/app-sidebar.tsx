@@ -1,7 +1,5 @@
 'use client'
 
-import { ANON_AVATAR_URL } from '@/lib/constants'
-
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
@@ -21,7 +19,7 @@ import {
   Check,
   Loader2,
 } from 'lucide-react'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { AvatarUpload } from '@/components/avatar-upload'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -99,15 +97,6 @@ export function AppSidebar({ profile, workspaces }: { profile: UserProfile | nul
   const tenantRole = activeWorkspace?.role
   const isAdmin =
     tenantRole === 'admin' || tenantRole === 'superadmin' || profile?.role === 'superadmin'
-
-  const initials = profile?.full_name
-    ? profile.full_name
-        .split(' ')
-        .map((n) => n[0])
-        .join('')
-        .toUpperCase()
-        .slice(0, 2)
-    : profile?.email?.[0]?.toUpperCase() ?? 'U'
 
   return (
     <aside className="flex h-screen w-60 flex-col border-r border-border bg-card">
@@ -220,10 +209,12 @@ export function AppSidebar({ profile, workspaces }: { profile: UserProfile | nul
       <Separator />
 
       <div className="flex items-center gap-3 p-4">
-        <Avatar className="h-8 w-8">
-          <AvatarImage src={profile?.avatar_url ?? ANON_AVATAR_URL} alt={profile?.full_name ?? 'User'} />
-          <AvatarFallback>{initials}</AvatarFallback>
-        </Avatar>
+        <AvatarUpload
+          currentUrl={profile?.avatar_url ?? null}
+          name={profile?.full_name ?? profile?.email ?? 'User'}
+          uploadUrl="/api/profile/avatar"
+          size="sm"
+        />
         <div className="flex-1 truncate">
           <p className="text-sm font-medium text-foreground truncate">
             {profile?.full_name ?? profile?.email ?? 'User'}

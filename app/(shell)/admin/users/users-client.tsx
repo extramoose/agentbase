@@ -1,9 +1,7 @@
 'use client'
 
-import { ANON_AVATAR_URL } from '@/lib/constants'
-
 import { useEffect, useState, useCallback } from 'react'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { AvatarUpload } from '@/components/avatar-upload'
 import { Badge } from '@/components/ui/badge'
 import {
   DropdownMenu,
@@ -15,7 +13,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from '@/hooks/use-toast'
 import { formatDistanceToNow } from 'date-fns'
-import { Check, ChevronDown, Copy, Link, Loader2, Pencil, Shield, ShieldAlert, Trash2, User, X } from 'lucide-react'
+import { ChevronDown, Copy, Link, Loader2, Shield, ShieldAlert, Trash2, User } from 'lucide-react'
 
 type Invite = {
   id: string
@@ -48,11 +46,6 @@ interface UsersClientProps {
 export function UsersClient({ currentUserId }: UsersClientProps) {
   const [members, setMembers] = useState<Member[]>([])
   const [loading, setLoading] = useState(true)
-
-  // Avatar editing state
-  const [editingAvatar, setEditingAvatar] = useState<string | null>(null)
-  const [avatarDraft, setAvatarDraft] = useState('')
-  const [savingAvatar, setSavingAvatar] = useState(false)
 
   // Invite state
   const [invites, setInvites] = useState<Invite[]>([])
@@ -99,29 +92,6 @@ export function UsersClient({ currentUserId }: UsersClientProps) {
       toast({ type: 'error', message: err instanceof Error ? err.message : 'Failed to update role' })
     }
   }, [])
-
-  const handleSaveAvatar = useCallback(async (userId: string) => {
-    setSavingAvatar(true)
-    try {
-      const res = await fetch(`/api/admin/users/${userId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ avatar_url: avatarDraft.trim() || null }),
-      })
-      const json = await res.json()
-      if (!res.ok) throw new Error(json.error ?? 'Failed to update avatar')
-
-      setMembers(prev => prev.map(m =>
-        m.id === userId ? { ...m, avatar_url: avatarDraft.trim() || null } : m
-      ))
-      setEditingAvatar(null)
-      toast({ type: 'success', message: 'Avatar updated' })
-    } catch (err) {
-      toast({ type: 'error', message: err instanceof Error ? err.message : 'Failed to update avatar' })
-    } finally {
-      setSavingAvatar(false)
-    }
-  }, [avatarDraft])
 
   const handleGenerateInvite = useCallback(async () => {
     setGenerating(true)
@@ -205,59 +175,27 @@ export function UsersClient({ currentUserId }: UsersClientProps) {
             {members.map(member => {
               const config = ROLE_CONFIG[member.role] ?? ROLE_CONFIG.user
               const displayName = member.full_name ?? member.email.split('@')[0]
-              const initials = displayName.slice(0, 2).toUpperCase()
               const isSelf = member.id === currentUserId
               const isSuperadmin = member.role === 'superadmin'
-              const isEditingAvatar = editingAvatar === member.id
 
               return (
                 <tr key={member.id} className="border-b border-border last:border-0 hover:bg-muted/40">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
-                      <div className="relative group">
-                        <Avatar className="h-8 w-8">
-                          <AvatarImage src={member.avatar_url ?? ANON_AVATAR_URL} alt={displayName} />
-                          <AvatarFallback className="text-xs">{initials}</AvatarFallback>
-                        </Avatar>
-                        {!isEditingAvatar && (
-                          <button
-                            className="absolute inset-0 flex items-center justify-center rounded-full bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity"
-                            onClick={() => { setEditingAvatar(member.id); setAvatarDraft(member.avatar_url ?? '') }}
-                          >
-                            <Pencil className="h-3 w-3 text-white" />
-                          </button>
-                        )}
-                      </div>
+                      <AvatarUpload
+                        currentUrl={member.avatar_url}
+                        name={displayName}
+                        uploadUrl="/api/profile/avatar"
+                        size="sm"
+                        onSuccess={(newUrl) =>
+                          setMembers(prev => prev.map(m =>
+                            m.id === member.id ? { ...m, avatar_url: newUrl } : m
+                          ))
+                        }
+                      />
                       <div className="min-w-0">
                         <p className="text-sm font-medium truncate">{displayName}</p>
                         <p className="text-xs text-muted-foreground truncate">{member.email}</p>
-                        {isEditingAvatar && (
-                          <div className="flex items-center gap-1 mt-1">
-                            <Input
-                              className="h-6 text-xs"
-                              placeholder="Avatar URL"
-                              value={avatarDraft}
-                              onChange={e => setAvatarDraft(e.target.value)}
-                              disabled={savingAvatar}
-                            />
-                            <Button
-                              variant="ghost"
-                              size="icon-xs"
-                              onClick={() => handleSaveAvatar(member.id)}
-                              disabled={savingAvatar}
-                            >
-                              {savingAvatar ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon-xs"
-                              onClick={() => setEditingAvatar(null)}
-                              disabled={savingAvatar}
-                            >
-                              <X className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        )}
                       </div>
                     </div>
                   </td>

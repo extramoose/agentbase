@@ -5,7 +5,6 @@ import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { cn } from '@/lib/utils'
-import { ANON_AVATAR_URL } from '@/lib/constants'
 
 type ActorDisplay = {
   id: string
@@ -84,23 +83,25 @@ export function ActorChip({ actorId, actorType, compact = false, className }: Ac
 
   const displayName = actor?.displayName ?? '…'
   const initials = displayName === '…' ? '?' : displayName.slice(0, 2).toUpperCase()
-  const avatarSrc = actor?.avatar_url ?? ANON_AVATAR_URL
+  const avatarSrc = actor?.avatar_url ?? null
+
+  const avatarContent = avatarSrc && !imgError ? (
+    <Image
+      src={avatarSrc}
+      alt={displayName}
+      width={24}
+      height={24}
+      className="aspect-square size-full object-cover"
+      onError={() => setImgError(true)}
+    />
+  ) : (
+    <AvatarFallback className="text-xs">{initials}</AvatarFallback>
+  )
 
   if (compact) {
     return (
       <Avatar className={cn('h-6 w-6 shrink-0', className)}>
-        {!imgError ? (
-          <Image
-            src={avatarSrc}
-            alt={displayName}
-            width={24}
-            height={24}
-            className="aspect-square size-full object-cover"
-            onError={() => setImgError(true)}
-          />
-        ) : (
-          <AvatarFallback className="text-xs">{initials}</AvatarFallback>
-        )}
+        {avatarContent}
       </Avatar>
     )
   }
@@ -108,18 +109,7 @@ export function ActorChip({ actorId, actorType, compact = false, className }: Ac
   return (
     <div className={cn('flex items-center gap-2', className)}>
       <Avatar className="h-6 w-6 shrink-0">
-        {!imgError ? (
-          <Image
-            src={avatarSrc}
-            alt={displayName}
-            width={24}
-            height={24}
-            className="aspect-square size-full object-cover"
-            onError={() => setImgError(true)}
-          />
-        ) : (
-          <AvatarFallback className="text-xs">{initials}</AvatarFallback>
-        )}
+        {avatarContent}
       </Avatar>
       <span className="text-sm text-muted-foreground truncate">{displayName}</span>
     </div>
