@@ -3,6 +3,7 @@ import { Inter } from 'next/font/google'
 import './globals.css'
 import '@/lib/env' // Boot-time env validation
 import { ToastProvider } from '@/components/toast-provider'
+import { PostHogProvider } from '@/providers/posthog'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -20,8 +21,10 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body className={inter.className}>
-        {children}
-        <ToastProvider />
+        <PostHogProvider>
+          {children}
+          <ToastProvider />
+        </PostHogProvider>
       </body>
     </html>
   )
