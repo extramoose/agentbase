@@ -96,8 +96,9 @@ export function AppSidebar({ profile, workspaces }: { profile: UserProfile | nul
   const activeWorkspace = workspaces.find((w) => w.is_active)
   const hasMultipleWorkspaces = workspaces.length > 1
 
+  const tenantRole = activeWorkspace?.role
   const isAdmin =
-    profile?.role === 'admin' || profile?.role === 'superadmin'
+    tenantRole === 'admin' || tenantRole === 'superadmin' || profile?.role === 'superadmin'
 
   const initials = profile?.full_name
     ? profile.full_name
