@@ -303,7 +303,7 @@ Close these tickets when their session completes.
 - No entity-specific code in this session — foundation only
 - `npx tsc --noEmit` must pass
 
-**Claude Code instructions:** Read this document fully. Read existing `components/search-filter-bar.tsx`, `components/right-shelf.tsx`, `components/activity-and-comments.tsx`, `lib/format-activity.tsx`. Build the shared foundation components as specified. Do not touch any page-level files.
+**Claude Code instructions:** Read this document fully. Read existing `components/edit-shelf.tsx`, `components/search-filter-bar.tsx`, `components/activity-and-comments.tsx`, `lib/format-activity.tsx`, `components/entity-preview-shelf.tsx`. Build the shared foundation components as specified. Do not touch any page-level files.
 
 ---
 
