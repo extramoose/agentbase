@@ -4,14 +4,17 @@ import { useCallback, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { RichTextEditor } from '@/components/rich-text-editor'
 import { MarkdownRenderer } from '@/components/markdown-renderer'
+import { ActivityAndComments } from '@/components/activity-and-comments'
 import { toast } from '@/hooks/use-toast'
 
 type DiaryEntry = {
   id: string
   date: string
   content: string | null
+  summary: string | null
   created_at: string
   updated_at: string
 }
@@ -54,6 +57,7 @@ export function DiaryClient({ entry, date }: DiaryClientProps) {
   const phase = useMemo<Phase>(() => computePhase(date), [date])
   const [currentEntry, setCurrentEntry] = useState<DiaryEntry | null>(entry)
   const [currentContent, setCurrentContent] = useState(entry?.content ?? '')
+  const [currentSummary] = useState(entry?.summary ?? '')
   const [saving, setSaving] = useState(false)
   const savingRef = useRef(false)
   const denverToday = useMemo(() => getDenverToday(), [])
@@ -100,6 +104,14 @@ export function DiaryClient({ entry, date }: DiaryClientProps) {
 
   const isEditable = phase !== 'past'
 
+  const lifecycleLabel = phase === 'future' ? 'Future' : phase === 'today' ? 'Open' : 'Closed'
+  const lifecycleClass =
+    phase === 'future'
+      ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300'
+      : phase === 'today'
+        ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300'
+        : 'bg-muted text-muted-foreground'
+
   return (
     <div className="flex flex-col h-full max-w-3xl mx-auto w-full">
       {/* Calendar day strip nav */}
@@ -126,6 +138,7 @@ export function DiaryClient({ entry, date }: DiaryClientProps) {
           {saving && (
             <span className="text-xs text-muted-foreground">Saving…</span>
           )}
+          <Badge className={lifecycleClass}>{lifecycleLabel}</Badge>
         </div>
 
         <Button
@@ -137,23 +150,51 @@ export function DiaryClient({ entry, date }: DiaryClientProps) {
         </Button>
       </div>
 
-      {/* Document area */}
-      <div className="flex-1 px-2 pb-4">
+      {/* Hunter Notes */}
+      <div className="px-2 pb-4">
+        <h3 className="text-sm font-medium text-muted-foreground mb-2">Hunter Notes</h3>
         {isEditable ? (
           <RichTextEditor
             value={currentContent}
             onChange={(md) => setCurrentContent(md)}
             onBlur={(md) => saveEntry(md)}
             placeholder="Write today's entry..."
-            minHeight="400px"
+            minHeight="200px"
           />
         ) : (
-          <div className="min-h-[400px] rounded-md border border-border p-4">
+          <div className="min-h-[100px] rounded-md border border-border p-4">
             <MarkdownRenderer content={currentContent} />
           </div>
         )}
       </div>
 
+      {/* Comments */}
+      {currentEntry && (
+        <div className="px-2 pb-4">
+          <h3 className="text-sm font-medium text-muted-foreground mb-2">Comments</h3>
+          <div className="rounded-md border border-border">
+            <ActivityAndComments
+              entityType="diary_entries"
+              entityId={currentEntry.id}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Conclusion — only when closed */}
+      {phase === 'past' && (
+        <div className="px-2 pb-4">
+          <h3 className="text-sm font-medium text-muted-foreground mb-2">Conclusion</h3>
+          <div className="rounded-md border border-border p-4">
+            {currentSummary ? (
+              <MarkdownRenderer content={currentSummary} />
+            ) : (
+              <p className="text-sm text-muted-foreground">No conclusion yet.</p>
+            )}
+            <p className="text-xs italic text-muted-foreground mt-2">Written by Lucy</p>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
