@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { RichTextEditor } from '@/components/rich-text-editor'
 import { TagCombobox } from '@/components/tag-combobox'
+import { ActivityAndComments } from '@/components/activity-and-comments'
 import { toast } from '@/hooks/use-toast'
 import { cn } from '@/lib/utils'
 import { stripMarkdown } from '@/lib/strip-markdown'
@@ -392,12 +393,18 @@ function EssayDetail({
               onUpdate(essay.id, { title: e.target.value.trim() })
             }
           }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') e.currentTarget.blur()
+          }}
           className="text-lg font-semibold border-none bg-transparent px-0 h-auto focus-visible:ring-0"
         />
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => onDelete(essay.id)}
+          onClick={() => {
+            if (!window.confirm('Delete this essay? This cannot be undone.')) return
+            onDelete(essay.id)
+          }}
           className="shrink-0 text-muted-foreground hover:text-destructive"
         >
           <Trash2 className="h-4 w-4" />
@@ -415,8 +422,13 @@ function EssayDetail({
         />
       </div>
 
-      {/* Document area */}
-      <div className="flex-1 px-4 pb-4">
+      {/* Hunter Notes */}
+      <div className="px-4 pt-2">
+        <div className="border-t border-border pt-3 pb-1">
+          <h3 className="text-sm font-medium text-muted-foreground">Hunter Notes</h3>
+        </div>
+      </div>
+      <div className="px-4 pb-4">
         <RichTextEditor
           value={body}
           onChange={(md) => setBody(md)}
@@ -428,6 +440,16 @@ function EssayDetail({
           placeholder="Start writing your essay..."
           minHeight="400px"
         />
+      </div>
+
+      {/* Comments */}
+      <div className="px-4">
+        <div className="border-t border-border pt-3 pb-1">
+          <h3 className="text-sm font-medium text-muted-foreground">Comments</h3>
+        </div>
+      </div>
+      <div className="px-4 pb-4">
+        <ActivityAndComments entityType="essays" entityId={essay.id} />
       </div>
     </div>
   )
