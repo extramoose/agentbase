@@ -51,3 +51,58 @@ export function paginateInMemory<R>(records: R[], page: number, limit: number): 
   const from = (page - 1) * limit
   return records.slice(from, from + limit)
 }
+
+/**
+ * Parse optional filter params from the request URL.
+ * Returns a map of field→value (raw string, may be comma-separated for multi-value).
+ */
+export function parseFilterParams(request: Request, fields: string[]): Record<string, string> {
+  const url = new URL(request.url)
+  const filters: Record<string, string> = {}
+  for (const f of fields) {
+    const v = url.searchParams.get(f)
+    if (v) filters[f] = v
+  }
+  return filters
+}
+
+/**
+ * Apply field-exact filters to a Supabase query.
+ * Single values use .eq(), comma-separated values use .in().
+ */
+export function applyFilters<T>(
+  query: T,
+  filters: Record<string, string>,
+): T {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let q = query as any
+  for (const [field, value] of Object.entries(filters)) {
+    const values = value.split(',').map(v => v.trim()).filter(Boolean)
+    if (values.length === 1) {
+      q = q.eq(field, values[0])
+    } else if (values.length > 1) {
+      q = q.in(field, values)
+    }
+  }
+  return q as T
+}
+
+/**
+ * Filter an array of records in-memory by exact field matches.
+ * Supports comma-separated multi-value params.
+ */
+export function filterByFieldsInMemory<R extends Record<string, unknown>>(
+  records: R[],
+  filters: Record<string, string>,
+): R[] {
+  let result = records
+  for (const [field, value] of Object.entries(filters)) {
+    const values = value.split(',').map(v => v.trim()).filter(Boolean)
+    result = result.filter(r => {
+      const fieldVal = r[field]
+      if (fieldVal == null) return false
+      return values.includes(String(fieldVal))
+    })
+  }
+  return result
+}
