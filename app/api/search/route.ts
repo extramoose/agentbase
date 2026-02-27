@@ -2,7 +2,7 @@ import { resolveActorUnified } from '@/lib/api/resolve-actor'
 import { apiError } from '@/lib/api/errors'
 import { filterInMemory, paginateInMemory } from '@/lib/api/list-query'
 
-const ALL_TYPES = ['tasks', 'people', 'companies', 'deals', 'meetings', 'library', 'essays', 'diary', 'grocery'] as const
+const ALL_TYPES = ['tasks', 'people', 'companies', 'deals', 'library', 'grocery'] as const
 type SearchType = (typeof ALL_TYPES)[number]
 
 const SEARCH_COLUMNS: Record<SearchType, string[]> = {
@@ -10,10 +10,7 @@ const SEARCH_COLUMNS: Record<SearchType, string[]> = {
   people: ['name', 'email', 'title', 'notes'],
   companies: ['name', 'website', 'notes'],
   deals: ['name', 'notes'],
-  meetings: ['title'],
   library: ['name', 'notes', 'url'],
-  essays: ['title', 'body'],
-  diary: ['content', 'summary'],
   grocery: ['name', 'category'],
 }
 
@@ -22,10 +19,7 @@ const TABLE_NAMES: Record<SearchType, string> = {
   people: 'people',
   companies: 'companies',
   deals: 'deals',
-  meetings: 'meetings',
   library: 'library_items',
-  essays: 'essays',
-  diary: 'diary_entries',
   grocery: 'grocery_items',
 }
 
@@ -34,10 +28,7 @@ const RPC_NAMES: Record<SearchType, string> = {
   people: 'rpc_list_people',
   companies: 'rpc_list_companies',
   deals: 'rpc_list_deals',
-  meetings: 'rpc_list_meetings',
   library: 'rpc_list_library_items',
-  essays: 'rpc_list_essays',
-  diary: 'rpc_list_diary_entries',
   grocery: 'rpc_list_grocery_items',
 }
 

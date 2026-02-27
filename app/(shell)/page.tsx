@@ -2,14 +2,12 @@ import { requireAuth } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import {
-  CheckSquare, Video, BookOpen, BookMarked, ShoppingCart, Users, Clock
+  CheckSquare, BookOpen, ShoppingCart, Users, Clock
 } from 'lucide-react'
 
 const TOOLS = [
   { href: '/tools/tasks',    label: 'Tasks',    icon: CheckSquare, desc: 'Manage your work queue' },
-  { href: '/tools/meetings', label: 'Meetings', icon: Video,       desc: 'Meeting notes & summaries' },
   { href: '/tools/library',  label: 'Library',  icon: BookOpen,    desc: 'Save links, notes & ideas' },
-  { href: '/tools/diary',    label: 'Diary',    icon: BookMarked,  desc: 'Daily reflections' },
   { href: '/tools/grocery',  label: 'Grocery',  icon: ShoppingCart, desc: 'Shared grocery list' },
   { href: '/tools/crm',      label: 'CRM',      icon: Users,       desc: 'Companies, people & deals' },
   { href: '/history',        label: 'History',  icon: Clock,       desc: 'All recent activity' },
@@ -21,11 +19,9 @@ export default async function HomePage() {
 
   const [
     { count: taskCount },
-    { count: meetingCount },
     { count: libraryCount },
   ] = await Promise.all([
     supabase.from('tasks').select('*', { count: 'exact', head: true }).eq('status', 'in_progress'),
-    supabase.from('meetings').select('*', { count: 'exact', head: true }).eq('status', 'upcoming'),
     supabase.from('library_items').select('*', { count: 'exact', head: true }),
   ])
 
@@ -45,9 +41,8 @@ export default async function HomePage() {
         <p className="text-muted-foreground mt-1">Here&apos;s your workspace at a glance.</p>
       </div>
 
-      <div className="grid grid-cols-3 gap-4 mb-10">
+      <div className="grid grid-cols-2 gap-4 mb-10">
         <StatCard label="Tasks in progress" value={taskCount ?? 0} href="/tools/tasks" />
-        <StatCard label="Upcoming meetings" value={meetingCount ?? 0} href="/tools/meetings" />
         <StatCard label="Library items" value={libraryCount ?? 0} href="/tools/library" />
       </div>
 

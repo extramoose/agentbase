@@ -2,8 +2,8 @@ import { resolveActorUnified } from '@/lib/api/resolve-actor'
 import { apiError } from '@/lib/api/errors'
 import { z } from 'zod'
 
-const ALLOWED_TABLES = ['tasks', 'meetings', 'library_items', 'companies', 'people', 'deals',
-  'grocery_items', 'diary_entries', 'essays', 'stream_entries', 'document_versions'] as const
+const ALLOWED_TABLES = ['tasks', 'library_items', 'companies', 'people', 'deals',
+  'grocery_items'] as const
 
 const schema = z.object({
   table: z.enum(ALLOWED_TABLES),

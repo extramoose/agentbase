@@ -3,7 +3,7 @@ import { resolveActorUnified } from '@/lib/api/resolve-actor'
 import { apiError } from '@/lib/api/errors'
 
 const ALLOWED_TABLES = [
-  'tasks', 'meetings', 'library_items',
+  'tasks', 'library_items',
   'companies', 'people', 'deals', 'grocery_items',
 ] as const
 

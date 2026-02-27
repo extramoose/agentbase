@@ -7,9 +7,7 @@ import { MarkdownRenderer } from '@/components/markdown-renderer'
 
 const TABLE_MAP: Record<string, string> = {
   tasks: 'tasks',
-  meetings: 'meetings',
   library_items: 'library_items',
-  diary_entries: 'diary_entries',
   grocery_items: 'grocery_items',
   companies: 'companies',
   people: 'people',
@@ -99,12 +97,6 @@ function EntityFields({ entityType, entity }: { entityType: string; entity: Reco
       { label: 'Tags', value: Array.isArray(entity.tags) ? (entity.tags as string[]).join(', ') : null },
       { label: 'Body', value: entity.body },
     )
-  } else if (entityType === 'meetings') {
-    rows.push(
-      { label: 'Date', value: entity.date },
-      { label: 'Status', value: entity.status },
-      { label: 'Tags', value: Array.isArray(entity.tags) ? (entity.tags as string[]).join(', ') : null },
-    )
   } else if (entityType === 'companies') {
     rows.push(
       { label: 'Domain', value: entity.domain },
@@ -131,11 +123,6 @@ function EntityFields({ entityType, entity }: { entityType: string; entity: Reco
       { label: 'URL', value: entity.url },
       { label: 'Body', value: entity.body },
       { label: 'Tags', value: Array.isArray(entity.tags) ? (entity.tags as string[]).join(', ') : null },
-    )
-  } else if (entityType === 'diary_entries') {
-    rows.push(
-      { label: 'Date', value: entity.date },
-      { label: 'Content', value: entity.content },
     )
   } else if (entityType === 'grocery_items') {
     rows.push(
