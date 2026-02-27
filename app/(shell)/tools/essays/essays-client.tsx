@@ -8,14 +8,10 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { RichTextEditor } from '@/components/rich-text-editor'
-import { StreamPanel } from '@/components/stream-panel'
-import { VersionHistoryDropdown } from '@/components/version-history-dropdown'
-import { SynthesizeButton } from '@/components/synthesize-button'
 import { TagCombobox } from '@/components/tag-combobox'
 import { toast } from '@/hooks/use-toast'
 import { cn } from '@/lib/utils'
 import { stripMarkdown } from '@/lib/strip-markdown'
-import type { DocumentVersion } from '@/lib/types/stream'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -376,26 +372,13 @@ function EssayDetail({
   const [title, setTitle] = useState(essay.title)
   const [body, setBody] = useState(essay.body)
   const [tags, setTags] = useState<string[]>(essay.tags)
-  const [viewingVersion, setViewingVersion] = useState<DocumentVersion | null>(null)
 
   // Sync when essay prop changes (from realtime or list selection)
   useEffect(() => {
     setTitle(essay.title)
     setBody(essay.body)
     setTags(essay.tags)
-    setViewingVersion(null)
   }, [essay.id, essay.title, essay.body, essay.tags])
-
-  function handleSynthesizeComplete(version: DocumentVersion) {
-    setBody(version.content)
-    setViewingVersion(null)
-  }
-
-  function handleVersionSelect(content: string) {
-    setViewingVersion({ content } as DocumentVersion)
-  }
-
-  const displayContent = viewingVersion ? viewingVersion.content : body
 
   return (
     <div className="flex flex-col h-full max-w-3xl mx-auto w-full">
@@ -432,49 +415,19 @@ function EssayDetail({
         />
       </div>
 
-      {/* Toolbar: Version History + Synthesize */}
-      <div className="flex items-center gap-2 px-4 pb-4 flex-wrap">
-        <VersionHistoryDropdown
-          entityType="essay"
-          entityId={essay.id}
-          currentContent={body}
-          onVersionSelect={handleVersionSelect}
-        />
-        <SynthesizeButton
-          entityType="essay"
-          entityId={essay.id}
-          contextHint="update"
-          label="Synthesize"
-          onComplete={handleSynthesizeComplete}
-        />
-      </div>
-
       {/* Document area */}
       <div className="flex-1 px-4 pb-4">
-        {viewingVersion ? (
-          <div className="min-h-[400px] rounded-md border border-border p-4">
-            <div className="prose prose-invert max-w-none whitespace-pre-wrap">
-              {displayContent}
-            </div>
-          </div>
-        ) : (
-          <RichTextEditor
-            value={displayContent}
-            onChange={(md) => setBody(md)}
-            onBlur={(md) => {
-              if (md !== essay.body) {
-                onUpdate(essay.id, { body: md })
-              }
-            }}
-            placeholder="Start writing your essay..."
-            minHeight="400px"
-          />
-        )}
-      </div>
-
-      {/* Stream Panel */}
-      <div className="border-t border-border px-4 py-4">
-        <StreamPanel entityType="essay" entityId={essay.id} />
+        <RichTextEditor
+          value={body}
+          onChange={(md) => setBody(md)}
+          onBlur={(md) => {
+            if (md !== essay.body) {
+              onUpdate(essay.id, { body: md })
+            }
+          }}
+          placeholder="Start writing your essay..."
+          minHeight="400px"
+        />
       </div>
     </div>
   )
