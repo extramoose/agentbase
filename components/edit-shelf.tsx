@@ -14,7 +14,6 @@ interface EditShelfProps {
   entityType?: string
   entityId?: string
   children: React.ReactNode
-  width?: string
 }
 
 export function EditShelf({
@@ -25,7 +24,6 @@ export function EditShelf({
   entityType,
   entityId,
   children,
-  width = 'w-[520px]',
 }: EditShelfProps) {
   // Close on Escape
   useEffect(() => {
@@ -50,12 +48,11 @@ export function EditShelf({
         className={cn(
           'fixed right-0 top-0 h-full z-50 flex flex-col',
           'bg-card border-l border-border shadow-2xl',
-          width,
-          'max-w-full'
+          'w-full sm:w-[520px] sm:max-w-full',
         )}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border shrink-0">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-border shrink-0">
           <h2 className="text-base font-semibold truncate">{title}</h2>
           <div className="flex items-center gap-2">
             {headerRight}
@@ -68,7 +65,7 @@ export function EditShelf({
         {/* Scrollable content */}
         <div className="flex-1 overflow-y-auto">
           {/* Entity form content */}
-          <div className="p-6">
+          <div className="p-4 sm:p-6">
             {children}
           </div>
 

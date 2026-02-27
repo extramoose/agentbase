@@ -58,9 +58,9 @@ export function EntityPreviewShelf({ entityType, entityId, entityLabel, onClose 
         className="fixed inset-0 z-40 bg-black/20"
         onClick={onClose}
       />
-      <div className="fixed right-0 top-0 z-50 h-full w-[480px] bg-background border-l border-border flex flex-col shadow-xl">
+      <div className="fixed right-0 top-0 z-50 h-full w-full sm:w-[480px] sm:max-w-full bg-background border-l border-border flex flex-col shadow-xl">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-border">
           <div className="min-w-0 flex-1">
             <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">{entityType.replace(/_/g, ' ')}</p>
             <h2 className="text-base font-semibold text-foreground truncate">{title}</h2>
@@ -71,7 +71,7 @@ export function EntityPreviewShelf({ entityType, entityId, entityLabel, onClose 
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto px-6 py-4">
+        <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4">
           {loading && <p className="text-sm text-muted-foreground">Loading...</p>}
           {!loading && !entity && <p className="text-sm text-muted-foreground">Entity not found or deleted.</p>}
           {!loading && entity && (

@@ -158,11 +158,11 @@ export function UsersClient({ currentUserId }: UsersClientProps) {
   }
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Users</h1>
+    <div className="space-y-4 sm:space-y-6">
+      <h1 className="text-xl sm:text-2xl font-bold">Users</h1>
 
-      <div className="rounded-lg border border-border">
-        <table className="w-full">
+      <div className="rounded-lg border border-border overflow-x-auto">
+        <table className="w-full min-w-[600px]">
           <thead>
             <tr className="border-b border-border text-left text-sm text-muted-foreground">
               <th className="px-4 py-3 font-medium">User</th>

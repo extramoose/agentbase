@@ -18,8 +18,8 @@ export function SearchFilterBar({
   className,
 }: SearchFilterBarProps) {
   return (
-    <div className={cn('flex items-center gap-3', className)}>
-      <div className="relative flex-1 max-w-sm">
+    <div className={cn('flex flex-wrap items-center gap-2 sm:gap-3', className)}>
+      <div className="relative flex-1 min-w-[140px] max-w-sm">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
           value={search}

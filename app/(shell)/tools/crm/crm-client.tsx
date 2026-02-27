@@ -427,9 +427,9 @@ export function CrmClient({
   return (
     <div className="flex flex-col h-full">
       {/* Top bar */}
-      <div className="flex items-center justify-between gap-4 mb-4">
-        <h1 className="text-2xl font-bold shrink-0">CRM</h1>
-        <div className="flex items-center gap-3 flex-1 justify-end">
+      <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-4 mb-4">
+        <h1 className="text-xl sm:text-2xl font-bold shrink-0">CRM</h1>
+        <div className="flex items-center gap-2 sm:gap-3 flex-1 justify-end min-w-0">
           <SearchFilterBar
             search={search}
             onSearchChange={setSearch}
@@ -438,13 +438,14 @@ export function CrmClient({
           />
           <Button size="sm" onClick={() => setAdding(true)}>
             <Plus className="h-4 w-4 mr-1" />
-            Add {tab === 'companies' ? 'Company' : tab === 'people' ? 'Person' : 'Deal'}
+            <span className="hidden sm:inline">Add {tab === 'companies' ? 'Company' : tab === 'people' ? 'Person' : 'Deal'}</span>
+            <span className="sm:hidden">Add</span>
           </Button>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-4 border-b border-border pb-2">
+      <div className="flex gap-1 mb-4 border-b border-border pb-2 overflow-x-auto">
         {TABS.map((t) => {
           const count = t.value === 'companies' ? companies.length : t.value === 'people' ? people.length : deals.length
           return (
@@ -599,38 +600,40 @@ function CompaniesTable({
   }
 
   return (
-    <div>
-      {/* Header */}
-      <div className="grid grid-cols-[1fr_150px_150px_100px] gap-3 px-3 py-2 border-b border-border">
-        <SortableHeader label="Name" sortKey="name" currentKey={sortKey} currentDir={sortDir} onSort={onSort} />
-        <SortableHeader label="Industry" sortKey="industry" currentKey={sortKey} currentDir={sortDir} onSort={onSort} />
-        <SortableHeader label="Created" sortKey="created_at" currentKey={sortKey} currentDir={sortDir} onSort={onSort} />
-        <span className="text-xs font-medium text-muted-foreground">Tags</span>
-      </div>
-      {/* Rows */}
-      {companies.map((c) => (
-        <div
-          key={c.id}
-          onClick={() => onSelect(c)}
-          className="grid grid-cols-[1fr_150px_150px_100px] gap-3 px-3 py-2.5 hover:bg-muted/50 cursor-pointer border-b border-border/50 transition-colors"
-        >
-          <div className="flex items-center gap-2 min-w-0">
-            <Building2 className="h-4 w-4 text-muted-foreground shrink-0" />
-            <span className="text-sm truncate">{c.name}</span>
-            {c.domain && <span className="text-xs text-muted-foreground truncate">{c.domain}</span>}
-          </div>
-          <span className="text-sm text-muted-foreground truncate">{c.industry ?? '\u2014'}</span>
-          <span className="text-xs text-muted-foreground">
-            {new Date(c.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-          </span>
-          <div className="flex gap-1 overflow-hidden">
-            {c.tags.slice(0, 2).map((tag) => (
-              <Badge key={tag} variant="outline" className="text-xs px-1.5 py-0 shrink-0">{tag}</Badge>
-            ))}
-            {c.tags.length > 2 && <span className="text-xs text-muted-foreground">+{c.tags.length - 2}</span>}
-          </div>
+    <div className="overflow-x-auto">
+      <div className="min-w-[500px]">
+        {/* Header */}
+        <div className="grid grid-cols-[1fr_150px_150px_100px] gap-3 px-3 py-2 border-b border-border">
+          <SortableHeader label="Name" sortKey="name" currentKey={sortKey} currentDir={sortDir} onSort={onSort} />
+          <SortableHeader label="Industry" sortKey="industry" currentKey={sortKey} currentDir={sortDir} onSort={onSort} />
+          <SortableHeader label="Created" sortKey="created_at" currentKey={sortKey} currentDir={sortDir} onSort={onSort} />
+          <span className="text-xs font-medium text-muted-foreground">Tags</span>
         </div>
-      ))}
+        {/* Rows */}
+        {companies.map((c) => (
+          <div
+            key={c.id}
+            onClick={() => onSelect(c)}
+            className="grid grid-cols-[1fr_150px_150px_100px] gap-3 px-3 py-2.5 hover:bg-muted/50 cursor-pointer border-b border-border/50 transition-colors"
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <Building2 className="h-4 w-4 text-muted-foreground shrink-0" />
+              <span className="text-sm truncate">{c.name}</span>
+              {c.domain && <span className="text-xs text-muted-foreground truncate">{c.domain}</span>}
+            </div>
+            <span className="text-sm text-muted-foreground truncate">{c.industry ?? '\u2014'}</span>
+            <span className="text-xs text-muted-foreground">
+              {new Date(c.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+            </span>
+            <div className="flex gap-1 overflow-hidden">
+              {c.tags.slice(0, 2).map((tag) => (
+                <Badge key={tag} variant="outline" className="text-xs px-1.5 py-0 shrink-0">{tag}</Badge>
+              ))}
+              {c.tags.length > 2 && <span className="text-xs text-muted-foreground">+{c.tags.length - 2}</span>}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
@@ -657,33 +660,35 @@ function PeopleTable({
   }
 
   return (
-    <div>
-      <div className="grid grid-cols-[1fr_1fr_150px_100px] gap-3 px-3 py-2 border-b border-border">
-        <SortableHeader label="Name" sortKey="name" currentKey={sortKey} currentDir={sortDir} onSort={onSort} />
-        <SortableHeader label="Email" sortKey="email" currentKey={sortKey} currentDir={sortDir} onSort={onSort} />
-        <SortableHeader label="Title" sortKey="title" currentKey={sortKey} currentDir={sortDir} onSort={onSort} />
-        <span className="text-xs font-medium text-muted-foreground">Tags</span>
-      </div>
-      {people.map((p) => (
-        <div
-          key={p.id}
-          onClick={() => onSelect(p)}
-          className="grid grid-cols-[1fr_1fr_150px_100px] gap-3 px-3 py-2.5 hover:bg-muted/50 cursor-pointer border-b border-border/50 transition-colors"
-        >
-          <div className="flex items-center gap-2 min-w-0">
-            <User className="h-4 w-4 text-muted-foreground shrink-0" />
-            <span className="text-sm truncate">{p.name}</span>
-          </div>
-          <span className="text-sm text-muted-foreground truncate">{p.email ?? '\u2014'}</span>
-          <span className="text-sm text-muted-foreground truncate">{p.title ?? '\u2014'}</span>
-          <div className="flex gap-1 overflow-hidden">
-            {p.tags.slice(0, 2).map((tag) => (
-              <Badge key={tag} variant="outline" className="text-xs px-1.5 py-0 shrink-0">{tag}</Badge>
-            ))}
-            {p.tags.length > 2 && <span className="text-xs text-muted-foreground">+{p.tags.length - 2}</span>}
-          </div>
+    <div className="overflow-x-auto">
+      <div className="min-w-[500px]">
+        <div className="grid grid-cols-[1fr_1fr_150px_100px] gap-3 px-3 py-2 border-b border-border">
+          <SortableHeader label="Name" sortKey="name" currentKey={sortKey} currentDir={sortDir} onSort={onSort} />
+          <SortableHeader label="Email" sortKey="email" currentKey={sortKey} currentDir={sortDir} onSort={onSort} />
+          <SortableHeader label="Title" sortKey="title" currentKey={sortKey} currentDir={sortDir} onSort={onSort} />
+          <span className="text-xs font-medium text-muted-foreground">Tags</span>
         </div>
-      ))}
+        {people.map((p) => (
+          <div
+            key={p.id}
+            onClick={() => onSelect(p)}
+            className="grid grid-cols-[1fr_1fr_150px_100px] gap-3 px-3 py-2.5 hover:bg-muted/50 cursor-pointer border-b border-border/50 transition-colors"
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <User className="h-4 w-4 text-muted-foreground shrink-0" />
+              <span className="text-sm truncate">{p.name}</span>
+            </div>
+            <span className="text-sm text-muted-foreground truncate">{p.email ?? '\u2014'}</span>
+            <span className="text-sm text-muted-foreground truncate">{p.title ?? '\u2014'}</span>
+            <div className="flex gap-1 overflow-hidden">
+              {p.tags.slice(0, 2).map((tag) => (
+                <Badge key={tag} variant="outline" className="text-xs px-1.5 py-0 shrink-0">{tag}</Badge>
+              ))}
+              {p.tags.length > 2 && <span className="text-xs text-muted-foreground">+{p.tags.length - 2}</span>}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
@@ -710,37 +715,39 @@ function DealsTable({
   }
 
   return (
-    <div>
-      <div className="grid grid-cols-[1fr_100px_120px_100px] gap-3 px-3 py-2 border-b border-border">
-        <SortableHeader label="Title" sortKey="title" currentKey={sortKey} currentDir={sortDir} onSort={onSort} />
-        <SortableHeader label="Status" sortKey="status" currentKey={sortKey} currentDir={sortDir} onSort={onSort} />
-        <SortableHeader label="Value" sortKey="value" currentKey={sortKey} currentDir={sortDir} onSort={onSort} />
-        <SortableHeader label="Created" sortKey="created_at" currentKey={sortKey} currentDir={sortDir} onSort={onSort} />
-      </div>
-      {deals.map((d) => {
-        const statusCfg = DEAL_STATUS_CONFIG[d.status]
-        return (
-          <div
-            key={d.id}
-            onClick={() => onSelect(d)}
-            className="grid grid-cols-[1fr_100px_120px_100px] gap-3 px-3 py-2.5 hover:bg-muted/50 cursor-pointer border-b border-border/50 transition-colors"
-          >
-            <div className="flex items-center gap-2 min-w-0">
-              <Handshake className="h-4 w-4 text-muted-foreground shrink-0" />
-              <span className="text-sm truncate">{d.title}</span>
+    <div className="overflow-x-auto">
+      <div className="min-w-[420px]">
+        <div className="grid grid-cols-[1fr_100px_120px_100px] gap-3 px-3 py-2 border-b border-border">
+          <SortableHeader label="Title" sortKey="title" currentKey={sortKey} currentDir={sortDir} onSort={onSort} />
+          <SortableHeader label="Status" sortKey="status" currentKey={sortKey} currentDir={sortDir} onSort={onSort} />
+          <SortableHeader label="Value" sortKey="value" currentKey={sortKey} currentDir={sortDir} onSort={onSort} />
+          <SortableHeader label="Created" sortKey="created_at" currentKey={sortKey} currentDir={sortDir} onSort={onSort} />
+        </div>
+        {deals.map((d) => {
+          const statusCfg = DEAL_STATUS_CONFIG[d.status]
+          return (
+            <div
+              key={d.id}
+              onClick={() => onSelect(d)}
+              className="grid grid-cols-[1fr_100px_120px_100px] gap-3 px-3 py-2.5 hover:bg-muted/50 cursor-pointer border-b border-border/50 transition-colors"
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                <Handshake className="h-4 w-4 text-muted-foreground shrink-0" />
+                <span className="text-sm truncate">{d.title}</span>
+              </div>
+              <Badge variant="secondary" className={cn('text-xs w-fit', statusCfg.className)}>
+                {statusCfg.label}
+              </Badge>
+              <span className="text-sm text-muted-foreground">
+                {d.value != null ? `$${Number(d.value).toLocaleString()}` : '\u2014'}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                {new Date(d.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+              </span>
             </div>
-            <Badge variant="secondary" className={cn('text-xs w-fit', statusCfg.className)}>
-              {statusCfg.label}
-            </Badge>
-            <span className="text-sm text-muted-foreground">
-              {d.value != null ? `$${Number(d.value).toLocaleString()}` : '\u2014'}
-            </span>
-            <span className="text-xs text-muted-foreground">
-              {new Date(d.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-            </span>
-          </div>
-        )
-      })}
+          )
+        })}
+      </div>
     </div>
   )
 }

@@ -277,9 +277,9 @@ export function GroceryClient({
   const checkedCount = checkedItems.length
 
   return (
-    <div className="max-w-2xl mx-auto w-full py-4 px-2">
+    <div className="max-w-2xl mx-auto w-full py-4 px-0 sm:px-2">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">Grocery List</h1>
+        <h1 className="text-xl sm:text-2xl font-bold">Grocery List</h1>
         {checkedCount > 0 && (
           <Button variant="outline" size="sm" onClick={clearChecked}>
             Clear checked ({checkedCount})
@@ -293,27 +293,27 @@ export function GroceryClient({
           e.preventDefault()
           addItem()
         }}
-        className="flex gap-2 mb-6"
+        className="flex flex-wrap gap-2 mb-6"
       >
         <Input
           ref={nameInputRef}
           placeholder="Add item…"
           value={newName}
           onChange={(e) => setNewName(e.target.value)}
-          className="flex-1"
+          className="flex-1 min-w-[120px]"
         />
         <Input
           placeholder="Category"
           value={newCategory}
           onChange={(e) => setNewCategory(e.target.value)}
           list="category-list"
-          className="w-36"
+          className="w-28 sm:w-36"
         />
         <Input
           placeholder="Qty"
           value={newQuantity}
           onChange={(e) => setNewQuantity(e.target.value)}
-          className="w-20"
+          className="w-16 sm:w-20"
         />
         <Button type="submit" size="icon" disabled={!newName.trim()}>
           <Plus className="h-4 w-4" />

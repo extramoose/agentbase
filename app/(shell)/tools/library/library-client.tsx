@@ -287,8 +287,8 @@ export function LibraryClient({ initialItems, initialItemId }: { initialItems: L
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Library</h1>
+      <div className="flex items-center justify-between gap-2">
+        <h1 className="text-xl sm:text-2xl font-bold">Library</h1>
         <Button onClick={() => setIsCreating(true)} size="sm">
           <Plus className="h-4 w-4 mr-1" />
           Add Item
