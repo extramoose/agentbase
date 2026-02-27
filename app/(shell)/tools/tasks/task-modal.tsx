@@ -329,7 +329,7 @@ export function TaskModal({ task, onClose }: { task: TaskData; onClose: () => vo
 
           {/* Activity + comments */}
           <div className="border-t border-border">
-            <ActivityAndComments entityType="tasks" entityId={task.id} />
+            <ActivityAndComments entityType="tasks" entityId={task.id} noCollapse />
           </div>
         </div>
       </div>
