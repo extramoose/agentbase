@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import {
   DndContext,
   DragOverlay,
@@ -31,6 +31,7 @@ import { ActorChip } from '@/components/actor-chip'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import { cn } from '@/lib/utils'
 import { ANON_AVATAR_URL } from '@/lib/constants'
+import { TaskModal } from './task-modal'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -406,13 +407,12 @@ function PriorityGroup({
 export function TasksClient({
   initialTasks,
   currentUser,
+  initialSelectedTask,
 }: {
   initialTasks: Task[]
   currentUser: CurrentUser
+  initialSelectedTask?: Task
 }) {
-  const router = useRouter()
-  const routerRef = useRef(router)
-  useEffect(() => { routerRef.current = router })
   const searchParams = useSearchParams()
 
   const [tasks, setTasks] = useState<Task[]>(initialTasks)
@@ -438,6 +438,7 @@ export function TasksClient({
   const [assigneeFilter, setAssigneeFilter] = useState<string | null>('me')
   const [workspaceMembers, setWorkspaceMembers] = useState<WorkspaceMember[]>([])
   const [showCancelled, setShowCancelled] = useState(false)
+  const [selectedTask, setSelectedTask] = useState<Task | null>(initialSelectedTask ?? null)
 
   const supabase = createClient()
 
@@ -458,7 +459,7 @@ export function TasksClient({
       isFirstRender.current = false
       return
     }
-    routerRef.current.replace(`${window.location.pathname}${buildQs()}`, { scroll: false })
+    window.history.replaceState(null, '', `${window.location.pathname}${buildQs()}`)
   }, [buildQs])
 
   // Hydration guard — defer dnd-kit tree to avoid SSR ID mismatch
@@ -488,6 +489,29 @@ export function TasksClient({
       }
     }
     fetchMembers()
+  }, [])
+
+  // ----- Shelf open/close with URL sync -----
+
+  const handleTaskClick = useCallback((task: Task) => {
+    setSelectedTask(task)
+    window.history.pushState(null, '', `/tools/tasks/${task.ticket_id}`)
+  }, [])
+
+  const handleShelfClose = useCallback(() => {
+    setSelectedTask(null)
+    window.history.pushState(null, '', `/tools/tasks${buildQs()}`)
+  }, [buildQs])
+
+  // Handle browser back/forward button
+  useEffect(() => {
+    const handler = () => {
+      if (!window.location.pathname.match(/\/tools\/tasks\/\d+/)) {
+        setSelectedTask(null)
+      }
+    }
+    window.addEventListener('popstate', handler)
+    return () => window.removeEventListener('popstate', handler)
   }, [])
 
   const sensors = useSensors(
@@ -958,9 +982,7 @@ export function TasksClient({
                 key={priority}
                 priority={priority}
                 tasks={grouped[priority]}
-                onTaskClick={(task) => {
-                  router.push(`/tools/tasks/${task.ticket_id}`, { scroll: false })
-                }}
+                onTaskClick={handleTaskClick}
                 addingTo={addingToPriority === priority}
                 onStartAdding={() => setAddingToPriority(priority)}
                 onCreateTask={createTask}
@@ -1011,9 +1033,7 @@ export function TasksClient({
                       <div
                         key={task.id}
                         className="group flex items-center gap-2 px-3 py-1.5 rounded-md hover:bg-accent/40 cursor-pointer border border-transparent hover:border-border transition-colors"
-                        onClick={() => {
-                          router.push(`/tools/tasks/${task.ticket_id}`, { scroll: false })
-                        }}
+                        onClick={() => handleTaskClick(task)}
                       >
                         <input
                           type="checkbox"
@@ -1097,6 +1117,11 @@ export function TasksClient({
           </div>
         )}
       </div>
+
+      {/* Task detail shelf */}
+      {selectedTask && (
+        <TaskModal task={selectedTask} onClose={handleShelfClose} />
+      )}
 
       {/* Floating batch action bar */}
       {selectedIds.size > 0 && (

@@ -1,7 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
 import { X, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -50,7 +49,7 @@ const TASK_TYPE_CONFIG: Record<TaskType, { label: string; className: string }> =
 // Types
 // ---------------------------------------------------------------------------
 
-interface TaskData {
+export interface TaskData {
   id: string
   ticket_id: number
   title: string
@@ -68,9 +67,7 @@ interface TaskData {
 // Component
 // ---------------------------------------------------------------------------
 
-export function TaskModal({ task }: { task: TaskData }) {
-  const router = useRouter()
-
+export function TaskModal({ task, onClose }: { task: TaskData; onClose: () => void }) {
   // Local state for all editable fields
   const [title, setTitle] = useState(task.title)
   const [status, setStatus] = useState<Status>(task.status as Status)
@@ -82,18 +79,27 @@ export function TaskModal({ task }: { task: TaskData }) {
   const [tags, setTags] = useState<string[]>(task.tags ?? [])
   const [body, setBody] = useState(task.body ?? '')
 
-  const close = useCallback(() => {
-    router.back()
-  }, [router])
+  // Reset local state when task prop changes (e.g. selecting a different task)
+  useEffect(() => {
+    setTitle(task.title)
+    setStatus(task.status as Status)
+    setPriority(task.priority as Priority)
+    setTaskType(task.type as TaskType | null)
+    setAssigneeId(task.assignee_id)
+    setAssigneeType(task.assignee_type)
+    setDueDate(task.due_date ?? '')
+    setTags(task.tags ?? [])
+    setBody(task.body ?? '')
+  }, [task.id, task.title, task.status, task.priority, task.type, task.assignee_id, task.assignee_type, task.due_date, task.tags, task.body])
 
   // Escape key closes
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') close()
+      if (e.key === 'Escape') onClose()
     }
     document.addEventListener('keydown', handler)
     return () => document.removeEventListener('keydown', handler)
-  }, [close])
+  }, [onClose])
 
   // Save helper
   async function saveField(fields: Record<string, unknown>) {
@@ -126,7 +132,7 @@ export function TaskModal({ task }: { task: TaskData }) {
         const json = await res.json()
         throw new Error(json.error ?? 'Delete failed')
       }
-      router.back()
+      onClose()
     } catch (err) {
       toast({
         type: 'error',
@@ -140,7 +146,7 @@ export function TaskModal({ task }: { task: TaskData }) {
       {/* Backdrop */}
       <div
         className="fixed inset-0 bg-black/50 z-40"
-        onClick={close}
+        onClick={onClose}
       />
       {/* Panel */}
       <div className="fixed right-0 top-0 h-full z-50 flex flex-col bg-card border-l border-border shadow-2xl w-[520px] max-w-full">
@@ -156,7 +162,7 @@ export function TaskModal({ task }: { task: TaskData }) {
             >
               <Trash2 className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="icon" onClick={close}>
+            <Button variant="ghost" size="icon" onClick={onClose}>
               <X className="h-4 w-4" />
             </Button>
           </div>
