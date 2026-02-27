@@ -951,28 +951,10 @@ export function TasksClient({
           </DropdownMenuContent>
         </DropdownMenu>
 
-        {/* Type filter chips + assignee face pile */}
+        {/* Assignee face pile + type filter chips */}
         <div className="sm:ml-auto flex items-center gap-1 flex-wrap">
-          {TASK_TYPE_TABS.map((tab) => (
-            <button
-              key={tab.value}
-              onClick={() => setTypeFilter(tab.value)}
-              className={cn(
-                'px-2.5 py-1 text-xs rounded-md transition-colors',
-                typeFilter === tab.value
-                  ? tab.value === 'all'
-                    ? 'bg-muted text-foreground font-medium'
-                    : cn('font-medium', TASK_TYPE_CONFIG[tab.value].className)
-                  : 'bg-zinc-800 text-zinc-500'
-              )}
-            >
-              {tab.label}
-            </button>
-          ))}
-
           {workspaceMembers.length > 0 && (
             <>
-              <div className="w-px h-5 bg-border mx-1" />
               <div className="flex -space-x-1">
                 {workspaceMembers.map((m) => (
                   <button
@@ -993,8 +975,26 @@ export function TasksClient({
                   </button>
                 ))}
               </div>
+              <div className="w-px h-5 bg-border mx-1" />
             </>
           )}
+
+          {TASK_TYPE_TABS.map((tab) => (
+            <button
+              key={tab.value}
+              onClick={() => setTypeFilter(tab.value)}
+              className={cn(
+                'px-2.5 py-1 text-xs rounded-md transition-colors',
+                typeFilter === tab.value
+                  ? tab.value === 'all'
+                    ? 'bg-muted text-foreground font-medium'
+                    : cn('font-medium', TASK_TYPE_CONFIG[tab.value].className)
+                  : 'bg-zinc-800 text-zinc-500'
+              )}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
       </div>
 

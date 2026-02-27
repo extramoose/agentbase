@@ -366,13 +366,13 @@ export function LibraryClient({ initialItems, initialItemId }: { initialItems: L
       ) : viewMode === 'card' ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((item) => (
-            <ItemCard key={item.id} item={item} onClick={() => { setSelectedItem(item); router.replace(`/tools/library/${item.seq_id ?? item.id}${buildQs()}`, { scroll: false }) }} />
+            <ItemCard key={item.id} item={item} onClick={() => { setSelectedItem(item); router.replace(`/tools/library/${item.seq_id ?? item.id}`, { scroll: false }) }} />
           ))}
         </div>
       ) : (
         <div className="border border-border rounded-lg overflow-hidden">
           {filtered.map((item, idx) => (
-            <ItemRow key={item.id} item={item} isLast={idx === filtered.length - 1} onClick={() => { setSelectedItem(item); router.replace(`/tools/library/${item.seq_id ?? item.id}${buildQs()}`, { scroll: false }) }} />
+            <ItemRow key={item.id} item={item} isLast={idx === filtered.length - 1} onClick={() => { setSelectedItem(item); router.replace(`/tools/library/${item.seq_id ?? item.id}`, { scroll: false }) }} />
           ))}
         </div>
       )}
