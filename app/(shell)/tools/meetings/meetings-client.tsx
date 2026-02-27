@@ -18,6 +18,7 @@ import { toast } from '@/hooks/use-toast'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { RichTextEditor } from '@/components/rich-text-editor'
+import { MarkdownRenderer } from '@/components/markdown-renderer'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 
@@ -68,7 +69,7 @@ const STATUS_CONFIG: Record<
     color: 'text-blue-400',
   },
   in_meeting: {
-    label: 'In Meeting',
+    label: 'Open',
     color: 'text-green-400',
   },
   ended: {
@@ -197,7 +198,11 @@ export function MeetingsClient({
   const filteredMeetings = useMemo(() => {
     let result = meetings
     if (statusFilter !== 'all') {
-      result = result.filter((m) => m.status === statusFilter)
+      if (statusFilter === 'closed') {
+        result = result.filter((m) => m.status === 'closed' || m.status === 'ended')
+      } else {
+        result = result.filter((m) => m.status === statusFilter)
+      }
     }
     if (search.trim()) {
       const q = search.toLowerCase()
@@ -331,7 +336,7 @@ export function MeetingsClient({
   const statusTabs: Array<{ value: MeetingStatus | 'all'; label: string }> = [
     { value: 'all', label: 'All' },
     { value: 'upcoming', label: 'Upcoming' },
-    { value: 'in_meeting', label: 'In Meeting' },
+    { value: 'in_meeting', label: 'Open' },
     { value: 'closed', label: 'Closed' },
   ]
 
@@ -486,8 +491,6 @@ function MeetingDetail({
   const [meetingTime, setMeetingTime] = useState(meeting.meeting_time ?? '')
   const [tags, setTags] = useState<string[]>(meeting.tags)
   const [prepNotes, setPrepNotes] = useState(meeting.prep_notes ?? '')
-  const [liveNotes, setLiveNotes] = useState(meeting.live_notes ?? '')
-  const [meetingSummary, setMeetingSummary] = useState(meeting.meeting_summary ?? '')
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
   // Linked people state
@@ -502,8 +505,6 @@ function MeetingDetail({
     setMeetingTime(meeting.meeting_time ?? '')
     setTags(meeting.tags)
     setPrepNotes(meeting.prep_notes ?? '')
-    setLiveNotes(meeting.live_notes ?? '')
-    setMeetingSummary(meeting.meeting_summary ?? '')
   }, [meeting])
 
   // Fetch linked people and all people for linking
@@ -614,12 +615,10 @@ function MeetingDetail({
           />
         </div>
 
-        <Badge
-          variant="secondary"
-          className={cn('shrink-0', STATUS_BADGE_CLASS[meeting.status])}
-        >
-          {STATUS_CONFIG[meeting.status].label}
-        </Badge>
+        <LifecycleChip
+          status={meeting.status}
+          onChange={(newStatus) => saveFieldImmediate({ status: newStatus })}
+        />
 
         <Button
           variant="ghost"
@@ -744,51 +743,52 @@ function MeetingDetail({
             </div>
           )}
 
-          {/* Document areas */}
-          <div>
-            <label className="text-xs text-muted-foreground font-medium mb-1 block">
-              Prep Notes
-            </label>
-            <RichTextEditor
-              value={prepNotes}
-              onChange={(md) => setPrepNotes(md)}
-              onBlur={(md) => saveFieldImmediate({ prep_notes: md })}
-              placeholder="Meeting prep notes..."
-              minHeight="150px"
-            />
-          </div>
-
-          <div>
-            <label className="text-xs text-muted-foreground font-medium mb-1 block">
-              Live Notes
-            </label>
-            <RichTextEditor
-              value={liveNotes}
-              onChange={(md) => setLiveNotes(md)}
-              onBlur={(md) => saveFieldImmediate({ live_notes: md })}
-              placeholder="Type meeting notes..."
-              minHeight="150px"
-            />
-          </div>
-
-          <div>
-            <label className="text-xs text-muted-foreground font-medium mb-1 block">
-              Summary
-            </label>
-            <RichTextEditor
-              value={meetingSummary}
-              onChange={(md) => setMeetingSummary(md)}
-              onBlur={(md) => saveFieldImmediate({ meeting_summary: md })}
-              placeholder="Meeting summary..."
-              minHeight="150px"
-            />
-          </div>
         </div>
 
-        {/* Activity + Comments */}
-        <div className="border-t border-border">
-          <ActivitySection meetingId={meeting.id} />
+        {/* Hunter Notes */}
+        <div className="px-4 pt-2">
+          <div className="border-t border-border pt-3 pb-1">
+            <h3 className="text-sm font-medium text-muted-foreground">Hunter Notes</h3>
+          </div>
         </div>
+        <div className="px-4 pb-4">
+          <RichTextEditor
+            value={prepNotes}
+            onChange={(md) => setPrepNotes(md)}
+            onBlur={(md) => saveFieldImmediate({ prep_notes: md })}
+            placeholder="Meeting prep notes..."
+            minHeight="150px"
+          />
+        </div>
+
+        {/* Comments */}
+        <div className="px-4">
+          <div className="border-t border-border pt-3 pb-1">
+            <h3 className="text-sm font-medium text-muted-foreground">Comments</h3>
+          </div>
+        </div>
+        <ActivitySection meetingId={meeting.id} />
+
+        {/* Conclusion — only when closed/ended */}
+        {(meeting.status === 'closed' || meeting.status === 'ended') && (
+          <>
+            <div className="px-4">
+              <div className="border-t border-border pt-3 pb-1">
+                <h3 className="text-sm font-medium text-muted-foreground">Conclusion</h3>
+              </div>
+            </div>
+            <div className="px-4 pb-4">
+              {meeting.meeting_summary ? (
+                <div className="rounded-lg bg-muted/40 px-3 py-2 text-sm">
+                  <MarkdownRenderer content={meeting.meeting_summary} />
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">No conclusion yet.</p>
+              )}
+              <p className="text-xs italic text-muted-foreground mt-2">Written by Lucy</p>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Delete confirmation */}
@@ -800,6 +800,68 @@ function MeetingDetail({
           }}
           onCancel={() => setShowDeleteConfirm(false)}
         />
+      )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Lifecycle chip — status badge with click-to-advance
+// ---------------------------------------------------------------------------
+
+const LIFECYCLE_TRANSITIONS: Partial<Record<MeetingStatus, MeetingStatus[]>> = {
+  upcoming: ['in_meeting'],
+  in_meeting: ['closed'],
+}
+
+function LifecycleChip({
+  status,
+  onChange,
+}: {
+  status: MeetingStatus
+  onChange: (newStatus: MeetingStatus) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const nextStatuses = LIFECYCLE_TRANSITIONS[status]
+
+  if (!nextStatuses) {
+    // Terminal state — no transitions
+    return (
+      <Badge variant="secondary" className={cn('shrink-0', STATUS_BADGE_CLASS[status])}>
+        {STATUS_CONFIG[status].label}
+      </Badge>
+    )
+  }
+
+  return (
+    <div className="relative shrink-0">
+      <button
+        onClick={() => setOpen(!open)}
+        className={cn(
+          'inline-flex items-center rounded-md px-2.5 py-0.5 text-xs font-medium transition-colors cursor-pointer',
+          STATUS_BADGE_CLASS[status]
+        )}
+      >
+        {STATUS_CONFIG[status].label}
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="absolute top-full mt-1 right-0 z-50 min-w-[120px] rounded-md border border-border bg-card shadow-lg py-1">
+            {nextStatuses.map((s) => (
+              <button
+                key={s}
+                className="w-full px-3 py-1.5 text-sm text-left hover:bg-muted transition-colors"
+                onClick={() => {
+                  onChange(s)
+                  setOpen(false)
+                }}
+              >
+                Set to {STATUS_CONFIG[s].label}
+              </button>
+            ))}
+          </div>
+        </>
       )}
     </div>
   )
