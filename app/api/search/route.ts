@@ -10,7 +10,7 @@ const SEARCH_COLUMNS: Record<SearchType, string[]> = {
   people: ['name', 'email', 'title', 'notes'],
   companies: ['name', 'website', 'notes'],
   deals: ['name', 'notes'],
-  library: ['name', 'notes', 'url'],
+  library: ['title', 'url', 'excerpt', 'body'],
   grocery: ['name', 'category'],
 }
 
