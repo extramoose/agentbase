@@ -3,8 +3,15 @@ import { requireAuth } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { CrmClient } from '../crm-client'
 
-export default async function CrmSectionPage({ params }: { params: Promise<{ section: string }> }) {
+export default async function CrmSectionPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ section: string }>
+  searchParams: Promise<Record<string, string | string[] | undefined>>
+}) {
   const { section } = await params
+  const sp = await searchParams
   await requireAuth()
   const supabase = await createClient()
 
@@ -14,6 +21,9 @@ export default async function CrmSectionPage({ params }: { params: Promise<{ sec
     supabase.from('deals').select('*').order('created_at', { ascending: false }),
   ])
 
+  const idParam = typeof sp.id === 'string' ? Number(sp.id) : undefined
+  const initialSelectedId = idParam && !isNaN(idParam) ? idParam : undefined
+
   return (
     <Suspense fallback={null}>
       <CrmClient
@@ -21,6 +31,7 @@ export default async function CrmSectionPage({ params }: { params: Promise<{ sec
         initialPeople={people ?? []}
         initialDeals={deals ?? []}
         initialSection={section}
+        initialSelectedId={initialSelectedId}
       />
     </Suspense>
   )
