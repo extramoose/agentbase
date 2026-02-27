@@ -4,10 +4,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
   CheckSquare,
-  Calendar,
   BookOpen,
-  BookText,
-  PenTool,
   ShoppingCart,
   Users,
   Clock,
@@ -46,10 +43,7 @@ export type Workspace = {
 
 const navItems = [
   { label: 'Tasks', href: '/tools/tasks', icon: CheckSquare },
-  { label: 'Meetings', href: '/tools/meetings', icon: Calendar },
   { label: 'Library', href: '/tools/library', icon: BookOpen },
-  { label: 'Diary', href: '/tools/diary', icon: BookText },
-  { label: 'Essays', href: '/tools/essays', icon: PenTool },
   { label: 'Grocery', href: '/tools/grocery', icon: ShoppingCart },
   { label: 'CRM', href: '/tools/crm', icon: Users },
   { label: 'History', href: '/history', icon: Clock },

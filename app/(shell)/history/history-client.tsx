@@ -20,21 +20,17 @@ import { MarkdownRenderer } from '@/components/markdown-renderer'
 function getEntityUrl(entityType: string, entityId: string): string {
   switch (entityType) {
     case 'tasks':         return `/tools/tasks/${entityId}`
-    case 'meetings':      return `/tools/meetings/${entityId}`
     case 'library_items': return `/tools/library/${entityId}`
     case 'companies':     return `/tools/crm/companies/${entityId}`
     case 'people':        return `/tools/crm/people/${entityId}`
     case 'deals':         return `/tools/crm/deals/${entityId}`
-    case 'essays':        return `/tools/essays/${entityId}`
     default:              return ''
   }
 }
 
 const ENTITY_COLORS: Record<string, string> = {
   tasks:          'bg-blue-500/20 text-blue-400',
-  meetings:       'bg-green-500/20 text-green-400',
   library_items:  'bg-yellow-500/20 text-yellow-400',
-  diary_entries:  'bg-purple-500/20 text-purple-400',
   grocery_items:  'bg-orange-500/20 text-orange-400',
   companies:      'bg-red-500/20 text-red-400',
   people:         'bg-pink-500/20 text-pink-400',
@@ -42,7 +38,7 @@ const ENTITY_COLORS: Record<string, string> = {
 }
 
 const ENTITY_TYPES = [
-  'tasks', 'meetings', 'library_items', 'diary_entries',
+  'tasks', 'library_items',
   'grocery_items', 'companies', 'people', 'deals',
 ] as const
 
