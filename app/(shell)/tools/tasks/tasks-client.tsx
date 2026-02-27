@@ -30,7 +30,6 @@ import { Badge } from '@/components/ui/badge'
 import { ActorChip } from '@/components/actor-chip'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import { cn } from '@/lib/utils'
-import { ANON_AVATAR_URL } from '@/lib/constants'
 import { TaskModal } from './task-modal'
 
 // ---------------------------------------------------------------------------
@@ -242,21 +241,23 @@ function SortableTaskRow({
       {/* Status badge */}
       <Badge
         variant="secondary"
-        className={cn('text-xs shrink-0', statusCfg.className)}
+        className={cn('text-xs shrink-0 hidden sm:inline-flex', statusCfg.className)}
       >
         {statusCfg.label}
       </Badge>
 
       {/* Assignee */}
-      {task.assignee_id ? (
-        <ActorChip actorId={task.assignee_id} actorType={task.assignee_type as 'human' | 'agent'} compact />
-      ) : (
-        <span className="text-xs text-muted-foreground shrink-0">Unassigned</span>
-      )}
+      <span className="hidden sm:inline-flex">
+        {task.assignee_id ? (
+          <ActorChip actorId={task.assignee_id} actorType={task.assignee_type as 'human' | 'agent'} compact />
+        ) : (
+          <span className="text-xs text-muted-foreground shrink-0">Unassigned</span>
+        )}
+      </span>
 
       {/* Due date */}
       {task.due_date && (
-        <span className="text-xs text-muted-foreground shrink-0">
+        <span className="text-xs text-muted-foreground shrink-0 hidden md:inline">
           {new Date(task.due_date).toLocaleDateString(undefined, {
             month: 'short',
             day: 'numeric',
@@ -266,7 +267,7 @@ function SortableTaskRow({
 
       {/* Tags */}
       {visibleTags.length > 0 && (
-        <div className="flex gap-1 shrink-0">
+        <div className="hidden md:flex gap-1 shrink-0">
           {visibleTags.map((tag) => (
             <Badge
               key={tag}
@@ -875,8 +876,8 @@ export function TasksClient({
   return (
     <div className="flex flex-col h-full">
       {/* Top bar */}
-      <div className="flex items-center justify-between gap-4 mb-4">
-        <h1 className="text-2xl font-bold shrink-0">Tasks</h1>
+      <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-4 mb-4">
+        <h1 className="text-xl sm:text-2xl font-bold shrink-0">Tasks</h1>
         <div className="flex items-center gap-2">
           <SearchFilterBar
             search={search}
@@ -885,13 +886,14 @@ export function TasksClient({
           />
           <Button size="sm" onClick={handleNewTask}>
             <Plus className="h-4 w-4 mr-1" />
-            New Task
+            <span className="hidden sm:inline">New Task</span>
+            <span className="sm:hidden">New</span>
           </Button>
         </div>
       </div>
 
       {/* Status filter tabs */}
-      <div className="flex gap-1 mb-4 border-b border-border pb-2">
+      <div className="flex gap-1 mb-4 border-b border-border pb-2 overflow-x-auto">
         {STATUS_TABS.map((tab) => (
           <button
             key={tab.value}
@@ -911,7 +913,7 @@ export function TasksClient({
         ))}
 
         {/* Type filter chips + assignee face pile */}
-        <div className="ml-auto flex items-center gap-1">
+        <div className="sm:ml-auto flex items-center gap-1 flex-wrap">
           {TASK_TYPE_TABS.map((tab) => (
             <button
               key={tab.value}
@@ -946,7 +948,7 @@ export function TasksClient({
                         ? 'ring-primary'
                         : 'ring-background hover:ring-muted-foreground/40'
                     )}>
-                      <AvatarImage src={m.avatarUrl ?? ANON_AVATAR_URL} alt={m.name} />
+                      <AvatarImage src={m.avatarUrl ?? undefined} alt={m.name} />
                       <AvatarFallback className="text-[9px]">{m.name.slice(0, 2).toUpperCase()}</AvatarFallback>
                     </Avatar>
                   </button>
@@ -1061,21 +1063,23 @@ export function TasksClient({
                           <PriorityIcon priority={task.priority} />
                         </span>
                         <span className={cn('flex-1 text-sm font-medium truncate', task.status === 'cancelled' && 'line-through text-muted-foreground/60')}>{task.title}</span>
-                        <Badge variant="secondary" className={cn('text-xs shrink-0', statusCfg.className)}>
+                        <Badge variant="secondary" className={cn('text-xs shrink-0 hidden sm:inline-flex', statusCfg.className)}>
                           {statusCfg.label}
                         </Badge>
-                        {task.assignee_id ? (
-                          <ActorChip actorId={task.assignee_id} actorType={task.assignee_type as 'human' | 'agent'} compact />
-                        ) : (
-                          <span className="text-xs text-muted-foreground shrink-0">Unassigned</span>
-                        )}
+                        <span className="hidden sm:inline-flex">
+                          {task.assignee_id ? (
+                            <ActorChip actorId={task.assignee_id} actorType={task.assignee_type as 'human' | 'agent'} compact />
+                          ) : (
+                            <span className="text-xs text-muted-foreground shrink-0">Unassigned</span>
+                          )}
+                        </span>
                         {task.due_date && (
-                          <span className="text-xs text-muted-foreground shrink-0">
+                          <span className="text-xs text-muted-foreground shrink-0 hidden md:inline">
                             {new Date(task.due_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
                           </span>
                         )}
                         {visibleTags.length > 0 && (
-                          <div className="flex gap-1 shrink-0">
+                          <div className="hidden md:flex gap-1 shrink-0">
                             {visibleTags.map((tag) => (
                               <Badge key={tag} variant="outline" className="text-xs px-1.5 py-0">{tag}</Badge>
                             ))}
@@ -1130,7 +1134,7 @@ export function TasksClient({
 
       {/* Floating batch action bar */}
       {selectedIds.size > 0 && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] bg-zinc-800 border border-zinc-700 rounded-xl shadow-2xl px-4 py-3 flex items-center gap-3">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] bg-zinc-800 border border-zinc-700 rounded-xl shadow-2xl px-3 sm:px-4 py-3 flex items-center gap-2 sm:gap-3 max-w-[calc(100vw-2rem)]">
           <span className="text-sm text-zinc-300 font-medium whitespace-nowrap">
             {selectedIds.size} selected
           </span>

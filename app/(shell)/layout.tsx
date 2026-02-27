@@ -1,7 +1,7 @@
 import { getUserProfile } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { AppSidebar } from '@/components/app-sidebar'
+import { MobileShell } from '@/components/mobile-shell'
 import { CmdK } from '@/components/cmd-k'
 
 export default async function ShellLayout({
@@ -20,12 +20,11 @@ export default async function ShellLayout({
   const { data: workspaces } = await supabase.rpc('rpc_list_my_workspaces')
 
   return (
-    <div className="flex h-screen overflow-hidden">
-      <AppSidebar profile={profile} workspaces={workspaces ?? []} />
-      <main className="flex-1 overflow-y-auto p-6">
+    <>
+      <MobileShell profile={profile} workspaces={workspaces ?? []}>
         {children}
-      </main>
+      </MobileShell>
       <CmdK />
-    </div>
+    </>
   )
 }

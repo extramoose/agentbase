@@ -12,25 +12,20 @@ import { cn } from '@/lib/utils'
 
 const ENTITY_COLORS: Record<string, string> = {
   tasks:          'bg-blue-500/20 text-blue-400',
-  meetings:       'bg-green-500/20 text-green-400',
   library_items:  'bg-yellow-500/20 text-yellow-400',
-  diary_entries:  'bg-purple-500/20 text-purple-400',
   grocery_items:  'bg-orange-500/20 text-orange-400',
   companies:      'bg-red-500/20 text-red-400',
   people:         'bg-pink-500/20 text-pink-400',
   deals:          'bg-emerald-500/20 text-emerald-400',
-  essays:         'bg-indigo-500/20 text-indigo-400',
 }
 
 function getEntityUrl(entityType: string, entityId: string): string {
   switch (entityType) {
     case 'tasks':         return `/tools/tasks/${entityId}`
-    case 'meetings':      return `/tools/meetings/${entityId}`
     case 'library_items': return `/tools/library/${entityId}`
     case 'companies':     return `/tools/crm/companies/${entityId}`
     case 'people':        return `/tools/crm/people/${entityId}`
     case 'deals':         return `/tools/crm/deals/${entityId}`
-    case 'essays':        return `/tools/essays/${entityId}`
     default:              return ''
   }
 }
@@ -110,13 +105,6 @@ async function resolveNames(links: EntityLink[]): Promise<Map<string, string>> {
             for (const row of data ?? []) nameMap.set(`people:${row.id}`, row.name)
           })
       )
-    } else if (type === 'meetings') {
-      queries.push(
-        supabase.from('meetings').select('id,title').in('id', uniqueIds)
-          .then(({ data }) => {
-            for (const row of data ?? []) nameMap.set(`meetings:${row.id}`, row.title)
-          })
-      )
     } else if (type === 'library_items') {
       queries.push(
         supabase.from('library_items').select('id,title').in('id', uniqueIds)
@@ -129,13 +117,6 @@ async function resolveNames(links: EntityLink[]): Promise<Map<string, string>> {
         supabase.from('deals').select('id,title').in('id', uniqueIds)
           .then(({ data }) => {
             for (const row of data ?? []) nameMap.set(`deals:${row.id}`, row.title)
-          })
-      )
-    } else if (type === 'essays') {
-      queries.push(
-        supabase.from('essays').select('id,title').in('id', uniqueIds)
-          .then(({ data }) => {
-            for (const row of data ?? []) nameMap.set(`essays:${row.id}`, row.title)
           })
       )
     }

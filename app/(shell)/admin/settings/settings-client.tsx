@@ -128,15 +128,15 @@ export function SettingsClient({ settings, supabaseProjectId }: SettingsClientPr
   const currentModelName = models.find(m => m.id === model)?.name ?? model
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <div className="flex items-center gap-3">
         <Settings className="h-6 w-6 text-muted-foreground" />
-        <h1 className="text-2xl font-bold">Settings</h1>
+        <h1 className="text-xl sm:text-2xl font-bold">Settings</h1>
       </div>
 
-      <div className="max-w-xl space-y-8">
+      <div className="max-w-xl space-y-6 sm:space-y-8">
         {/* Workspace section */}
-        <section className="rounded-lg border border-border p-5 space-y-4">
+        <section className="rounded-lg border border-border p-3 sm:p-5 space-y-4">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Workspace</h2>
 
           <div className="space-y-2">
@@ -169,7 +169,7 @@ export function SettingsClient({ settings, supabaseProjectId }: SettingsClientPr
         </section>
 
         {/* AI / LLM section */}
-        <section className="rounded-lg border border-border p-5 space-y-4">
+        <section className="rounded-lg border border-border p-3 sm:p-5 space-y-4">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">AI / LLM</h2>
 
           <div className="space-y-2">
@@ -261,7 +261,7 @@ export function SettingsClient({ settings, supabaseProjectId }: SettingsClientPr
         </section>
 
         {/* Deals label section */}
-        <section className="rounded-lg border border-border p-5 space-y-2">
+        <section className="rounded-lg border border-border p-3 sm:p-5 space-y-2">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Labels</h2>
           <div className="space-y-1">
             <Label>Deal Label</Label>

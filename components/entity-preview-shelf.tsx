@@ -7,9 +7,7 @@ import { MarkdownRenderer } from '@/components/markdown-renderer'
 
 const TABLE_MAP: Record<string, string> = {
   tasks: 'tasks',
-  meetings: 'meetings',
   library_items: 'library_items',
-  diary_entries: 'diary_entries',
   grocery_items: 'grocery_items',
   companies: 'companies',
   people: 'people',
@@ -60,9 +58,9 @@ export function EntityPreviewShelf({ entityType, entityId, entityLabel, onClose 
         className="fixed inset-0 z-40 bg-black/20"
         onClick={onClose}
       />
-      <div className="fixed right-0 top-0 z-50 h-full w-[480px] bg-background border-l border-border flex flex-col shadow-xl">
+      <div className="fixed right-0 top-0 z-50 h-full w-full sm:w-[480px] sm:max-w-full bg-background border-l border-border flex flex-col shadow-xl">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-border">
           <div className="min-w-0 flex-1">
             <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">{entityType.replace(/_/g, ' ')}</p>
             <h2 className="text-base font-semibold text-foreground truncate">{title}</h2>
@@ -73,7 +71,7 @@ export function EntityPreviewShelf({ entityType, entityId, entityLabel, onClose 
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto px-6 py-4">
+        <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4">
           {loading && <p className="text-sm text-muted-foreground">Loading...</p>}
           {!loading && !entity && <p className="text-sm text-muted-foreground">Entity not found or deleted.</p>}
           {!loading && entity && (
@@ -98,12 +96,6 @@ function EntityFields({ entityType, entity }: { entityType: string; entity: Reco
       { label: 'Due date', value: entity.due_date },
       { label: 'Tags', value: Array.isArray(entity.tags) ? (entity.tags as string[]).join(', ') : null },
       { label: 'Body', value: entity.body },
-    )
-  } else if (entityType === 'meetings') {
-    rows.push(
-      { label: 'Date', value: entity.date },
-      { label: 'Status', value: entity.status },
-      { label: 'Tags', value: Array.isArray(entity.tags) ? (entity.tags as string[]).join(', ') : null },
     )
   } else if (entityType === 'companies') {
     rows.push(
@@ -131,11 +123,6 @@ function EntityFields({ entityType, entity }: { entityType: string; entity: Reco
       { label: 'URL', value: entity.url },
       { label: 'Body', value: entity.body },
       { label: 'Tags', value: Array.isArray(entity.tags) ? (entity.tags as string[]).join(', ') : null },
-    )
-  } else if (entityType === 'diary_entries') {
-    rows.push(
-      { label: 'Date', value: entity.date },
-      { label: 'Content', value: entity.content },
     )
   } else if (entityType === 'grocery_items') {
     rows.push(

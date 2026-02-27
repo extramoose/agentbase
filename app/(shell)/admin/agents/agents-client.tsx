@@ -1,15 +1,13 @@
 'use client'
 
-import { ANON_AVATAR_URL } from '@/lib/constants'
-
 import { useState, useCallback } from 'react'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { AvatarUpload } from '@/components/avatar-upload'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from '@/hooks/use-toast'
 import { formatDistanceToNow } from 'date-fns'
-import { Bot, Check, Copy, Loader2, Pencil, Plus, Trash2, X } from 'lucide-react'
+import { Bot, Check, Copy, Loader2, Plus, Trash2, X } from 'lucide-react'
 
 type Agent = {
   id: string
@@ -38,7 +36,6 @@ export function AgentsClient({ agents: initialAgents, currentUserName, currentUs
 
   // Create form state
   const [name, setName] = useState('')
-  const [avatarUrl, setAvatarUrl] = useState('')
 
   // Result after create
   const [createResult, setCreateResult] = useState<{
@@ -46,11 +43,6 @@ export function AgentsClient({ agents: initialAgents, currentUserName, currentUs
     api_key: string | null
   } | null>(null)
   const [copied, setCopied] = useState(false)
-
-  // Inline avatar editing
-  const [editingAvatar, setEditingAvatar] = useState<string | null>(null)
-  const [avatarDraft, setAvatarDraft] = useState('')
-  const [savingAvatar, setSavingAvatar] = useState(false)
 
   const handleCreate = useCallback(async () => {
     if (!name.trim()) return
@@ -61,7 +53,6 @@ export function AgentsClient({ agents: initialAgents, currentUserName, currentUs
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: name.trim(),
-          avatar_url: avatarUrl.trim() || null,
         }),
       })
       const json = await res.json()
@@ -80,14 +71,13 @@ export function AgentsClient({ agents: initialAgents, currentUserName, currentUs
       setAgents(prev => [newAgent, ...prev])
       setCreateResult({ agent: newAgent, api_key: json.api_key })
       setName('')
-      setAvatarUrl('')
       toast({ type: 'success', message: `Agent "${newAgent.name}" created` })
     } catch (err) {
       toast({ type: 'error', message: err instanceof Error ? err.message : 'Failed to create agent' })
     } finally {
       setCreating(false)
     }
-  }, [name, avatarUrl, currentUserName, currentUserId])
+  }, [name, currentUserName, currentUserId])
 
   const handleRevoke = useCallback(async (agentId: string) => {
     setRevoking(agentId)
@@ -132,33 +122,10 @@ export function AgentsClient({ agents: initialAgents, currentUserName, currentUs
     setTimeout(() => setCopied(false), 2000)
   }, [])
 
-  const handleSaveAvatar = useCallback(async (agentId: string) => {
-    setSavingAvatar(true)
-    try {
-      const res = await fetch(`/api/admin/users/${agentId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ avatar_url: avatarDraft.trim() || null }),
-      })
-      const json = await res.json()
-      if (!res.ok) throw new Error(json.error ?? 'Failed to update avatar')
-
-      setAgents(prev => prev.map(a =>
-        a.id === agentId ? { ...a, avatar_url: avatarDraft.trim() || null } : a
-      ))
-      setEditingAvatar(null)
-      toast({ type: 'success', message: 'Avatar updated' })
-    } catch (err) {
-      toast({ type: 'error', message: err instanceof Error ? err.message : 'Failed to update avatar' })
-    } finally {
-      setSavingAvatar(false)
-    }
-  }, [avatarDraft])
-
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Agents</h1>
+    <div className="space-y-4 sm:space-y-6">
+      <div className="flex items-center justify-between gap-2">
+        <h1 className="text-xl sm:text-2xl font-bold">Agents</h1>
         {!showCreate && !createResult && (
           <Button size="sm" onClick={() => setShowCreate(true)}>
             <Plus className="h-4 w-4" />
@@ -172,36 +139,25 @@ export function AgentsClient({ agents: initialAgents, currentUserName, currentUs
         <div className="rounded-lg border border-border p-4 space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-medium">New Agent</h2>
-            <Button variant="ghost" size="icon-xs" onClick={() => { setShowCreate(false); setName(''); setAvatarUrl('') }}>
+            <Button variant="ghost" size="icon-xs" onClick={() => { setShowCreate(false); setName('') }}>
               <X className="h-4 w-4" />
             </Button>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">Name</label>
-              <Input
-                placeholder="e.g. Lucy"
-                value={name}
-                onChange={e => setName(e.target.value)}
-                disabled={creating}
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">Avatar URL (optional)</label>
-              <Input
-                placeholder="https://..."
-                value={avatarUrl}
-                onChange={e => setAvatarUrl(e.target.value)}
-                disabled={creating}
-              />
-            </div>
+          <div className="space-y-1">
+            <label className="text-xs text-muted-foreground">Name</label>
+            <Input
+              placeholder="e.g. Lucy"
+              value={name}
+              onChange={e => setName(e.target.value)}
+              disabled={creating}
+            />
           </div>
           <div className="space-y-1">
             <label className="text-xs text-muted-foreground">Owner</label>
             <p className="text-sm">{currentUserName}</p>
           </div>
           <div className="flex justify-end gap-2">
-            <Button variant="outline" size="sm" onClick={() => { setShowCreate(false); setName(''); setAvatarUrl('') }} disabled={creating}>
+            <Button variant="outline" size="sm" onClick={() => { setShowCreate(false); setName('') }} disabled={creating}>
               Cancel
             </Button>
             <Button size="sm" onClick={handleCreate} disabled={creating || !name.trim()}>
@@ -249,8 +205,8 @@ export function AgentsClient({ agents: initialAgents, currentUserName, currentUs
       )}
 
       {/* Agents table */}
-      <div className="rounded-lg border border-border">
-        <table className="w-full">
+      <div className="rounded-lg border border-border overflow-x-auto">
+        <table className="w-full min-w-[600px]">
           <thead>
             <tr className="border-b border-border text-left text-sm text-muted-foreground">
               <th className="px-4 py-3 font-medium">Agent</th>
@@ -262,28 +218,23 @@ export function AgentsClient({ agents: initialAgents, currentUserName, currentUs
           <tbody>
             {agents.map(agent => {
               const displayName = agent.name
-              const initials = displayName.slice(0, 2).toUpperCase()
-              const isEditingAvatar = editingAvatar === agent.id
               const isRevoked = !!agent.revoked_at
 
               return (
                 <tr key={agent.id} className={`border-b border-border last:border-0 hover:bg-muted/40${isRevoked ? ' opacity-60' : ''}`}>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
-                      <div className="relative group">
-                        <Avatar className="h-8 w-8">
-                          <AvatarImage src={agent.avatar_url ?? ANON_AVATAR_URL} alt={displayName} />
-                          <AvatarFallback className="text-xs">{initials}</AvatarFallback>
-                        </Avatar>
-                        {!isEditingAvatar && !isRevoked && (
-                          <button
-                            className="absolute inset-0 flex items-center justify-center rounded-full bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity"
-                            onClick={() => { setEditingAvatar(agent.id); setAvatarDraft(agent.avatar_url ?? '') }}
-                          >
-                            <Pencil className="h-3 w-3 text-white" />
-                          </button>
-                        )}
-                      </div>
+                      <AvatarUpload
+                        currentUrl={agent.avatar_url}
+                        name={displayName}
+                        uploadUrl={`/api/admin/agents/${agent.id}/avatar`}
+                        size="sm"
+                        onSuccess={(newUrl) =>
+                          setAgents(prev => prev.map(a =>
+                            a.id === agent.id ? { ...a, avatar_url: newUrl } : a
+                          ))
+                        }
+                      />
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
                           <p className="text-sm font-medium truncate">{displayName}</p>
@@ -297,33 +248,6 @@ export function AgentsClient({ agents: initialAgents, currentUserName, currentUs
                             </span>
                           )}
                         </div>
-                        {isEditingAvatar && (
-                          <div className="flex items-center gap-1 mt-1">
-                            <Input
-                              className="h-6 text-xs"
-                              placeholder="Avatar URL"
-                              value={avatarDraft}
-                              onChange={e => setAvatarDraft(e.target.value)}
-                              disabled={savingAvatar}
-                            />
-                            <Button
-                              variant="ghost"
-                              size="icon-xs"
-                              onClick={() => handleSaveAvatar(agent.id)}
-                              disabled={savingAvatar}
-                            >
-                              {savingAvatar ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon-xs"
-                              onClick={() => setEditingAvatar(null)}
-                              disabled={savingAvatar}
-                            >
-                              <X className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        )}
                       </div>
                     </div>
                   </td>

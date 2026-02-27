@@ -1,15 +1,10 @@
 'use client'
 
-import { ANON_AVATAR_URL } from '@/lib/constants'
-
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
   CheckSquare,
-  Calendar,
   BookOpen,
-  BookText,
-  PenTool,
   ShoppingCart,
   Users,
   Clock,
@@ -21,7 +16,7 @@ import {
   Check,
   Loader2,
 } from 'lucide-react'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { AvatarUpload } from '@/components/avatar-upload'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -48,10 +43,7 @@ export type Workspace = {
 
 const navItems = [
   { label: 'Tasks', href: '/tools/tasks', icon: CheckSquare },
-  { label: 'Meetings', href: '/tools/meetings', icon: Calendar },
   { label: 'Library', href: '/tools/library', icon: BookOpen },
-  { label: 'Diary', href: '/tools/diary', icon: BookText },
-  { label: 'Essays', href: '/tools/essays', icon: PenTool },
   { label: 'Grocery', href: '/tools/grocery', icon: ShoppingCart },
   { label: 'CRM', href: '/tools/crm', icon: Users },
   { label: 'History', href: '/history', icon: Clock },
@@ -63,7 +55,7 @@ const adminItems = [
   { label: 'Settings', href: '/admin/settings', icon: Settings },
 ]
 
-export function AppSidebar({ profile, workspaces }: { profile: UserProfile | null; workspaces: Workspace[] }) {
+export function AppSidebar({ profile, workspaces, onNavigate }: { profile: UserProfile | null; workspaces: Workspace[]; onNavigate?: () => void }) {
   const pathname = usePathname()
   const router = useRouter()
   const [switching, setSwitching] = useState(false)
@@ -100,17 +92,8 @@ export function AppSidebar({ profile, workspaces }: { profile: UserProfile | nul
   const isAdmin =
     tenantRole === 'admin' || tenantRole === 'superadmin' || profile?.role === 'superadmin'
 
-  const initials = profile?.full_name
-    ? profile.full_name
-        .split(' ')
-        .map((n) => n[0])
-        .join('')
-        .toUpperCase()
-        .slice(0, 2)
-    : profile?.email?.[0]?.toUpperCase() ?? 'U'
-
   return (
-    <aside className="flex h-screen w-60 flex-col border-r border-border bg-card">
+    <aside className="flex h-full w-60 flex-col border-r border-border bg-card">
       <div className="flex h-14 items-center px-4">
         <Link href="/" className="text-lg font-bold text-foreground">
           AgentBase
@@ -125,6 +108,7 @@ export function AppSidebar({ profile, workspaces }: { profile: UserProfile | nul
             <Link
               key={item.href}
               href={item.href}
+              onClick={onNavigate}
               className={cn(
                 'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
                 isActive(item.href)
@@ -152,6 +136,7 @@ export function AppSidebar({ profile, workspaces }: { profile: UserProfile | nul
                 <Link
                   key={item.href}
                   href={item.href}
+                  onClick={onNavigate}
                   className={cn(
                     'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
                     isActive(item.href)
@@ -220,10 +205,12 @@ export function AppSidebar({ profile, workspaces }: { profile: UserProfile | nul
       <Separator />
 
       <div className="flex items-center gap-3 p-4">
-        <Avatar className="h-8 w-8">
-          <AvatarImage src={profile?.avatar_url ?? ANON_AVATAR_URL} alt={profile?.full_name ?? 'User'} />
-          <AvatarFallback>{initials}</AvatarFallback>
-        </Avatar>
+        <AvatarUpload
+          currentUrl={profile?.avatar_url ?? null}
+          name={profile?.full_name ?? profile?.email ?? 'User'}
+          uploadUrl="/api/profile/avatar"
+          size="sm"
+        />
         <div className="flex-1 truncate">
           <p className="text-sm font-medium text-foreground truncate">
             {profile?.full_name ?? profile?.email ?? 'User'}
