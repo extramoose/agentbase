@@ -97,12 +97,10 @@ const STATUS_CONFIG: Record<Status, { label: string; className: string }> = {
 }
 
 const STATUS_TABS: Array<{ value: Status | 'all'; label: string }> = [
-  { value: 'all', label: 'All' },
-  { value: 'backlog', label: 'Backlog' },
   { value: 'todo', label: 'To Do' },
   { value: 'in_progress', label: 'In Progress' },
-  { value: 'blocked', label: 'Blocked' },
   { value: 'done', label: 'Done' },
+  { value: 'all', label: 'All' },
 ]
 
 const TASK_TYPE_CONFIG: Record<TaskType, { label: string; className: string }> = {
@@ -422,7 +420,7 @@ export function TasksClient({
     () => {
       const s = searchParams.get('status')
       const valid: Array<Status | 'all'> = ['backlog', 'todo', 'in_progress', 'blocked', 'done', 'cancelled', 'all']
-      return valid.includes(s as Status | 'all') ? (s as Status | 'all') : 'all'
+      return valid.includes(s as Status | 'all') ? (s as Status | 'all') : 'todo'
     }
   )
   const [typeFilter, setTypeFilter] = useState<TaskType | 'all'>(
