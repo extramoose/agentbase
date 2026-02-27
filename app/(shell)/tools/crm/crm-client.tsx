@@ -21,6 +21,7 @@ import { cn } from '@/lib/utils'
 
 type Company = {
   id: string
+  seq_id: number | null
   name: string
   domain: string | null
   industry: string | null
@@ -32,6 +33,7 @@ type Company = {
 
 type Person = {
   id: string
+  seq_id: number | null
   name: string
   email: string | null
   phone: string | null
@@ -46,6 +48,7 @@ type DealStatus = 'prospect' | 'active' | 'won' | 'lost'
 
 type Deal = {
   id: string
+  seq_id: number | null
   title: string
   status: DealStatus
   value: number | null
@@ -137,14 +140,23 @@ export function CrmClient({
     if (!hasData) return
     initialHandled.current = true
 
+    const isNumeric = /^\d+$/.test(initialId)
+    const numId = isNumeric ? Number(initialId) : null
+
     if (tab === 'companies') {
-      const entity = companies.find(c => c.id === initialId)
+      const entity = isNumeric
+        ? companies.find(c => c.seq_id === numId)
+        : companies.find(c => c.id === initialId)
       if (entity) setSelectedCompany(entity)
     } else if (tab === 'people') {
-      const entity = people.find(p => p.id === initialId)
+      const entity = isNumeric
+        ? people.find(p => p.seq_id === numId)
+        : people.find(p => p.id === initialId)
       if (entity) setSelectedPerson(entity)
     } else {
-      const entity = deals.find(d => d.id === initialId)
+      const entity = isNumeric
+        ? deals.find(d => d.seq_id === numId)
+        : deals.find(d => d.id === initialId)
       if (entity) setSelectedDeal(entity)
     }
   }, [companies, people, deals, initialId, tab])
@@ -257,7 +269,7 @@ export function CrmClient({
   const createCompany = useCallback(async (name: string) => {
     const tempId = `temp-${Date.now()}`
     const optimistic: Company = {
-      id: tempId, name, domain: null, industry: null, notes: null, tags: [],
+      id: tempId, seq_id: null, name, domain: null, industry: null, notes: null, tags: [],
       created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
     }
     setCompanies((prev) => [optimistic, ...prev])
@@ -281,7 +293,7 @@ export function CrmClient({
   const createPerson = useCallback(async (name: string) => {
     const tempId = `temp-${Date.now()}`
     const optimistic: Person = {
-      id: tempId, name, email: null, phone: null, title: null, notes: null, tags: [],
+      id: tempId, seq_id: null, name, email: null, phone: null, title: null, notes: null, tags: [],
       created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
     }
     setPeople((prev) => [optimistic, ...prev])
@@ -305,7 +317,7 @@ export function CrmClient({
   const createDeal = useCallback(async (title: string) => {
     const tempId = `temp-${Date.now()}`
     const optimistic: Deal = {
-      id: tempId, title, status: 'prospect', value: null, notes: null, tags: [],
+      id: tempId, seq_id: null, title, status: 'prospect', value: null, notes: null, tags: [],
       created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
     }
     setDeals((prev) => [optimistic, ...prev])
@@ -493,7 +505,7 @@ export function CrmClient({
             sortKey={companySortKey}
             sortDir={companySortDir}
             onSort={(key, dir) => { setCompanySortKey(key); setCompanySortDir(dir) }}
-            onSelect={(c) => { setSelectedCompany(c); router.replace(`/tools/crm/companies/${c.id}${buildQs()}`, { scroll: false }) }}
+            onSelect={(c) => { setSelectedCompany(c); router.replace(`/tools/crm/companies/${c.seq_id ?? c.id}${buildQs()}`, { scroll: false }) }}
           />
         )}
         {tab === 'people' && (
@@ -502,7 +514,7 @@ export function CrmClient({
             sortKey={peopleSortKey}
             sortDir={peopleSortDir}
             onSort={(key, dir) => { setPeopleSortKey(key); setPeopleSortDir(dir) }}
-            onSelect={(p) => { setSelectedPerson(p); router.replace(`/tools/crm/people/${p.id}${buildQs()}`, { scroll: false }) }}
+            onSelect={(p) => { setSelectedPerson(p); router.replace(`/tools/crm/people/${p.seq_id ?? p.id}${buildQs()}`, { scroll: false }) }}
           />
         )}
         {tab === 'deals' && (
@@ -511,7 +523,7 @@ export function CrmClient({
             sortKey={dealsSortKey}
             sortDir={dealsSortDir}
             onSort={(key, dir) => { setDealsSortKey(key); setDealsSortDir(dir) }}
-            onSelect={(d) => { setSelectedDeal(d); router.replace(`/tools/crm/deals/${d.id}${buildQs()}`, { scroll: false }) }}
+            onSelect={(d) => { setSelectedDeal(d); router.replace(`/tools/crm/deals/${d.seq_id ?? d.id}${buildQs()}`, { scroll: false }) }}
           />
         )}
       </div>
