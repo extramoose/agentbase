@@ -123,9 +123,9 @@ export function AgentsClient({ agents: initialAgents, currentUserName, currentUs
   }, [])
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Agents</h1>
+    <div className="space-y-4 sm:space-y-6">
+      <div className="flex items-center justify-between gap-2">
+        <h1 className="text-xl sm:text-2xl font-bold">Agents</h1>
         {!showCreate && !createResult && (
           <Button size="sm" onClick={() => setShowCreate(true)}>
             <Plus className="h-4 w-4" />
@@ -205,8 +205,8 @@ export function AgentsClient({ agents: initialAgents, currentUserName, currentUs
       )}
 
       {/* Agents table */}
-      <div className="rounded-lg border border-border">
-        <table className="w-full">
+      <div className="rounded-lg border border-border overflow-x-auto">
+        <table className="w-full min-w-[600px]">
           <thead>
             <tr className="border-b border-border text-left text-sm text-muted-foreground">
               <th className="px-4 py-3 font-medium">Agent</th>

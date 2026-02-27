@@ -55,7 +55,7 @@ const adminItems = [
   { label: 'Settings', href: '/admin/settings', icon: Settings },
 ]
 
-export function AppSidebar({ profile, workspaces }: { profile: UserProfile | null; workspaces: Workspace[] }) {
+export function AppSidebar({ profile, workspaces, onNavigate }: { profile: UserProfile | null; workspaces: Workspace[]; onNavigate?: () => void }) {
   const pathname = usePathname()
   const router = useRouter()
   const [switching, setSwitching] = useState(false)
@@ -93,7 +93,7 @@ export function AppSidebar({ profile, workspaces }: { profile: UserProfile | nul
     tenantRole === 'admin' || tenantRole === 'superadmin' || profile?.role === 'superadmin'
 
   return (
-    <aside className="flex h-screen w-60 flex-col border-r border-border bg-card">
+    <aside className="flex h-full w-60 flex-col border-r border-border bg-card">
       <div className="flex h-14 items-center px-4">
         <Link href="/" className="text-lg font-bold text-foreground">
           AgentBase
@@ -108,6 +108,7 @@ export function AppSidebar({ profile, workspaces }: { profile: UserProfile | nul
             <Link
               key={item.href}
               href={item.href}
+              onClick={onNavigate}
               className={cn(
                 'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
                 isActive(item.href)
@@ -135,6 +136,7 @@ export function AppSidebar({ profile, workspaces }: { profile: UserProfile | nul
                 <Link
                   key={item.href}
                   href={item.href}
+                  onClick={onNavigate}
                   className={cn(
                     'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
                     isActive(item.href)

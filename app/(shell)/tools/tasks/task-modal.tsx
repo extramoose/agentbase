@@ -149,9 +149,9 @@ export function TaskModal({ task, onClose }: { task: TaskData; onClose: () => vo
         onClick={onClose}
       />
       {/* Panel */}
-      <div className="fixed right-0 top-0 h-full z-50 flex flex-col bg-card border-l border-border shadow-2xl w-[520px] max-w-full">
+      <div className="fixed right-0 top-0 h-full z-50 flex flex-col bg-card border-l border-border shadow-2xl w-full sm:w-[520px] sm:max-w-full">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border shrink-0">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-border shrink-0">
           <h2 className="text-base font-semibold truncate">{title}</h2>
           <div className="flex items-center gap-1 shrink-0">
             <Button
@@ -170,7 +170,7 @@ export function TaskModal({ task, onClose }: { task: TaskData; onClose: () => vo
 
         {/* Scrollable content */}
         <div className="flex-1 overflow-y-auto">
-          <div className="p-6 space-y-5">
+          <div className="p-4 sm:p-6 space-y-5">
             {/* Ticket number */}
             <p className="text-xs text-muted-foreground -mt-1">#{task.ticket_id}</p>
 

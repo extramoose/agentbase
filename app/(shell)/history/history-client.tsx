@@ -195,8 +195,8 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
   }
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold">History</h1>
+    <div className="space-y-4 sm:space-y-6">
+      <h1 className="text-xl sm:text-2xl font-bold">History</h1>
 
       <SearchFilterBar
         search={search}
