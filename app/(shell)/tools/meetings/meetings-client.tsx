@@ -18,13 +18,8 @@ import { toast } from '@/hooks/use-toast'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { RichTextEditor } from '@/components/rich-text-editor'
-import { MarkdownRenderer } from '@/components/markdown-renderer'
-import { StreamPanel } from '@/components/stream-panel'
-import { VersionHistoryDropdown } from '@/components/version-history-dropdown'
-import { SynthesizeButton } from '@/components/synthesize-button'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
-import type { DocumentVersion } from '@/lib/types/stream'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -490,8 +485,9 @@ function MeetingDetail({
   const [date, setDate] = useState(meeting.date ?? '')
   const [meetingTime, setMeetingTime] = useState(meeting.meeting_time ?? '')
   const [tags, setTags] = useState<string[]>(meeting.tags)
-  const [docContent, setDocContent] = useState('')
-  const [viewingVersion, setViewingVersion] = useState<DocumentVersion | null>(null)
+  const [prepNotes, setPrepNotes] = useState(meeting.prep_notes ?? '')
+  const [liveNotes, setLiveNotes] = useState(meeting.live_notes ?? '')
+  const [meetingSummary, setMeetingSummary] = useState(meeting.meeting_summary ?? '')
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
   // Linked people state
@@ -505,17 +501,9 @@ function MeetingDetail({
     setDate(meeting.date ?? '')
     setMeetingTime(meeting.meeting_time ?? '')
     setTags(meeting.tags)
-    setViewingVersion(null)
-
-    // Set doc content based on phase
-    if (meeting.status === 'upcoming') {
-      setDocContent(meeting.prep_notes ?? '')
-    } else if (meeting.status === 'in_meeting') {
-      setDocContent(meeting.live_notes ?? '')
-    } else {
-      // ended or closed
-      setDocContent(meeting.meeting_summary ?? '')
-    }
+    setPrepNotes(meeting.prep_notes ?? '')
+    setLiveNotes(meeting.live_notes ?? '')
+    setMeetingSummary(meeting.meeting_summary ?? '')
   }, [meeting])
 
   // Fetch linked people and all people for linking
@@ -601,55 +589,10 @@ function MeetingDetail({
     }
   }
 
-  // ----- Status transitions -----
-
-  async function startMeeting() {
-    saveFieldImmediate({ status: 'in_meeting' })
-  }
-
-  async function closeMeeting() {
-    saveFieldImmediate({ status: 'closed' })
-
-    // Auto-trigger summary synthesis
-    try {
-      const res = await fetch(`/api/meetings/${meeting.id}/synthesize`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ context_hint: 'summary' }),
-      })
-      if (res.ok) {
-        const json = await res.json()
-        const version = json.version as DocumentVersion
-        setDocContent(version.content)
-        toast({ type: 'success', message: 'Meeting closed and summary generated' })
-      }
-    } catch {
-      toast({ type: 'error', message: 'Meeting closed but summary generation failed' })
-    }
-  }
-
-  // ----- Version / Synthesis handlers -----
-
-  function handleSynthesizeComplete(version: DocumentVersion) {
-    setDocContent(version.content)
-    setViewingVersion(null)
-  }
-
-  function handleVersionSelect(content: string) {
-    setViewingVersion({ content } as DocumentVersion)
-  }
-
-  const displayContent = viewingVersion ? viewingVersion.content : docContent
-  const isClosed = meeting.status === 'closed' || meeting.status === 'ended'
-
   const linkedPeopleItems = linkedPeopleIds
     .map((id) => allPeople.find((p) => p.id === id))
     .filter(Boolean)
     .map((p) => ({ id: p!.id, label: p!.name }))
-
-  // Phase-specific config
-  const synthesizeLabel = meeting.status === 'upcoming' ? 'Synthesize Prep Brief' : 'Synthesize Summary'
-  const synthesizeHint = meeting.status === 'upcoming' ? 'prep' : 'summary'
 
   return (
     <div className="flex flex-col h-full">
@@ -663,16 +606,12 @@ function MeetingDetail({
         </button>
 
         <div className="flex-1 min-w-0">
-          {isClosed ? (
-            <h2 className="text-lg font-semibold px-0 truncate">{title}</h2>
-          ) : (
-            <Input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              onBlur={(e) => saveFieldImmediate({ title: e.target.value })}
-              className="text-lg font-semibold border-none bg-transparent px-0 focus-visible:ring-0"
-            />
-          )}
+          <Input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            onBlur={(e) => saveFieldImmediate({ title: e.target.value })}
+            className="text-lg font-semibold border-none bg-transparent px-0 focus-visible:ring-0"
+          />
         </div>
 
         <Badge
@@ -692,23 +631,6 @@ function MeetingDetail({
         </Button>
       </div>
 
-      {/* Status bar + transition buttons */}
-      <div className="flex items-center gap-3 px-4 py-2 border-b border-border shrink-0 bg-muted/30">
-        <span className={cn('text-sm font-medium', STATUS_CONFIG[meeting.status].color)}>
-          {STATUS_CONFIG[meeting.status].label}
-        </span>
-        {meeting.status === 'upcoming' && (
-          <Button size="sm" onClick={startMeeting}>
-            Start Meeting
-          </Button>
-        )}
-        {meeting.status === 'in_meeting' && (
-          <Button size="sm" onClick={closeMeeting}>
-            Close Meeting
-          </Button>
-        )}
-      </div>
-
       {/* Scrollable content */}
       <div className="flex-1 overflow-y-auto">
         <div className="p-4 space-y-6">
@@ -718,55 +640,45 @@ function MeetingDetail({
               <label className="text-xs text-muted-foreground font-medium mb-1 block">
                 Date
               </label>
-              {isClosed ? (
-                <p className="text-sm">{date ? new Date(date + 'T00:00:00').toLocaleDateString() : 'No date'}</p>
-              ) : (
-                <Input
-                  type="date"
-                  value={date}
-                  onChange={(e) => {
-                    setDate(e.target.value)
-                    saveFieldImmediate({ date: e.target.value || null })
-                  }}
-                  className="text-sm"
-                />
-              )}
+              <Input
+                type="date"
+                value={date}
+                onChange={(e) => {
+                  setDate(e.target.value)
+                  saveFieldImmediate({ date: e.target.value || null })
+                }}
+                className="text-sm"
+              />
             </div>
             <div>
               <label className="text-xs text-muted-foreground font-medium mb-1 block">
                 Time
               </label>
-              {isClosed ? (
-                <p className="text-sm">{meetingTime || 'No time'}</p>
-              ) : (
-                <Input
-                  type="time"
-                  value={meetingTime}
-                  onChange={(e) => {
-                    setMeetingTime(e.target.value)
-                    saveFieldImmediate({ meeting_time: e.target.value || null })
-                  }}
-                  className="text-sm"
-                />
-              )}
+              <Input
+                type="time"
+                value={meetingTime}
+                onChange={(e) => {
+                  setMeetingTime(e.target.value)
+                  saveFieldImmediate({ meeting_time: e.target.value || null })
+                }}
+                className="text-sm"
+              />
             </div>
           </div>
 
           {/* Tags */}
-          {!isClosed && (
-            <div>
-              <label className="text-xs text-muted-foreground font-medium mb-1 block">
-                Tags
-              </label>
-              <TagCombobox
-                selected={tags}
-                onChange={(newTags) => {
-                  setTags(newTags)
-                  saveFieldImmediate({ tags: newTags })
-                }}
-              />
-            </div>
-          )}
+          <div>
+            <label className="text-xs text-muted-foreground font-medium mb-1 block">
+              Tags
+            </label>
+            <TagCombobox
+              selected={tags}
+              onChange={(newTags) => {
+                setTags(newTags)
+                saveFieldImmediate({ tags: newTags })
+              }}
+            />
+          </div>
 
           {/* Linked People */}
           <div>
@@ -775,14 +687,12 @@ function MeetingDetail({
                 <Users className="h-3.5 w-3.5" />
                 People
               </label>
-              {!isClosed && (
-                <LinkPicker
-                  items={allPeople}
-                  linkedIds={new Set(linkedPeopleIds)}
-                  onLink={linkPerson}
-                  placeholder="Link Person"
-                />
-              )}
+              <LinkPicker
+                items={allPeople}
+                linkedIds={new Set(linkedPeopleIds)}
+                onLink={linkPerson}
+                placeholder="Link Person"
+              />
             </div>
             {linkedPeopleItems.length > 0 ? (
               <div className="space-y-1">
@@ -792,14 +702,12 @@ function MeetingDetail({
                     className="flex items-center justify-between px-2 py-1.5 rounded-md bg-muted/30 group"
                   >
                     <span className="text-sm truncate">{item.label}</span>
-                    {!isClosed && (
-                      <button
-                        onClick={() => unlinkPerson(item.id)}
-                        className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    )}
+                    <button
+                      onClick={() => unlinkPerson(item.id)}
+                      className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
                   </div>
                 ))}
               </div>
@@ -836,88 +744,45 @@ function MeetingDetail({
             </div>
           )}
 
-          {/* Version History + Synthesize toolbar */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <VersionHistoryDropdown
-              entityType="meeting"
-              entityId={meeting.id}
-              currentContent={docContent}
-              onVersionSelect={handleVersionSelect}
-            />
-            {!isClosed && (
-              <SynthesizeButton
-                entityType="meetings"
-                entityId={meeting.id}
-                contextHint={synthesizeHint}
-                label={synthesizeLabel}
-                onComplete={handleSynthesizeComplete}
-              />
-            )}
-          </div>
-
-          {/* Document area */}
+          {/* Document areas */}
           <div>
-            {meeting.status === 'upcoming' && (
-              <>
-                <label className="text-xs text-muted-foreground font-medium mb-1 block">
-                  Prep Brief
-                </label>
-                {viewingVersion ? (
-                  <div className="min-h-[150px] rounded-md border border-border p-4">
-                    <MarkdownRenderer content={displayContent} />
-                  </div>
-                ) : (
-                  <RichTextEditor
-                    value={displayContent}
-                    onChange={(md) => setDocContent(md)}
-                    onBlur={(md) => saveFieldImmediate({ prep_notes: md })}
-                    placeholder="Meeting prep notes..."
-                    minHeight="150px"
-                  />
-                )}
-              </>
-            )}
-
-            {meeting.status === 'in_meeting' && (
-              <>
-                <label className="text-xs text-muted-foreground font-medium mb-1 block">
-                  Live Notes
-                </label>
-                {viewingVersion ? (
-                  <div className="min-h-[300px] rounded-md border border-border p-4">
-                    <MarkdownRenderer content={displayContent} />
-                  </div>
-                ) : (
-                  <RichTextEditor
-                    value={displayContent}
-                    onChange={(md) => setDocContent(md)}
-                    onBlur={(md) => saveFieldImmediate({ live_notes: md })}
-                    placeholder="Type meeting notes..."
-                    minHeight="300px"
-                  />
-                )}
-              </>
-            )}
-
-            {isClosed && (
-              <>
-                <label className="text-xs text-muted-foreground font-medium mb-1 block">
-                  Summary
-                </label>
-                <div className="min-h-[200px] rounded-md border border-border p-4 bg-muted/20">
-                  <MarkdownRenderer content={displayContent} />
-                  {!displayContent && (
-                    <p className="text-sm text-muted-foreground">No summary generated yet.</p>
-                  )}
-                </div>
-              </>
-            )}
+            <label className="text-xs text-muted-foreground font-medium mb-1 block">
+              Prep Notes
+            </label>
+            <RichTextEditor
+              value={prepNotes}
+              onChange={(md) => setPrepNotes(md)}
+              onBlur={(md) => saveFieldImmediate({ prep_notes: md })}
+              placeholder="Meeting prep notes..."
+              minHeight="150px"
+            />
           </div>
-        </div>
 
-        {/* Stream Panel */}
-        <div className="border-t border-border px-4 py-4">
-          <StreamPanel entityType="meeting" entityId={meeting.id} />
+          <div>
+            <label className="text-xs text-muted-foreground font-medium mb-1 block">
+              Live Notes
+            </label>
+            <RichTextEditor
+              value={liveNotes}
+              onChange={(md) => setLiveNotes(md)}
+              onBlur={(md) => saveFieldImmediate({ live_notes: md })}
+              placeholder="Type meeting notes..."
+              minHeight="150px"
+            />
+          </div>
+
+          <div>
+            <label className="text-xs text-muted-foreground font-medium mb-1 block">
+              Summary
+            </label>
+            <RichTextEditor
+              value={meetingSummary}
+              onChange={(md) => setMeetingSummary(md)}
+              onBlur={(md) => saveFieldImmediate({ meeting_summary: md })}
+              placeholder="Meeting summary..."
+              minHeight="150px"
+            />
+          </div>
         </div>
 
         {/* Activity + Comments */}
