@@ -163,6 +163,24 @@ export function EntityLinksSection({ entityType, entityId, editMode }: EntityLin
   const inputRef = useRef<HTMLInputElement>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(null)
 
+  // Recent entities for empty-query suggestions
+  const [recentEntities, setRecentEntities] = useState<SearchResult[]>([])
+
+  useEffect(() => {
+    fetch('/api/entities/recent')
+      .then(r => r.json())
+      .then(json => {
+        if (json.success) {
+          setRecentEntities(json.data.map((e: { id: string; label: string; entity_type: string }) => ({
+            id: e.id,
+            type: e.entity_type,
+            name: e.label,
+          })))
+        }
+      })
+      .catch(() => {})
+  }, [])
+
   // Fetch links + resolve names
   const fetchLinks = useCallback(async () => {
     const res = await fetch(`/api/entity-links?sourceType=${entityType}&sourceId=${entityId}`)
@@ -193,6 +211,17 @@ export function EntityLinksSection({ entityType, entityId, editMode }: EntityLin
     if (debounceRef.current) clearTimeout(debounceRef.current)
 
     const trimmed = searchQuery.trim()
+    if (!trimmed) {
+      const linkedIds = new Set(links.map(l => `${l.target_type}:${l.target_id}`))
+      const filtered = recentEntities.filter(r => {
+        if (r.type === entityType && r.id === entityId) return false
+        return !linkedIds.has(`${r.type}:${r.id}`)
+      })
+      setSearchResults(filtered)
+      setSearchOpen(filtered.length > 0)
+      setSearchLoading(false)
+      return
+    }
     if (trimmed.length < 2) {
       setSearchResults([])
       setSearchLoading(false)
@@ -241,7 +270,7 @@ export function EntityLinksSection({ entityType, entityId, editMode }: EntityLin
     }, 300)
 
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
-  }, [searchQuery, links, entityType, entityId])
+  }, [searchQuery, links, entityType, entityId, recentEntities])
 
   // Add link (optimistic)
   const addLink = useCallback(async (result: SearchResult) => {
@@ -389,7 +418,16 @@ export function EntityLinksSection({ entityType, entityId, editMode }: EntityLin
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               onKeyDown={handleKeyDown}
-              onFocus={() => searchQuery.trim().length >= 2 && searchResults.length > 0 && setSearchOpen(true)}
+              onFocus={() => {
+                if (!searchQuery.trim() && recentEntities.length > 0) {
+                  const linkedIds = new Set(links.map(l => `${l.target_type}:${l.target_id}`))
+                  const filtered = recentEntities.filter(e => !linkedIds.has(`${e.type}:${e.id}`) && !(e.type === entityType && e.id === entityId))
+                  setSearchResults(filtered)
+                  setSearchOpen(filtered.length > 0)
+                } else if (searchQuery.trim().length >= 2 && searchResults.length > 0) {
+                  setSearchOpen(true)
+                }
+              }}
               onBlur={() => setTimeout(() => setSearchOpen(false), 150)}
               placeholder="Link an entity..."
               className="flex-1 min-w-[80px] bg-transparent outline-none placeholder:text-muted-foreground text-sm"
