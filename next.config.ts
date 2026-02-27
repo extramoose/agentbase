@@ -14,8 +14,11 @@ const nextConfig: NextConfig = {
       { protocol: 'https', hostname: 'lh3.googleusercontent.com' },
     ],
   },
-  // Silence Turbopack warning — no custom config needed, defaults work fine
-  turbopack: {},
+  turbopack: {
+    // Explicitly set root to this project — prevents Next.js from walking up
+    // and finding stray pnpm-lock.yaml files in parent directories.
+    root: __dirname,
+  },
   async headers() {
     return [
       {
