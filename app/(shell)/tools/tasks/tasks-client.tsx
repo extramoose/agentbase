@@ -20,18 +20,13 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { GripVertical, Plus, ChevronDown, ChevronRight, AlertCircle, ArrowUp, Minus, ArrowDown, Trash2, X, User } from 'lucide-react'
+import { GripVertical, Plus, ChevronDown, ChevronRight, AlertCircle, ArrowUp, Minus, ArrowDown, X, User } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import { EditShelf } from '@/components/edit-shelf'
 import { SearchFilterBar } from '@/components/search-filter-bar'
-import { TagCombobox } from '@/components/tag-combobox'
-import { EntityLinksSection } from '@/components/entity-links-section'
 import { toast } from '@/hooks/use-toast'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { RichTextEditor } from '@/components/rich-text-editor'
 import { Badge } from '@/components/ui/badge'
-import { AssigneePicker } from '@/components/assignee-picker'
 import { ActorChip } from '@/components/actor-chip'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import { cn } from '@/lib/utils'
@@ -411,11 +406,9 @@ function PriorityGroup({
 export function TasksClient({
   initialTasks,
   currentUser,
-  initialTaskId,
 }: {
   initialTasks: Task[]
   currentUser: CurrentUser
-  initialTaskId?: string
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -436,7 +429,6 @@ export function TasksClient({
       return valid.includes(t as TaskType | 'all') ? (t as TaskType | 'all') : 'all'
     }
   )
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [addingToPriority, setAddingToPriority] = useState<Priority | null>(null)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [mounted, setMounted] = useState(false)
@@ -446,7 +438,6 @@ export function TasksClient({
   const [showCancelled, setShowCancelled] = useState(false)
 
   const supabase = createClient()
-  const initialHandled = useRef(false)
 
   // Build query string from current filter state
   const buildQs = useCallback(() => {
@@ -467,14 +458,6 @@ export function TasksClient({
     }
     router.replace(`${window.location.pathname}${buildQs()}`, { scroll: false })
   }, [buildQs, router])
-
-  // Open shelf for initialTaskId after data is available
-  useEffect(() => {
-    if (!initialTaskId || initialHandled.current || tasks.length === 0) return
-    initialHandled.current = true
-    const task = tasks.find(t => t.ticket_id === Number(initialTaskId))
-    if (task) setSelectedTask(task)
-  }, [tasks, initialTaskId])
 
   // Hydration guard — defer dnd-kit tree to avoid SSR ID mismatch
   useEffect(() => setMounted(true), [])
@@ -531,7 +514,6 @@ export function TasksClient({
         (payload) => {
           const updated = payload.new as Task
           setTasks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)))
-          setSelectedTask((prev) => (prev?.id === updated.id ? updated : prev))
         }
       )
       .on(
@@ -543,7 +525,6 @@ export function TasksClient({
             if (!prev.find((t) => t.id === deletedId)) return prev
             return prev.filter((t) => t.id !== deletedId)
           })
-          setSelectedTask((prev) => (prev?.id === deletedId ? null : prev))
           setSelectedIds((prev) => {
             if (!prev.has(deletedId)) return prev
             const next = new Set(prev)
@@ -665,11 +646,6 @@ export function TasksClient({
       setTasks((prev) =>
         prev.map((t) => (t.id === taskId ? { ...t, ...fields, updated_at: new Date().toISOString() } : t))
       )
-      setSelectedTask((prev) =>
-        prev?.id === taskId
-          ? { ...prev, ...fields, updated_at: new Date().toISOString() } as Task
-          : prev
-      )
 
       try {
         const res = await fetch('/api/commands/update', {
@@ -773,28 +749,6 @@ export function TasksClient({
       return new Set(filteredTasks.map((t) => t.id))
     })
   }, [filteredTasks])
-
-  // ----- Delete task -----
-
-  const deleteTask = useCallback(async (id: string) => {
-    setTasks((prev) => prev.filter((t) => t.id !== id))
-    setSelectedTask(null)
-    router.push(`/tools/tasks`, { scroll: false })
-    try {
-      const res = await fetch('/api/commands/delete-entity', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ table: 'tasks', id }),
-      })
-      if (!res.ok) {
-        const json = await res.json()
-        throw new Error(json.error ?? 'Failed to delete')
-      }
-      toast({ type: 'success', message: 'Task deleted' })
-    } catch (err) {
-      toast({ type: 'error', message: err instanceof Error ? err.message : 'Failed to delete' })
-    }
-  }, [router, buildQs])
 
   // ----- Batch actions -----
 
@@ -1003,7 +957,6 @@ export function TasksClient({
                 priority={priority}
                 tasks={grouped[priority]}
                 onTaskClick={(task) => {
-                  setSelectedTask(task)
                   router.push(`/tools/tasks/${task.ticket_id}`, { scroll: false })
                 }}
                 addingTo={addingToPriority === priority}
@@ -1057,7 +1010,6 @@ export function TasksClient({
                         key={task.id}
                         className="group flex items-center gap-2 px-3 py-1.5 rounded-md hover:bg-accent/40 cursor-pointer border border-transparent hover:border-border transition-colors"
                         onClick={() => {
-                          setSelectedTask(task)
                           router.push(`/tools/tasks/${task.ticket_id}`, { scroll: false })
                         }}
                       >
@@ -1213,240 +1165,7 @@ export function TasksClient({
         </div>
       )}
 
-      {/* EditShelf */}
-      {selectedTask && (
-        <TaskEditShelf
-          task={selectedTask}
-          onClose={() => {
-            setSelectedTask(null)
-            router.push(`/tools/tasks`, { scroll: false })
-          }}
-          onUpdate={updateTaskField}
-          onDelete={deleteTask}
-        />
-      )}
     </div>
   )
 }
 
-// ---------------------------------------------------------------------------
-// Edit shelf for a single task
-// ---------------------------------------------------------------------------
-
-function TaskEditShelf({
-  task,
-  onClose,
-  onUpdate,
-  onDelete,
-}: {
-  task: Task
-  onClose: () => void
-  onUpdate: (id: string, fields: Record<string, unknown>) => Promise<void>
-  onDelete: (id: string) => Promise<void>
-}) {
-  const [title, setTitle] = useState(task.title)
-  const [body, setBody] = useState(task.body ?? '')
-  const [status, setStatus] = useState<Status>(task.status)
-  const [priority, setPriority] = useState<Priority>(task.priority)
-  const [taskType, setTaskType] = useState<TaskType | null>(task.type)
-  const [dueDate, setDueDate] = useState(task.due_date ?? '')
-  const [tags, setTags] = useState<string[]>(task.tags ?? [])
-
-  // Sync when task prop changes (from realtime)
-  useEffect(() => {
-    setTitle(task.title)
-    setBody(task.body ?? '')
-    setStatus(task.status)
-    setPriority(task.priority)
-    setTaskType(task.type)
-    setDueDate(task.due_date ?? '')
-    setTags(task.tags ?? [])
-  }, [task])
-
-  function saveFieldImmediate(fields: Record<string, unknown>) {
-    onUpdate(task.id, fields)
-  }
-
-  return (
-    <EditShelf
-      isOpen
-      onClose={onClose}
-      title={task.title}
-      entityType="tasks"
-      entityId={task.id}
-      headerRight={
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={async () => {
-            if (!window.confirm('Delete this task? This cannot be undone.')) return
-            await onDelete(task.id)
-          }}
-          className="text-muted-foreground hover:text-red-400"
-        >
-          <Trash2 className="h-4 w-4" />
-        </Button>
-      }
-    >
-      <div className="space-y-5">
-        {/* Ticket number */}
-        <p className="text-xs text-muted-foreground -mt-1">#{task.ticket_id}</p>
-
-        {/* Title */}
-        <div>
-          <label className="text-xs text-muted-foreground font-medium mb-1 block">
-            Title
-          </label>
-          <Input
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            onBlur={(e) => saveFieldImmediate({ title: e.target.value })}
-            className="text-base font-medium"
-          />
-        </div>
-
-        {/* Status + Priority row */}
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="text-xs text-muted-foreground font-medium mb-1 block">
-              Status
-            </label>
-            <select
-              value={status}
-              onChange={(e) => {
-                const val = e.target.value as Status
-                setStatus(val)
-                saveFieldImmediate({ status: val })
-              }}
-              className="w-full h-9 rounded-md border border-input bg-transparent px-3 text-sm focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] outline-none"
-            >
-              {STATUS_ORDER.map((s) => (
-                <option key={s} value={s}>
-                  {STATUS_CONFIG[s].label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="text-xs text-muted-foreground font-medium mb-1 block">
-              Priority
-            </label>
-            <select
-              value={priority}
-              onChange={(e) => {
-                const val = e.target.value as Priority
-                setPriority(val)
-                saveFieldImmediate({ priority: val })
-              }}
-              className="w-full h-9 rounded-md border border-input bg-transparent px-3 text-sm focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] outline-none"
-            >
-              {PRIORITY_ORDER.map((p) => (
-                <option key={p} value={p}>
-                  {PRIORITY_CONFIG[p].label}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {/* Type */}
-        <div>
-          <label className="text-xs text-muted-foreground font-medium mb-1 block">
-            Type
-          </label>
-          <div className="flex gap-1.5">
-            {([null, 'bug', 'improvement', 'feature'] as const).map((t) => {
-              const isSelected = taskType === t
-              return (
-                <button
-                  key={t ?? 'none'}
-                  onClick={() => {
-                    setTaskType(t)
-                    saveFieldImmediate({ type: t })
-                  }}
-                  className={cn(
-                    'rounded px-2.5 py-1.5 text-xs font-medium transition-colors',
-                    isSelected
-                      ? t === null
-                        ? 'bg-zinc-700 text-zinc-200 border border-zinc-600'
-                        : TASK_TYPE_CONFIG[t].className
-                      : 'bg-zinc-800 text-zinc-400 border border-zinc-700'
-                  )}
-                >
-                  {t === null ? 'None' : t.charAt(0).toUpperCase() + t.slice(1)}
-                </button>
-              )
-            })}
-          </div>
-        </div>
-
-        {/* Assignee */}
-        <div>
-          <label className="text-xs text-muted-foreground font-medium mb-1 block">
-            Assignee
-          </label>
-          <AssigneePicker
-            value={task.assignee_id ? { id: task.assignee_id, type: task.assignee_type as 'human' | 'agent' } : null}
-            onChange={(actor) => {
-              saveFieldImmediate({
-                assignee_id: actor?.id ?? null,
-                assignee_type: actor?.type ?? null,
-              })
-            }}
-          />
-        </div>
-
-        {/* Body */}
-        <div>
-          <label className="text-xs text-muted-foreground font-medium mb-1 block">
-            Description
-          </label>
-          <RichTextEditor
-            value={body}
-            onBlur={(md) => {
-              setBody(md)
-              saveFieldImmediate({ body: md })
-            }}
-            placeholder="Add details..."
-            minHeight="120px"
-          />
-        </div>
-
-        {/* Due date */}
-        <div>
-          <label className="text-xs text-muted-foreground font-medium mb-1 block">
-            Due date
-          </label>
-          <Input
-            type="date"
-            value={dueDate}
-            onChange={(e) => {
-              setDueDate(e.target.value)
-              saveFieldImmediate({
-                due_date: e.target.value || null,
-              })
-            }}
-            className="text-sm"
-          />
-        </div>
-
-        {/* Tags */}
-        <div>
-          <label className="text-xs text-muted-foreground font-medium mb-1 block">
-            Tags
-          </label>
-          <TagCombobox
-            selected={tags}
-            onChange={(newTags) => {
-              setTags(newTags)
-              saveFieldImmediate({ tags: newTags })
-            }}
-          />
-        </div>
-
-        {/* Links */}
-        <EntityLinksSection entityType="tasks" entityId={task.id} editMode />
-      </div>
-    </EditShelf>
-  )
-}
