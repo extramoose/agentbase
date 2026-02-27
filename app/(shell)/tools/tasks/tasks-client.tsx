@@ -100,7 +100,7 @@ const STATUS_TABS: Array<{ value: Status | 'all'; label: string }> = [
   { value: 'todo', label: 'To Do' },
   { value: 'in_progress', label: 'In Progress' },
   { value: 'done', label: 'Done' },
-  { value: 'all', label: 'All' },
+  { value: 'cancelled', label: 'Cancelled' },
 ]
 
 const TASK_TYPE_CONFIG: Record<TaskType, { label: string; className: string }> = {
@@ -436,7 +436,6 @@ export function TasksClient({
   const [activeDragId, setActiveDragId] = useState<string | null>(null)
   const [assigneeFilter, setAssigneeFilter] = useState<string | null>(null)
   const [workspaceMembers, setWorkspaceMembers] = useState<WorkspaceMember[]>([])
-  const [showCancelled, setShowCancelled] = useState(false)
   const [selectedTask, setSelectedTask] = useState<Task | null>(initialSelectedTask ?? null)
 
   const supabase = createClient()
@@ -570,8 +569,8 @@ export function TasksClient({
   const filteredTasks = useMemo(() => {
     let result = tasks
 
-    // Hide cancelled unless explicitly toggled or filtered to cancelled
-    if (!showCancelled && statusFilter !== 'cancelled') {
+    // Hide cancelled unless on the Cancelled tab
+    if (statusFilter !== 'cancelled') {
       result = result.filter((t) => t.status !== 'cancelled')
     }
 
@@ -601,17 +600,13 @@ export function TasksClient({
     }
 
     return result
-  }, [tasks, statusFilter, typeFilter, search, assigneeFilter, showCancelled])
+  }, [tasks, statusFilter, typeFilter, search, assigneeFilter])
 
   const grouped = useMemo(() => groupByPriority(filteredTasks), [filteredTasks])
 
   // Count tasks per status, respecting type + assignee + search filters (but NOT status)
   const statusCounts = useMemo(() => {
     let base = tasks
-    // Always hide cancelled unless toggled
-    if (!showCancelled) {
-      base = base.filter((t) => t.status !== 'cancelled')
-    }
     if (typeFilter !== 'all') {
       base = base.filter((t) => t.type === typeFilter)
     }
@@ -635,7 +630,7 @@ export function TasksClient({
       done: base.filter((t) => t.status === 'done').length,
       cancelled: base.filter((t) => t.status === 'cancelled').length,
     } as Record<Status | 'all', number>
-  }, [tasks, typeFilter, assigneeFilter, search, showCancelled])
+  }, [tasks, typeFilter, assigneeFilter, search])
 
   // ----- Create task -----
 
@@ -1095,19 +1090,7 @@ export function TasksClient({
           })
         )}
 
-        {/* Show cancelled toggle */}
-        {statusFilter !== 'cancelled' && (() => {
-          const cancelledCount = tasks.filter((t) => t.status === 'cancelled').length
-          if (cancelledCount === 0) return null
-          return (
-            <button
-              onClick={() => setShowCancelled((prev) => !prev)}
-              className="mt-2 mb-1 px-3 py-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-            >
-              {showCancelled ? 'Hide' : 'Show'} cancelled ({cancelledCount})
-            </button>
-          )
-        })()}
+
 
         {filteredTasks.length === 0 && !addingToPriority && (
           <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
