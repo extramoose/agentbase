@@ -37,6 +37,7 @@ type ItemType = 'favorite' | 'flag' | 'restaurant' | 'note' | 'idea' | 'article'
 
 type LibraryItem = {
   id: string
+  seq_id: number | null
   type: ItemType
   title: string
   url: string | null
@@ -123,7 +124,10 @@ export function LibraryClient({ initialItems, initialItemId }: { initialItems: L
   useEffect(() => {
     if (!initialItemId || initialHandled.current || items.length === 0) return
     initialHandled.current = true
-    const item = items.find(i => i.id === initialItemId)
+    const isNumeric = /^\d+$/.test(initialItemId)
+    const item = isNumeric
+      ? items.find(i => i.seq_id === Number(initialItemId))
+      : items.find(i => i.id === initialItemId)
     if (item) setSelectedItem(item)
   }, [items, initialItemId])
 
@@ -203,11 +207,12 @@ export function LibraryClient({ initialItems, initialItemId }: { initialItems: L
 
   // ===== CRUD =====
   const createItem = useCallback(
-    async (fields: Omit<LibraryItem, 'id' | 'created_at' | 'updated_at'>) => {
+    async (fields: Omit<LibraryItem, 'id' | 'seq_id' | 'created_at' | 'updated_at'>) => {
       const tempId = `temp-${Date.now()}`
       const optimistic: LibraryItem = {
         ...fields,
         id: tempId,
+        seq_id: null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       }
@@ -361,13 +366,13 @@ export function LibraryClient({ initialItems, initialItemId }: { initialItems: L
       ) : viewMode === 'card' ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((item) => (
-            <ItemCard key={item.id} item={item} onClick={() => { setSelectedItem(item); router.replace(`/tools/library/${item.id}${buildQs()}`, { scroll: false }) }} />
+            <ItemCard key={item.id} item={item} onClick={() => { setSelectedItem(item); router.replace(`/tools/library/${item.seq_id ?? item.id}${buildQs()}`, { scroll: false }) }} />
           ))}
         </div>
       ) : (
         <div className="border border-border rounded-lg overflow-hidden">
           {filtered.map((item, idx) => (
-            <ItemRow key={item.id} item={item} isLast={idx === filtered.length - 1} onClick={() => { setSelectedItem(item); router.replace(`/tools/library/${item.id}${buildQs()}`, { scroll: false }) }} />
+            <ItemRow key={item.id} item={item} isLast={idx === filtered.length - 1} onClick={() => { setSelectedItem(item); router.replace(`/tools/library/${item.seq_id ?? item.id}${buildQs()}`, { scroll: false }) }} />
           ))}
         </div>
       )}
@@ -732,7 +737,7 @@ function LibraryCreateShelf({
   onCreate,
 }: {
   onClose: () => void
-  onCreate: (fields: Omit<LibraryItem, 'id' | 'created_at' | 'updated_at'>) => Promise<void>
+  onCreate: (fields: Omit<LibraryItem, 'id' | 'seq_id' | 'created_at' | 'updated_at'>) => Promise<void>
 }) {
   const [type, setType] = useState<ItemType>(() => {
     if (typeof window !== 'undefined') {
