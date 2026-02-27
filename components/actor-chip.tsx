@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { cn } from '@/lib/utils'
@@ -86,11 +85,10 @@ export function ActorChip({ actorId, actorType, compact = false, className }: Ac
   const avatarSrc = actor?.avatar_url ?? null
 
   const avatarContent = avatarSrc && !imgError ? (
-    <Image
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
       src={avatarSrc}
       alt={displayName}
-      width={24}
-      height={24}
       className="aspect-square size-full object-cover"
       onError={() => setImgError(true)}
     />
