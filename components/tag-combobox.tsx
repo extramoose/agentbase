@@ -37,10 +37,15 @@ export function TagCombobox({ selected, onChange, className }: TagComboboxProps)
   // Filter suggestions as user types
   useEffect(() => {
     const q = inputValue.toLowerCase().trim()
-    if (!q) { setSuggestions([]); setOpen(false); return }
-    const filtered = allTags.filter(t =>
-      t.toLowerCase().includes(q) && !selected.includes(t)
-    )
+    const available = allTags.filter(t => !selected.includes(t))
+    if (!q) {
+      // Show all available tags when field is open but empty
+      setSuggestions(available)
+      setOpen(available.length > 0)
+      setActiveIndex(-1)
+      return
+    }
+    const filtered = available.filter(t => t.toLowerCase().includes(q))
     setSuggestions(filtered)
     setOpen(filtered.length > 0 || q.length > 0)
     setActiveIndex(-1)
@@ -107,7 +112,22 @@ export function TagCombobox({ selected, onChange, className }: TagComboboxProps)
           value={inputValue}
           onChange={e => setInputValue(e.target.value)}
           onKeyDown={handleKeyDown}
-          onFocus={() => inputValue && setOpen(true)}
+          onFocus={() => {
+            if (!inputValue.trim()) {
+              const available = allTags.filter(t => !selected.includes(t))
+              setSuggestions(available)
+              setOpen(available.length > 0)
+            } else {
+              setOpen(true)
+            }
+          }}
+          onClick={() => {
+            if (!inputValue.trim()) {
+              const available = allTags.filter(t => !selected.includes(t))
+              setSuggestions(available)
+              setOpen(available.length > 0)
+            }
+          }}
           onBlur={() => setTimeout(() => setOpen(false), 150)}
           placeholder={selected.length === 0 ? 'Add tags...' : ''}
           className="flex-1 min-w-[80px] bg-transparent outline-none placeholder:text-muted-foreground text-sm"
