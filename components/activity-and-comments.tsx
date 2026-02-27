@@ -20,9 +20,10 @@ interface ActivityAndCommentsProps {
   entityType: string
   entityId: string
   currentUserId?: string
+  noCollapse?: boolean
 }
 
-export function ActivityAndComments({ entityType, entityId, currentUserId }: ActivityAndCommentsProps) {
+export function ActivityAndComments({ entityType, entityId, currentUserId, noCollapse }: ActivityAndCommentsProps) {
   const [entries, setEntries] = useState<ActivityLogEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [comment, setComment] = useState('')
@@ -180,10 +181,18 @@ export function ActivityAndComments({ entityType, entityId, currentUserId }: Act
 
             // Multi-item group — collapsed/expandable row
             const groupKey = group.firstItem.id
-            const isExpanded = expandedGroups.has(groupKey)
+            const isExpanded = noCollapse || expandedGroups.has(groupKey)
             const headline = getMostSignificantItem(group.items)
             const extraCount = group.items.length - 1
             const isCreateWithFields = headline.event_type === 'created' && group.items.every(i => i === headline || i.event_type === 'field_updated')
+
+            if (noCollapse) {
+              return (
+                <div key={groupKey} className="space-y-4">
+                  {group.items.map(entry => renderSingleEntry(entry))}
+                </div>
+              )
+            }
 
             return (
               <div key={groupKey}>

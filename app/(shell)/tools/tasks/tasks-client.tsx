@@ -20,7 +20,7 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { GripVertical, Plus, ChevronDown, ChevronRight, AlertCircle, ArrowUp, Minus, ArrowDown, X, User } from 'lucide-react'
+import { GripVertical, Plus, ChevronDown, ChevronRight, AlertCircle, ArrowUp, Minus, ArrowDown, X } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { SearchFilterBar } from '@/components/search-filter-bar'
 import { toast } from '@/hooks/use-toast'
@@ -406,7 +406,7 @@ function PriorityGroup({
 
 export function TasksClient({
   initialTasks,
-  currentUser,
+  currentUser: _currentUser,
   initialSelectedTask,
 }: {
   initialTasks: Task[]
@@ -435,7 +435,7 @@ export function TasksClient({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [mounted, setMounted] = useState(false)
   const [activeDragId, setActiveDragId] = useState<string | null>(null)
-  const [assigneeFilter, setAssigneeFilter] = useState<string | null>('me')
+  const [assigneeFilter, setAssigneeFilter] = useState<string | null>(null)
   const [workspaceMembers, setWorkspaceMembers] = useState<WorkspaceMember[]>([])
   const [showCancelled, setShowCancelled] = useState(false)
   const [selectedTask, setSelectedTask] = useState<Task | null>(initialSelectedTask ?? null)
@@ -587,9 +587,7 @@ export function TasksClient({
     }
 
     // Assignee filter
-    if (assigneeFilter === 'me' && currentUser) {
-      result = result.filter((t) => t.assignee_id === currentUser.id)
-    } else if (assigneeFilter && assigneeFilter !== 'me') {
+    if (assigneeFilter) {
       result = result.filter((t) => t.assignee_id === assigneeFilter)
     }
 
@@ -604,9 +602,41 @@ export function TasksClient({
     }
 
     return result
-  }, [tasks, statusFilter, typeFilter, search, assigneeFilter, currentUser, showCancelled])
+  }, [tasks, statusFilter, typeFilter, search, assigneeFilter, showCancelled])
 
   const grouped = useMemo(() => groupByPriority(filteredTasks), [filteredTasks])
+
+  // Count tasks per status, respecting type + assignee + search filters (but NOT status)
+  const statusCounts = useMemo(() => {
+    let base = tasks
+    // Always hide cancelled unless toggled
+    if (!showCancelled) {
+      base = base.filter((t) => t.status !== 'cancelled')
+    }
+    if (typeFilter !== 'all') {
+      base = base.filter((t) => t.type === typeFilter)
+    }
+    if (assigneeFilter) {
+      base = base.filter((t) => t.assignee_id === assigneeFilter)
+    }
+    if (search.trim()) {
+      const q = search.toLowerCase()
+      base = base.filter(
+        (t) =>
+          t.title.toLowerCase().includes(q) ||
+          (t.tags ?? []).some((tag) => tag.toLowerCase().includes(q))
+      )
+    }
+    return {
+      all: base.length,
+      backlog: base.filter((t) => t.status === 'backlog').length,
+      todo: base.filter((t) => t.status === 'todo').length,
+      in_progress: base.filter((t) => t.status === 'in_progress').length,
+      blocked: base.filter((t) => t.status === 'blocked').length,
+      done: base.filter((t) => t.status === 'done').length,
+      cancelled: base.filter((t) => t.status === 'cancelled').length,
+    } as Record<Status | 'all', number>
+  }, [tasks, typeFilter, assigneeFilter, search, showCancelled])
 
   // ----- Create task -----
 
@@ -862,32 +892,26 @@ export function TasksClient({
 
       {/* Status filter tabs */}
       <div className="flex gap-1 mb-4 border-b border-border pb-2">
-        {STATUS_TABS.map((tab) => {
-          const count =
-            tab.value === 'all'
-              ? tasks.length
-              : tasks.filter((t) => t.status === tab.value).length
-          return (
-            <button
-              key={tab.value}
-              onClick={() => setStatusFilter(tab.value)}
-              className={cn(
-                'px-3 py-1.5 text-sm rounded-md transition-colors',
-                statusFilter === tab.value
-                  ? 'bg-muted text-foreground font-medium'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
-              )}
-            >
-              {tab.label}
-              <span className="ml-1.5 text-xs text-muted-foreground">
-                {count}
-              </span>
-            </button>
-          )
-        })}
+        {STATUS_TABS.map((tab) => (
+          <button
+            key={tab.value}
+            onClick={() => setStatusFilter(tab.value)}
+            className={cn(
+              'px-3 py-1.5 text-sm rounded-md transition-colors',
+              statusFilter === tab.value
+                ? 'bg-muted text-foreground font-medium'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+            )}
+          >
+            {tab.label}
+            <span className="ml-1.5 text-xs text-muted-foreground">
+              {statusCounts[tab.value]}
+            </span>
+          </button>
+        ))}
 
-        {/* Type filter chips */}
-        <div className="ml-auto flex gap-1">
+        {/* Type filter chips + assignee face pile */}
+        <div className="ml-auto flex items-center gap-1">
           {TASK_TYPE_TABS.map((tab) => (
             <button
               key={tab.value}
@@ -904,52 +928,33 @@ export function TasksClient({
               {tab.label}
             </button>
           ))}
-        </div>
-      </div>
 
-      {/* Assignee filter row */}
-      <div className="flex gap-2 mb-3 overflow-x-auto pb-1">
-        <button
-          onClick={() => setAssigneeFilter('me')}
-          className={cn(
-            'flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-full border transition-colors shrink-0',
-            assigneeFilter === 'me'
-              ? 'bg-primary/20 border-primary text-foreground'
-              : 'bg-muted/40 border-transparent text-muted-foreground hover:bg-muted/60'
+          {workspaceMembers.length > 0 && (
+            <>
+              <div className="w-px h-5 bg-border mx-1" />
+              <div className="flex -space-x-1">
+                {workspaceMembers.map((m) => (
+                  <button
+                    key={m.id}
+                    onClick={() => setAssigneeFilter(assigneeFilter === m.id ? null : m.id)}
+                    title={m.name}
+                    className="relative rounded-full transition-transform hover:z-10 hover:scale-110"
+                  >
+                    <Avatar className={cn(
+                      'h-6 w-6 ring-2 transition-colors',
+                      assigneeFilter === m.id
+                        ? 'ring-primary'
+                        : 'ring-background hover:ring-muted-foreground/40'
+                    )}>
+                      <AvatarImage src={m.avatarUrl ?? ANON_AVATAR_URL} alt={m.name} />
+                      <AvatarFallback className="text-[9px]">{m.name.slice(0, 2).toUpperCase()}</AvatarFallback>
+                    </Avatar>
+                  </button>
+                ))}
+              </div>
+            </>
           )}
-        >
-          <User className="h-3.5 w-3.5" />
-          To me
-        </button>
-        {workspaceMembers.map((m) => (
-          <button
-            key={m.id}
-            onClick={() => setAssigneeFilter(m.id)}
-            className={cn(
-              'flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-full border transition-colors shrink-0',
-              assigneeFilter === m.id
-                ? 'bg-primary/20 border-primary text-foreground'
-                : 'bg-muted/40 border-transparent text-muted-foreground hover:bg-muted/60'
-            )}
-          >
-            <Avatar className="h-4 w-4">
-              <AvatarImage src={m.avatarUrl ?? ANON_AVATAR_URL} alt={m.name} />
-              <AvatarFallback className="text-[8px]">{m.name.slice(0, 2).toUpperCase()}</AvatarFallback>
-            </Avatar>
-            <span className="truncate max-w-[80px]">{m.name}</span>
-          </button>
-        ))}
-        <button
-          onClick={() => setAssigneeFilter(null)}
-          className={cn(
-            'px-2.5 py-1 text-xs rounded-full border transition-colors shrink-0',
-            assigneeFilter === null
-              ? 'bg-primary/20 border-primary text-foreground'
-              : 'bg-muted/40 border-transparent text-muted-foreground hover:bg-muted/60'
-          )}
-        >
-          All
-        </button>
+        </div>
       </div>
 
       {/* Select-all row */}

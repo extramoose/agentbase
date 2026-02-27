@@ -176,6 +176,7 @@ export function DiaryClient({ entry, date }: DiaryClientProps) {
             <ActivityAndComments
               entityType="diary_entries"
               entityId={currentEntry.id}
+              noCollapse
             />
           </div>
         </div>

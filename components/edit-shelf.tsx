@@ -78,6 +78,7 @@ export function EditShelf({
               <ActivityAndComments
                 entityType={entityType}
                 entityId={entityId}
+                noCollapse
               />
             </div>
           )}

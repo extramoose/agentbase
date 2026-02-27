@@ -449,7 +449,7 @@ function EssayDetail({
         </div>
       </div>
       <div className="px-4 pb-4">
-        <ActivityAndComments entityType="essays" entityId={essay.id} />
+        <ActivityAndComments entityType="essays" entityId={essay.id} noCollapse />
       </div>
     </div>
   )

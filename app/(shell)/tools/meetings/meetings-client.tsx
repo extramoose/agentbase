@@ -939,6 +939,7 @@ function ActivitySection({ meetingId }: { meetingId: string }) {
   const [ActivityAndComments, setComponent] = useState<React.ComponentType<{
     entityType: string
     entityId: string
+    noCollapse?: boolean
   }> | null>(null)
 
   useEffect(() => {
@@ -958,7 +959,7 @@ function ActivitySection({ meetingId }: { meetingId: string }) {
     )
   }
 
-  return <ActivityAndComments entityType="meetings" entityId={meetingId} />
+  return <ActivityAndComments entityType="meetings" entityId={meetingId} noCollapse />
 }
 
 // ---------------------------------------------------------------------------
