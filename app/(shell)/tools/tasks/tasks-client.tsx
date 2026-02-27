@@ -25,6 +25,7 @@ import { createClient } from '@/lib/supabase/client'
 import { SearchFilterBar } from '@/components/search-filter-bar'
 import { toast } from '@/hooks/use-toast'
 import { Button } from '@/components/ui/button'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { ActorChip } from '@/components/actor-chip'
@@ -100,6 +101,10 @@ const STATUS_TABS: Array<{ value: Status | 'all'; label: string }> = [
   { value: 'todo', label: 'To Do' },
   { value: 'in_progress', label: 'In Progress' },
   { value: 'done', label: 'Done' },
+]
+
+const STATUS_OVERFLOW: Array<{ value: Status; label: string }> = [
+  { value: 'backlog', label: 'Backlog' },
   { value: 'cancelled', label: 'Cancelled' },
 ]
 
@@ -569,9 +574,12 @@ export function TasksClient({
   const filteredTasks = useMemo(() => {
     let result = tasks
 
-    // Hide cancelled unless on the Cancelled tab
+    // Hide overflow statuses (backlog, cancelled) unless explicitly selected
     if (statusFilter !== 'cancelled') {
       result = result.filter((t) => t.status !== 'cancelled')
+    }
+    if (statusFilter !== 'backlog') {
+      result = result.filter((t) => t.status !== 'backlog')
     }
 
     // Status filter
@@ -904,6 +912,37 @@ export function TasksClient({
             </span>
           </button>
         ))}
+
+        {/* Overflow: Backlog + Cancelled */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              className={cn(
+                'px-3 py-1.5 text-sm rounded-md transition-colors flex items-center gap-1',
+                STATUS_OVERFLOW.some((o) => o.value === statusFilter)
+                  ? 'bg-muted text-foreground font-medium'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+              )}
+            >
+              {STATUS_OVERFLOW.find((o) => o.value === statusFilter)?.label ?? '···'}
+              <ChevronDown className="w-3 h-3" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            {STATUS_OVERFLOW.map((item) => (
+              <DropdownMenuItem
+                key={item.value}
+                onClick={() => setStatusFilter(item.value)}
+                className={cn(statusFilter === item.value && 'font-medium')}
+              >
+                {item.label}
+                <span className="ml-auto pl-4 text-xs text-muted-foreground">
+                  {statusCounts[item.value]}
+                </span>
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
 
         {/* Type filter chips + assignee face pile */}
         <div className="sm:ml-auto flex items-center gap-1 flex-wrap">
