@@ -6,24 +6,28 @@ import { cn } from '@/lib/utils'
 
 type View = 'grid' | 'table'
 
-function readViewParam(): View {
-  if (typeof window === 'undefined') return 'table'
+function readViewParam(defaultView: View): View {
+  if (typeof window === 'undefined') return defaultView
   const params = new URLSearchParams(window.location.search)
   const v = params.get('view')
-  return v === 'grid' ? 'grid' : 'table'
+  if (v === 'grid') return 'grid'
+  if (v === 'table') return 'table'
+  return defaultView
 }
 
 export function ViewToggle({
   onChange,
+  defaultView = 'table',
 }: {
   onChange?: (view: View) => void
+  defaultView?: View
 }) {
-  const [view, setView] = useState<View>('table')
+  const [view, setView] = useState<View>(defaultView)
 
   // Read initial value from URL on mount
   useEffect(() => {
-    setView(readViewParam())
-  }, [])
+    setView(readViewParam(defaultView))
+  }, [defaultView])
 
   function toggle(next: View) {
     setView(next)
