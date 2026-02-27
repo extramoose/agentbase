@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
 
 export default function CrmPage() {
-  redirect('/tools/crm/people')
+  redirect('/tools/crm/deals')
 }
