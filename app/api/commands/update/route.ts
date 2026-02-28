@@ -45,6 +45,11 @@ export async function PATCH(request: Request) {
       }
     }
 
+    // Normalize tags to lowercase on update
+    if ('tags' in input.fields && Array.isArray(input.fields.tags)) {
+      input.fields.tags = (input.fields.tags as string[]).map(t => t.toLowerCase())
+    }
+
     const { data, error } = await supabase.rpc('rpc_update_entity', {
       p_table: input.table,
       p_entity_id: input.id,

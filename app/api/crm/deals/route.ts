@@ -6,12 +6,14 @@ export async function GET(request: Request) {
   try {
     const { supabase, actorType, tenantId } = await resolveActorUnified(request)
     const { page, limit, q } = parseListParams(request)
+    const tag = new URL(request.url).searchParams.get('tag') || null
 
     let data, error
     if (actorType === 'agent') {
       // DB-level search for agent path requires a migration (future work)
       ;({ data, error } = await supabase.rpc('rpc_list_deals', { p_tenant_id: tenantId }))
       if (!error && data) {
+        if (tag) data = data.filter((r: Record<string, unknown>) => Array.isArray(r.tags) && r.tags.includes(tag))
         data = filterInMemory(data, q, ['name', 'notes'])
         data = paginateInMemory(data, page, limit)
       }
@@ -19,6 +21,7 @@ export async function GET(request: Request) {
       let query = supabase
         .from('deals')
         .select('*')
+      if (tag) query = query.contains('tags', [tag])
       query = applySearch(query, q, ['name', 'notes'])
       query = query.order('created_at', { ascending: false })
       query = applyPagination(query, page, limit)

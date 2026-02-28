@@ -9,6 +9,7 @@ export async function GET(request: Request) {
     const { supabase, actorType, tenantId } = await resolveActorUnified(request)
     const { page, limit, q } = parseListParams(request)
     const filters = parseFilterParams(request, LIBRARY_FILTER_FIELDS)
+    const tag = new URL(request.url).searchParams.get('tag') || null
 
     let data, error
     if (actorType === 'agent') {
@@ -16,6 +17,7 @@ export async function GET(request: Request) {
       ;({ data, error } = await supabase.rpc('rpc_list_library_items', { p_tenant_id: tenantId }))
       if (!error && data) {
         data = filterByFieldsInMemory(data, filters)
+        if (tag) data = data.filter((r: Record<string, unknown>) => Array.isArray(r.tags) && r.tags.includes(tag))
         data = filterInMemory(data, q, ['name', 'notes', 'url'])
         data = paginateInMemory(data, page, limit)
       }
@@ -24,6 +26,7 @@ export async function GET(request: Request) {
         .from('library_items')
         .select('*')
       query = applyFilters(query, filters)
+      if (tag) query = query.contains('tags', [tag])
       query = applySearch(query, q, ['name', 'notes', 'url'])
       query = query.order('created_at', { ascending: false })
       query = applyPagination(query, page, limit)

@@ -66,7 +66,7 @@ export async function POST(request: Request) {
       p_assignee_id: assigneeResult.assignee_id,
       p_assignee_type: assigneeResult.assignee_type,
       p_type: input.type ?? null,
-      p_tags: input.tags.length > 0 ? input.tags : null,
+      p_tags: input.tags.length > 0 ? input.tags.map(t => t.toLowerCase()) : null,
       p_due_date: input.due_date ?? null,
       p_idempotency_key: input.idempotency_key ?? null,
     })

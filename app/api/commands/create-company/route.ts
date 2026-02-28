@@ -25,7 +25,7 @@ export async function POST(request: Request) {
       p_domain: input.domain ?? null,
       p_industry: input.industry ?? null,
       p_notes: input.notes ?? null,
-      p_tags: input.tags,
+      p_tags: input.tags.map(t => t.toLowerCase()),
       p_idempotency_key: input.idempotency_key ?? null,
     })
     if (error) throw error

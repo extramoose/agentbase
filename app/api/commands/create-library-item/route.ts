@@ -38,7 +38,7 @@ export async function POST(request: Request) {
       p_location_name: input.location_name ?? null,
       p_latitude: input.latitude ?? null,
       p_longitude: input.longitude ?? null,
-      p_tags: input.tags,
+      p_tags: input.tags.map(t => t.toLowerCase()),
       p_is_public: input.is_public,
       p_idempotency_key: input.idempotency_key ?? null,
     })
