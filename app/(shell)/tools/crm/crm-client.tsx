@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Building2, Plus, Trash2, User, Handshake, Link2, X } from 'lucide-react'
+import { Building2, Plus, Trash2, User, Handshake } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { EntityShelf } from '@/components/entity-client/entity-shelf'
 import { EntityGrid } from '@/components/entity-client/entity-grid'
@@ -744,24 +744,18 @@ export function CrmClient({
             <DealShelfContent
               deal={selectedEntity as CrmDeal}
               onUpdate={(fields) => handleUpdate(selectedEntity.id, fields)}
-              allCompanies={companies}
-              allPeople={people}
             />
           )}
           {section === 'companies' && (
             <CompanyShelfContent
               company={selectedEntity as CrmCompany}
               onUpdate={(fields) => handleUpdate(selectedEntity.id, fields)}
-              allPeople={people}
-              allDeals={deals}
             />
           )}
           {section === 'people' && (
             <PersonShelfContent
               person={selectedEntity as CrmPerson}
               onUpdate={(fields) => handleUpdate(selectedEntity.id, fields)}
-              allCompanies={companies}
-              allDeals={deals}
             />
           )}
         </EntityShelf>
@@ -1043,24 +1037,15 @@ function PersonTableRow({ person, onClick }: { person: CrmPerson; onClick: () =>
 function DealShelfContent({
   deal,
   onUpdate,
-  allCompanies,
-  allPeople,
 }: {
   deal: CrmDeal
   onUpdate: (fields: Record<string, unknown>) => void
-  allCompanies: CrmCompany[]
-  allPeople: CrmPerson[]
 }) {
   const [title, setTitle] = useState(deal.title)
   const [status, setStatus] = useState<DealStatus>(deal.status)
   const [value, setValue] = useState(deal.value != null ? String(deal.value) : '')
   const [notes, setNotes] = useState(deal.notes ?? '')
   const [tags, setTags] = useState<string[]>(deal.tags)
-
-  const [linkedCompanyIds, setLinkedCompanyIds] = useState<string[]>([])
-  const [linkedPeopleIds, setLinkedPeopleIds] = useState<string[]>([])
-
-  const supabase = createClient()
 
   useEffect(() => {
     setTitle(deal.title)
@@ -1070,81 +1055,9 @@ function DealShelfContent({
     setTags(deal.tags)
   }, [deal])
 
-  useEffect(() => {
-    supabase
-      .from('deals_companies')
-      .select('company_id')
-      .eq('deal_id', deal.id)
-      .then(({ data }) => setLinkedCompanyIds((data ?? []).map((r) => r.company_id)))
-    supabase
-      .from('deals_people')
-      .select('person_id')
-      .eq('deal_id', deal.id)
-      .then(({ data }) => setLinkedPeopleIds((data ?? []).map((r) => r.person_id)))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [deal.id])
-
   function saveField(fields: Record<string, unknown>) {
     onUpdate(fields)
   }
-
-  async function linkCompany(companyId: string) {
-    setLinkedCompanyIds((prev) => [...prev, companyId])
-    const { error } = await supabase
-      .from('deals_companies')
-      .insert({ deal_id: deal.id, company_id: companyId })
-    if (error) {
-      setLinkedCompanyIds((prev) => prev.filter((id) => id !== companyId))
-      toast({ type: 'error', message: 'Failed to link company' })
-    }
-  }
-
-  async function unlinkCompany(companyId: string) {
-    setLinkedCompanyIds((prev) => prev.filter((id) => id !== companyId))
-    const { error } = await supabase
-      .from('deals_companies')
-      .delete()
-      .eq('deal_id', deal.id)
-      .eq('company_id', companyId)
-    if (error) {
-      setLinkedCompanyIds((prev) => [...prev, companyId])
-      toast({ type: 'error', message: 'Failed to unlink company' })
-    }
-  }
-
-  async function linkPerson(personId: string) {
-    setLinkedPeopleIds((prev) => [...prev, personId])
-    const { error } = await supabase
-      .from('deals_people')
-      .insert({ deal_id: deal.id, person_id: personId })
-    if (error) {
-      setLinkedPeopleIds((prev) => prev.filter((id) => id !== personId))
-      toast({ type: 'error', message: 'Failed to link person' })
-    }
-  }
-
-  async function unlinkPerson(personId: string) {
-    setLinkedPeopleIds((prev) => prev.filter((id) => id !== personId))
-    const { error } = await supabase
-      .from('deals_people')
-      .delete()
-      .eq('deal_id', deal.id)
-      .eq('person_id', personId)
-    if (error) {
-      setLinkedPeopleIds((prev) => [...prev, personId])
-      toast({ type: 'error', message: 'Failed to unlink person' })
-    }
-  }
-
-  const linkedCompanyItems = linkedCompanyIds
-    .map((id) => allCompanies.find((c) => c.id === id))
-    .filter((c): c is CrmCompany => c != null)
-    .map((c) => ({ id: c.id, label: c.name }))
-
-  const linkedPeopleItems = linkedPeopleIds
-    .map((id) => allPeople.find((p) => p.id === id))
-    .filter((p): p is CrmPerson => p != null)
-    .map((p) => ({ id: p.id, label: p.name }))
 
   return (
     <div className="space-y-5">
@@ -1243,35 +1156,6 @@ function DealShelfContent({
         />
       </div>
 
-      <LinkedSection
-        title="Linked Companies"
-        icon={<Building2 className="h-3 w-3" />}
-        items={linkedCompanyItems}
-        onUnlink={unlinkCompany}
-        linkPicker={
-          <LinkPicker
-            items={allCompanies}
-            linkedIds={new Set(linkedCompanyIds)}
-            onLink={linkCompany}
-            placeholder="Link Company"
-          />
-        }
-      />
-
-      <LinkedSection
-        title="Linked People"
-        icon={<User className="h-3 w-3" />}
-        items={linkedPeopleItems}
-        onUnlink={unlinkPerson}
-        linkPicker={
-          <LinkPicker
-            items={allPeople}
-            linkedIds={new Set(linkedPeopleIds)}
-            onLink={linkPerson}
-            placeholder="Link Person"
-          />
-        }
-      />
     </div>
   )
 }
@@ -1283,24 +1167,15 @@ function DealShelfContent({
 function CompanyShelfContent({
   company,
   onUpdate,
-  allPeople,
-  allDeals,
 }: {
   company: CrmCompany
   onUpdate: (fields: Record<string, unknown>) => void
-  allPeople: CrmPerson[]
-  allDeals: CrmDeal[]
 }) {
   const [name, setName] = useState(company.name)
   const [domain, setDomain] = useState(company.domain ?? '')
   const [industry, setIndustry] = useState(company.industry ?? '')
   const [notes, setNotes] = useState(company.notes ?? '')
   const [tags, setTags] = useState<string[]>(company.tags)
-
-  const [linkedPeopleIds, setLinkedPeopleIds] = useState<string[]>([])
-  const [linkedDealIds, setLinkedDealIds] = useState<string[]>([])
-
-  const supabase = createClient()
 
   useEffect(() => {
     setName(company.name)
@@ -1310,81 +1185,9 @@ function CompanyShelfContent({
     setTags(company.tags)
   }, [company])
 
-  useEffect(() => {
-    supabase
-      .from('people_companies')
-      .select('person_id')
-      .eq('company_id', company.id)
-      .then(({ data }) => setLinkedPeopleIds((data ?? []).map((r) => r.person_id)))
-    supabase
-      .from('deals_companies')
-      .select('deal_id')
-      .eq('company_id', company.id)
-      .then(({ data }) => setLinkedDealIds((data ?? []).map((r) => r.deal_id)))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [company.id])
-
   function saveField(fields: Record<string, unknown>) {
     onUpdate(fields)
   }
-
-  async function linkPerson(personId: string) {
-    setLinkedPeopleIds((prev) => [...prev, personId])
-    const { error } = await supabase
-      .from('people_companies')
-      .insert({ person_id: personId, company_id: company.id })
-    if (error) {
-      setLinkedPeopleIds((prev) => prev.filter((id) => id !== personId))
-      toast({ type: 'error', message: 'Failed to link person' })
-    }
-  }
-
-  async function unlinkPerson(personId: string) {
-    setLinkedPeopleIds((prev) => prev.filter((id) => id !== personId))
-    const { error } = await supabase
-      .from('people_companies')
-      .delete()
-      .eq('person_id', personId)
-      .eq('company_id', company.id)
-    if (error) {
-      setLinkedPeopleIds((prev) => [...prev, personId])
-      toast({ type: 'error', message: 'Failed to unlink person' })
-    }
-  }
-
-  async function linkDeal(dealId: string) {
-    setLinkedDealIds((prev) => [...prev, dealId])
-    const { error } = await supabase
-      .from('deals_companies')
-      .insert({ deal_id: dealId, company_id: company.id })
-    if (error) {
-      setLinkedDealIds((prev) => prev.filter((id) => id !== dealId))
-      toast({ type: 'error', message: 'Failed to link deal' })
-    }
-  }
-
-  async function unlinkDeal(dealId: string) {
-    setLinkedDealIds((prev) => prev.filter((id) => id !== dealId))
-    const { error } = await supabase
-      .from('deals_companies')
-      .delete()
-      .eq('deal_id', dealId)
-      .eq('company_id', company.id)
-    if (error) {
-      setLinkedDealIds((prev) => [...prev, dealId])
-      toast({ type: 'error', message: 'Failed to unlink deal' })
-    }
-  }
-
-  const linkedPeopleItems = linkedPeopleIds
-    .map((id) => allPeople.find((p) => p.id === id))
-    .filter((p): p is CrmPerson => p != null)
-    .map((p) => ({ id: p.id, label: p.name }))
-
-  const linkedDealItems = linkedDealIds
-    .map((id) => allDeals.find((d) => d.id === id))
-    .filter((d): d is CrmDeal => d != null)
-    .map((d) => ({ id: d.id, label: d.title }))
 
   return (
     <div className="space-y-5">
@@ -1459,35 +1262,6 @@ function CompanyShelfContent({
         />
       </div>
 
-      <LinkedSection
-        title="Linked People"
-        icon={<User className="h-3 w-3" />}
-        items={linkedPeopleItems}
-        onUnlink={unlinkPerson}
-        linkPicker={
-          <LinkPicker
-            items={allPeople}
-            linkedIds={new Set(linkedPeopleIds)}
-            onLink={linkPerson}
-            placeholder="Link Person"
-          />
-        }
-      />
-
-      <LinkedSection
-        title="Linked Deals"
-        icon={<Handshake className="h-3 w-3" />}
-        items={linkedDealItems}
-        onUnlink={unlinkDeal}
-        linkPicker={
-          <LinkPicker
-            items={allDeals}
-            linkedIds={new Set(linkedDealIds)}
-            onLink={linkDeal}
-            placeholder="Link Deal"
-          />
-        }
-      />
     </div>
   )
 }
@@ -1499,13 +1273,9 @@ function CompanyShelfContent({
 function PersonShelfContent({
   person,
   onUpdate,
-  allCompanies,
-  allDeals,
 }: {
   person: CrmPerson
   onUpdate: (fields: Record<string, unknown>) => void
-  allCompanies: CrmCompany[]
-  allDeals: CrmDeal[]
 }) {
   const [name, setName] = useState(person.name)
   const [email, setEmail] = useState(person.email ?? '')
@@ -1513,11 +1283,6 @@ function PersonShelfContent({
   const [personTitle, setPersonTitle] = useState(person.title ?? '')
   const [notes, setNotes] = useState(person.notes ?? '')
   const [tags, setTags] = useState<string[]>(person.tags)
-
-  const [linkedCompanyIds, setLinkedCompanyIds] = useState<string[]>([])
-  const [linkedDealIds, setLinkedDealIds] = useState<string[]>([])
-
-  const supabase = createClient()
 
   useEffect(() => {
     setName(person.name)
@@ -1528,81 +1293,9 @@ function PersonShelfContent({
     setTags(person.tags)
   }, [person])
 
-  useEffect(() => {
-    supabase
-      .from('people_companies')
-      .select('company_id')
-      .eq('person_id', person.id)
-      .then(({ data }) => setLinkedCompanyIds((data ?? []).map((r) => r.company_id)))
-    supabase
-      .from('deals_people')
-      .select('deal_id')
-      .eq('person_id', person.id)
-      .then(({ data }) => setLinkedDealIds((data ?? []).map((r) => r.deal_id)))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [person.id])
-
   function saveField(fields: Record<string, unknown>) {
     onUpdate(fields)
   }
-
-  async function linkCompany(companyId: string) {
-    setLinkedCompanyIds((prev) => [...prev, companyId])
-    const { error } = await supabase
-      .from('people_companies')
-      .insert({ person_id: person.id, company_id: companyId })
-    if (error) {
-      setLinkedCompanyIds((prev) => prev.filter((id) => id !== companyId))
-      toast({ type: 'error', message: 'Failed to link company' })
-    }
-  }
-
-  async function unlinkCompany(companyId: string) {
-    setLinkedCompanyIds((prev) => prev.filter((id) => id !== companyId))
-    const { error } = await supabase
-      .from('people_companies')
-      .delete()
-      .eq('person_id', person.id)
-      .eq('company_id', companyId)
-    if (error) {
-      setLinkedCompanyIds((prev) => [...prev, companyId])
-      toast({ type: 'error', message: 'Failed to unlink company' })
-    }
-  }
-
-  async function linkDeal(dealId: string) {
-    setLinkedDealIds((prev) => [...prev, dealId])
-    const { error } = await supabase
-      .from('deals_people')
-      .insert({ deal_id: dealId, person_id: person.id })
-    if (error) {
-      setLinkedDealIds((prev) => prev.filter((id) => id !== dealId))
-      toast({ type: 'error', message: 'Failed to link deal' })
-    }
-  }
-
-  async function unlinkDeal(dealId: string) {
-    setLinkedDealIds((prev) => prev.filter((id) => id !== dealId))
-    const { error } = await supabase
-      .from('deals_people')
-      .delete()
-      .eq('deal_id', dealId)
-      .eq('person_id', person.id)
-    if (error) {
-      setLinkedDealIds((prev) => [...prev, dealId])
-      toast({ type: 'error', message: 'Failed to unlink deal' })
-    }
-  }
-
-  const linkedCompanyItems = linkedCompanyIds
-    .map((id) => allCompanies.find((c) => c.id === id))
-    .filter((c): c is CrmCompany => c != null)
-    .map((c) => ({ id: c.id, label: c.name }))
-
-  const linkedDealItems = linkedDealIds
-    .map((id) => allDeals.find((d) => d.id === id))
-    .filter((d): d is CrmDeal => d != null)
-    .map((d) => ({ id: d.id, label: d.title }))
 
   return (
     <div className="space-y-5">
@@ -1692,163 +1385,6 @@ function PersonShelfContent({
         />
       </div>
 
-      <LinkedSection
-        title="Linked Companies"
-        icon={<Building2 className="h-3 w-3" />}
-        items={linkedCompanyItems}
-        onUnlink={unlinkCompany}
-        linkPicker={
-          <LinkPicker
-            items={allCompanies}
-            linkedIds={new Set(linkedCompanyIds)}
-            onLink={linkCompany}
-            placeholder="Link Company"
-          />
-        }
-      />
-
-      <LinkedSection
-        title="Linked Deals"
-        icon={<Handshake className="h-3 w-3" />}
-        items={linkedDealItems}
-        onUnlink={unlinkDeal}
-        linkPicker={
-          <LinkPicker
-            items={allDeals}
-            linkedIds={new Set(linkedDealIds)}
-            onLink={linkDeal}
-            placeholder="Link Deal"
-          />
-        }
-      />
-    </div>
-  )
-}
-
-// ---------------------------------------------------------------------------
-// Link picker dropdown
-// ---------------------------------------------------------------------------
-
-function LinkPicker<T extends { id: string; name?: string | null; title?: string | null }>({
-  items,
-  linkedIds,
-  onLink,
-  placeholder,
-}: {
-  items: T[]
-  linkedIds: Set<string>
-  onLink: (id: string) => void
-  placeholder: string
-}) {
-  const [open, setOpen] = useState(false)
-  const [query, setQuery] = useState('')
-
-  const available = items.filter(
-    (item) => !linkedIds.has(item.id) && !item.id.startsWith('temp-'),
-  )
-  const filtered = available.filter((item) => {
-    const label =
-      ('name' in item && item.name ? item.name : 'title' in item && item.title ? item.title : '') ?? ''
-    return label.toLowerCase().includes(query.toLowerCase())
-  })
-
-  return (
-    <div className="relative">
-      <Button size="sm" variant="outline" onClick={() => setOpen(!open)} className="text-xs">
-        <Link2 className="h-3 w-3 mr-1" />
-        {placeholder}
-      </Button>
-      {open && (
-        <div className="absolute top-full mt-1 left-0 z-50 w-64 rounded-md border border-border bg-card shadow-lg">
-          <div className="p-2">
-            <Input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search..."
-              className="text-sm h-8"
-              autoFocus
-              onBlur={() => setTimeout(() => setOpen(false), 200)}
-            />
-          </div>
-          <div className="max-h-48 overflow-y-auto">
-            {filtered.length === 0 ? (
-              <p className="px-3 py-2 text-xs text-muted-foreground">No items available</p>
-            ) : (
-              filtered.map((item) => {
-                const label =
-                  ('name' in item && item.name
-                    ? item.name
-                    : 'title' in item && item.title
-                      ? item.title
-                      : '') ?? ''
-                return (
-                  <button
-                    key={item.id}
-                    className="w-full px-3 py-2 text-sm text-left hover:bg-muted transition-colors"
-                    onMouseDown={() => {
-                      onLink(item.id)
-                      setOpen(false)
-                      setQuery('')
-                    }}
-                  >
-                    {label}
-                  </button>
-                )
-              })
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ---------------------------------------------------------------------------
-// Linked items section
-// ---------------------------------------------------------------------------
-
-function LinkedSection({
-  title,
-  icon,
-  items,
-  onUnlink,
-  linkPicker,
-}: {
-  title: string
-  icon: React.ReactNode
-  items: Array<{ id: string; label: string }>
-  onUnlink: (id: string) => void
-  linkPicker: React.ReactNode
-}) {
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-2">
-        <label className="text-xs text-muted-foreground font-medium flex items-center gap-1.5">
-          {icon}
-          {title}
-        </label>
-        {linkPicker}
-      </div>
-      {items.length > 0 ? (
-        <div className="space-y-1">
-          {items.map((item) => (
-            <div
-              key={item.id}
-              className="flex items-center justify-between px-2 py-1.5 rounded-md bg-muted/30 group"
-            >
-              <span className="text-sm truncate">{item.label}</span>
-              <button
-                onClick={() => onUnlink(item.id)}
-                className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <p className="text-xs text-muted-foreground">None linked</p>
-      )}
     </div>
   )
 }
