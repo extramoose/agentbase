@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { ActivityAndComments } from '@/components/activity-and-comments'
 import { cn } from '@/lib/utils'
 import { type BaseEntity, type EntityType, ENTITY_TABLE } from '@/types/entities'
+import { LinksSection } from './links-section'
 
 interface EntityShelfProps<T extends BaseEntity> {
   entity: T
@@ -66,8 +67,11 @@ export function EntityShelf<T extends BaseEntity>({
 
         {/* Scrollable content */}
         <div className="flex-1 overflow-y-auto">
-          <div className="p-4 sm:p-6">
+          <div className="p-4 sm:p-6 space-y-5">
             {children}
+
+            {/* Universal entity links */}
+            <LinksSection entityType={entityType} entityId={entity.id} />
           </div>
 
           {/* ActivityAndComments — always at bottom, noCollapse */}
