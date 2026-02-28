@@ -17,21 +17,39 @@ import {
 } from '@/lib/format-activity'
 import { MarkdownRenderer } from '@/components/markdown-renderer'
 
-function getEntityUrl(entityType: string, entityId: string): string {
-  switch (entityType) {
-    case 'tasks':         return `/tools/tasks/${entityId}`
-    case 'library_items': return `/tools/library/${entityId}`
-    case 'companies':     return `/tools/crm/companies/${entityId}`
-    case 'people':        return `/tools/crm/people/${entityId}`
-    case 'deals':         return `/tools/crm/deals/${entityId}`
+/** Maps entity_type (table name) to the front-end path prefix */
+function getEntityPath(entityType: string): string {
+  switch (normalizeEntityType(entityType)) {
+    case 'tasks':         return '/tools/tasks'
+    case 'library_items': return '/tools/library'
+    case 'companies':     return '/tools/crm/companies'
+    case 'people':        return '/tools/crm/people'
+    case 'deals':         return '/tools/crm/deals'
     default:              return ''
   }
+}
+
+/**
+ * Normalize entity_type values — handles both table name format (tasks,
+ * library_items) and legacy singular/hyphenated format written by older
+ * delete-entity / batch-update routes before the fix.
+ */
+function normalizeEntityType(raw: string): string {
+  const map: Record<string, string> = {
+    task: 'tasks',
+    'library-item': 'library_items',
+    'library-items': 'library_items',
+    company: 'companies',
+    companie: 'companies', // legacy bug
+    person: 'people',
+    deal: 'deals',
+  }
+  return map[raw] ?? raw
 }
 
 const ENTITY_COLORS: Record<string, string> = {
   tasks:          'bg-blue-500/20 text-blue-400',
   library_items:  'bg-yellow-500/20 text-yellow-400',
-  grocery_items:  'bg-orange-500/20 text-orange-400',
   companies:      'bg-red-500/20 text-red-400',
   people:         'bg-pink-500/20 text-pink-400',
   deals:          'bg-emerald-500/20 text-emerald-400',
@@ -43,7 +61,8 @@ const ENTITY_TYPES = [
 ] as const
 
 function formatEntityType(type: string): string {
-  return type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+  const normalized = normalizeEntityType(type)
+  return normalized.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
 }
 
 interface HistoryClientProps {
@@ -60,9 +79,11 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
   const sentinelRef = useRef<HTMLDivElement>(null)
   const supabase = createClient()
 
+  // seq_id cache: entity UUID → seq_id (number)
+  const seqIdCache = useRef<Map<string, number>>(new Map())
+  const [seqIdMap, setSeqIdMap] = useState<Map<string, number>>(new Map())
+
   // Refs to decouple loadMore identity from rapidly-changing state.
-  // Without these, loadMore changes identity on every fetch cycle,
-  // the IntersectionObserver re-creates, fires immediately, and loops.
   const loadingRef = useRef(false)
   const hasMoreRef = useRef(initialEntries.length >= 50)
   const entriesRef = useRef(entries)
@@ -76,6 +97,40 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
       return next
     })
   }
+
+  /**
+   * Resolve seq_ids for a batch of activity log entries.
+   * Only fetches IDs not already in the cache.
+   */
+  const resolveSeqIds = useCallback(async (entriesToResolve: ActivityLogEntry[]) => {
+    const byTable = new Map<string, string[]>()
+    for (const entry of entriesToResolve) {
+      if (seqIdCache.current.has(entry.entity_id)) continue
+      if (entry.event_type === 'deleted') continue // entity no longer exists
+      const table = normalizeEntityType(entry.entity_type)
+      if (!(ENTITY_TYPES as readonly string[]).includes(table)) continue
+      const ids = byTable.get(table) ?? []
+      if (!ids.includes(entry.entity_id)) ids.push(entry.entity_id)
+      byTable.set(table, ids)
+    }
+
+    if (byTable.size === 0) return
+
+    for (const [table, ids] of byTable) {
+      const { data } = await supabase.from(table).select('id, seq_id').in('id', ids)
+      if (data) {
+        for (const row of data as { id: string; seq_id: number | null }[]) {
+          if (row.seq_id != null) seqIdCache.current.set(row.id, row.seq_id)
+        }
+      }
+    }
+    setSeqIdMap(new Map(seqIdCache.current))
+  }, [supabase])
+
+  // Resolve seq_ids for initial entries
+  useEffect(() => {
+    resolveSeqIds(initialEntries)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load more entries — stable identity (only changes on filter/search)
   const loadMore = useCallback(async () => {
@@ -93,7 +148,8 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
     hasMoreRef.current = newEntries.length >= 50
     loadingRef.current = false
     setLoading(false)
-  }, [entityFilter, search])
+    resolveSeqIds(newEntries)
+  }, [entityFilter, search, supabase, resolveSeqIds])
 
   // Infinite scroll observer
   useEffect(() => {
@@ -125,10 +181,11 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
       hasMoreRef.current = results.length >= 50
       loadingRef.current = false
       setLoading(false)
+      resolveSeqIds(results)
     }
     const timeout = setTimeout(reload, search.trim() ? 300 : 0)
     return () => { cancelled = true; clearTimeout(timeout) }
-  }, [entityFilter, search])
+  }, [entityFilter, search]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Realtime subscription — prepend new entries
   useEffect(() => {
@@ -143,32 +200,44 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
             if (prev.some(e => e.id === newEntry.id)) return prev
             return [newEntry, ...prev]
           })
+          resolveSeqIds([newEntry])
         }
       )
       .subscribe()
 
     return () => { supabase.removeChannel(channel) }
-  }, [])
+  }, [supabase, resolveSeqIds])
 
   // Filter internal events, then group consecutive same-entity activity items
   const groups = useMemo(() => groupActivityItems(filterActivityItems(entries)), [entries])
 
+  function handleEntityClick(entry: ActivityLogEntry) {
+    const normalized = normalizeEntityType(entry.entity_type)
+    const path = getEntityPath(normalized)
+    if (!path) return
+    const seqId = seqIdMap.get(entry.entity_id)
+    if (seqId == null) return
+    router.push(`${path}?id=${seqId}`)
+  }
+
   function renderSingleEntry(entry: ActivityLogEntry) {
     const isDeleted = entry.event_type === 'deleted'
-    const entityUrl = entry.entity_id ? getEntityUrl(entry.entity_type, entry.entity_id) : ''
-    const isClickable = !!entityUrl && !isDeleted
+    const normalized = normalizeEntityType(entry.entity_type)
+    const path = getEntityPath(normalized)
+    const seqId = seqIdMap.get(entry.entity_id)
+    const isClickable = !!path && !isDeleted && seqId != null
     return (
       <div
         key={entry.id}
         className={`flex items-start gap-3 rounded-lg px-3 py-3 hover:bg-muted/40 transition-colors${isClickable ? ' cursor-pointer' : ''}`}
-        onClick={isClickable ? () => router.push(entityUrl) : undefined}
+        onClick={isClickable ? () => handleEntityClick(entry) : undefined}
       >
         <ActorChip actorId={entry.actor_id} actorType={entry.actor_type} compact />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <Badge
               variant="secondary"
-              className={`text-[10px] px-1.5 py-0 ${ENTITY_COLORS[entry.entity_type] ?? 'bg-muted text-muted-foreground'}`}
+              className={`text-[10px] px-1.5 py-0 ${ENTITY_COLORS[normalized] ?? 'bg-muted text-muted-foreground'}`}
             >
               {formatEntityType(entry.entity_type)}
             </Badge>
@@ -247,6 +316,10 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
             const headline = getMostSignificantItem(group.items)
             const extraCount = group.items.length - 1
             const isCreateWithFields = headline.event_type === 'created' && group.items.every(i => i === headline || i.event_type === 'field_updated')
+            const normalized = normalizeEntityType(group.entityType)
+            const path = getEntityPath(normalized)
+            const seqId = seqIdMap.get(group.entityId)
+            const isGroupClickable = !!path && headline.event_type !== 'deleted' && seqId != null
 
             return (
               <div key={groupKey}>
@@ -263,7 +336,7 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
                     <div className="flex items-center gap-2 flex-wrap">
                       <Badge
                         variant="secondary"
-                        className={`text-[10px] px-1.5 py-0 ${ENTITY_COLORS[group.entityType] ?? 'bg-muted text-muted-foreground'}`}
+                        className={`text-[10px] px-1.5 py-0 ${ENTITY_COLORS[normalized] ?? 'bg-muted text-muted-foreground'}`}
                       >
                         {formatEntityType(group.entityType)}
                       </Badge>
@@ -279,6 +352,17 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
                         <span className="text-xs text-muted-foreground">
                           +{extraCount} {isCreateWithFields ? (extraCount === 1 ? 'field set' : 'fields set') : (extraCount === 1 ? 'more change' : 'more changes')}
                         </span>
+                      )}
+                      {isGroupClickable && (
+                        <button
+                          className="text-xs text-blue-400 hover:text-blue-300 hover:underline ml-auto"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            router.push(`${path}?id=${seqId}`)
+                          }}
+                        >
+                          Open
+                        </button>
                       )}
                     </div>
                   </div>
