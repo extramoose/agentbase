@@ -766,7 +766,17 @@ export function TasksClient({
     () => searchParams.get('assignee') ?? null
   )
   const [workspaceMembers, setWorkspaceMembers] = useState<WorkspaceMember[]>([])
-  const [selectedTask, setSelectedTask] = useState<Task | null>(initialSelectedTask ?? null)
+  const [selectedTask, setSelectedTask] = useState<Task | null>(() => {
+    if (initialSelectedTask) return initialSelectedTask
+    const idParam = searchParams.get('id')
+    if (idParam) {
+      const n = Number(idParam)
+      if (!Number.isNaN(n)) {
+        return initialTasks.find((t) => (t.seq_id ?? t.ticket_id) === n) ?? null
+      }
+    }
+    return null
+  })
   const [view, setView] = useState<View>(
     () => {
       const v = searchParams.get('view')

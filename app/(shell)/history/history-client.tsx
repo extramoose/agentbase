@@ -1,10 +1,10 @@
 'use client'
 
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
-import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { ActorChip } from '@/components/actor-chip'
 import { SearchFilterBar } from '@/components/search-filter-bar'
+import { EntityShelf } from '@/components/entity-client/entity-shelf'
 import { Badge } from '@/components/ui/badge'
 import { formatDistanceToNow } from 'date-fns'
 import { Loader2, Minus, Plus } from 'lucide-react'
@@ -16,6 +16,7 @@ import {
   type ActivityLogEntry,
 } from '@/lib/format-activity'
 import { MarkdownRenderer } from '@/components/markdown-renderer'
+import { type BaseEntity, type EntityType } from '@/types/entities'
 
 /** Maps entity_type (table name) to the front-end path prefix */
 function getEntityPath(entityType: string): string {
@@ -65,12 +66,33 @@ function formatEntityType(type: string): string {
   return normalized.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
 }
 
+const ENTITY_TYPE_SINGULAR: Record<string, string> = {
+  tasks: 'Task',
+  library_items: 'Item',
+  companies: 'Company',
+  people: 'Person',
+  deals: 'Deal',
+}
+
+function formatEntityBadge(type: string, seqId: number | undefined): string {
+  const normalized = normalizeEntityType(type)
+  const singular = ENTITY_TYPE_SINGULAR[normalized] ?? formatEntityType(type)
+  return seqId != null ? `${singular} #${seqId}` : singular
+}
+
+const TABLE_TO_ENTITY_TYPE: Record<string, EntityType> = {
+  tasks: 'task',
+  library_items: 'library_item',
+  people: 'person',
+  companies: 'company',
+  deals: 'deal',
+}
+
 interface HistoryClientProps {
   initialEntries: ActivityLogEntry[]
 }
 
 export function HistoryClient({ initialEntries }: HistoryClientProps) {
-  const router = useRouter()
   const [entries, setEntries] = useState<ActivityLogEntry[]>(initialEntries)
   const [search, setSearch] = useState('')
   const [entityFilter, setEntityFilter] = useState<string | null>(null)
@@ -78,6 +100,13 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
   const sentinelRef = useRef<HTMLDivElement>(null)
   const supabase = createClient()
+
+  // Inline shelf state
+  const [shelfData, setShelfData] = useState<{
+    entity: BaseEntity
+    entityType: EntityType
+    label: string
+  } | null>(null)
 
   // seq_id cache: entity UUID → seq_id (number)
   const seqIdCache = useRef<Map<string, number>>(new Map())
@@ -211,13 +240,25 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
   // Filter internal events, then group consecutive same-entity activity items
   const groups = useMemo(() => groupActivityItems(filterActivityItems(entries)), [entries])
 
+  const openShelf = useCallback(async (entityId: string, entityType: string) => {
+    const normalized = normalizeEntityType(entityType)
+    const mappedType = TABLE_TO_ENTITY_TYPE[normalized]
+    if (!mappedType) return
+    const { data } = await supabase.from(normalized).select('*').eq('id', entityId).single()
+    if (!data) return
+    const entity = data as BaseEntity
+    const label = (data as Record<string, unknown>).title as string
+      ?? (data as Record<string, unknown>).name as string
+      ?? ''
+    setShelfData({ entity, entityType: mappedType, label })
+  }, [supabase])
+
   function handleEntityClick(entry: ActivityLogEntry) {
     const normalized = normalizeEntityType(entry.entity_type)
-    const path = getEntityPath(normalized)
-    if (!path) return
+    if (!getEntityPath(normalized)) return
     const seqId = seqIdMap.get(entry.entity_id)
     if (seqId == null) return
-    router.push(`${path}?id=${seqId}`)
+    openShelf(entry.entity_id, entry.entity_type)
   }
 
   function renderSingleEntry(entry: ActivityLogEntry) {
@@ -239,10 +280,10 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
               variant="secondary"
               className={`text-[10px] px-1.5 py-0 ${ENTITY_COLORS[normalized] ?? 'bg-muted text-muted-foreground'}`}
             >
-              {formatEntityType(entry.entity_type)}
+              {formatEntityBadge(entry.entity_type, seqId)}
             </Badge>
             {entry.entity_label && !['created', 'deleted'].includes(entry.event_type) && (
-              <span className="text-xs font-medium text-muted-foreground truncate max-w-[160px]" title={entry.entity_label}>
+              <span className="text-xs font-medium text-muted-foreground truncate max-w-[200px]" title={entry.entity_label}>
                 {entry.entity_label}
               </span>
             )}
@@ -338,10 +379,10 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
                         variant="secondary"
                         className={`text-[10px] px-1.5 py-0 ${ENTITY_COLORS[normalized] ?? 'bg-muted text-muted-foreground'}`}
                       >
-                        {formatEntityType(group.entityType)}
+                        {formatEntityBadge(group.entityType, seqId)}
                       </Badge>
                       {group.firstItem.entity_label && !['created', 'deleted'].includes(headline.event_type) && (
-                        <span className="text-xs font-medium text-muted-foreground truncate max-w-[160px]" title={group.firstItem.entity_label}>
+                        <span className="text-xs font-medium text-muted-foreground truncate max-w-[200px]" title={group.firstItem.entity_label}>
                           {group.firstItem.entity_label}
                         </span>
                       )}
@@ -358,7 +399,7 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
                           className="text-xs text-blue-400 hover:text-blue-300 hover:underline ml-auto"
                           onClick={(e) => {
                             e.stopPropagation()
-                            router.push(`${path}?id=${seqId}`)
+                            openShelf(group.entityId, group.entityType)
                           }}
                         >
                           Open
@@ -387,6 +428,78 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
         {loading && <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />}
       </div>
 
+      {/* Inline entity shelf */}
+      {shelfData && (
+        <EntityShelf
+          entity={shelfData.entity}
+          entityType={shelfData.entityType}
+          onClose={() => setShelfData(null)}
+          title={shelfData.label}
+        >
+          <HistoryShelfContent entity={shelfData.entity} entityType={shelfData.entityType} />
+        </EntityShelf>
+      )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Minimal read-only shelf content for entities opened from history
+// ---------------------------------------------------------------------------
+
+function HistoryShelfContent({
+  entity,
+  entityType,
+}: {
+  entity: BaseEntity
+  entityType: EntityType
+}) {
+  const data = entity as unknown as Record<string, unknown>
+
+  const fields: { label: string; value: string }[] = []
+  if (data.title) fields.push({ label: 'Title', value: String(data.title) })
+  if (data.name) fields.push({ label: 'Name', value: String(data.name) })
+  if (data.status) fields.push({ label: 'Status', value: String(data.status).replace(/_/g, ' ') })
+  if (data.priority && data.priority !== 'none') fields.push({ label: 'Priority', value: String(data.priority) })
+  if (data.email) fields.push({ label: 'Email', value: String(data.email) })
+  if (data.phone) fields.push({ label: 'Phone', value: String(data.phone) })
+  if (data.domain) fields.push({ label: 'Domain', value: String(data.domain) })
+  if (data.industry) fields.push({ label: 'Industry', value: String(data.industry) })
+  if (data.value != null && entityType === 'deal') fields.push({ label: 'Value', value: `$${Number(data.value).toLocaleString()}` })
+  if (data.url) fields.push({ label: 'URL', value: String(data.url) })
+
+  const bodyText = (data.body ?? data.notes ?? '') as string
+
+  return (
+    <div className="space-y-4">
+      {fields.map(({ label, value }) => (
+        <div key={label}>
+          <span className="text-xs text-muted-foreground font-medium">{label}</span>
+          <p className="text-sm mt-0.5">{value}</p>
+        </div>
+      ))}
+      {bodyText && (
+        <div>
+          <span className="text-xs text-muted-foreground font-medium">
+            {data.notes ? 'Notes' : 'Description'}
+          </span>
+          <div className="mt-1 text-sm text-muted-foreground">
+            <MarkdownRenderer content={bodyText} />
+          </div>
+        </div>
+      )}
+      {(entity.tags ?? []).length > 0 && (
+        <div>
+          <span className="text-xs text-muted-foreground font-medium">Tags</span>
+          <div className="flex gap-1 flex-wrap mt-1">
+            {entity.tags.map((tag) => (
+              <Badge key={tag} variant="secondary" className="text-xs">
+                {tag}
+              </Badge>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
