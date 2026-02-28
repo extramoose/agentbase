@@ -28,7 +28,7 @@ export async function POST(request: Request) {
     if (error) throw error
 
     const logEntries = ids.map((id) => ({
-      entity_type: table.replace(/_/g, '-').replace(/s$/, ''),
+      entity_type: table,
       entity_id: id,
       tenant_id: tenantId,
       actor_id: actorId,

@@ -29,7 +29,7 @@ export async function POST(request: Request) {
     if (error) return apiError(error)
 
     await supabase.from('activity_log').insert({
-      entity_type: table.replace(/_/g, '-').replace(/s$/, ''),
+      entity_type: table,
       entity_id: id,
       tenant_id: tenantId,
       actor_id: actorId,
