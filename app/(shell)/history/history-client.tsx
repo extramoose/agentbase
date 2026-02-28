@@ -7,11 +7,10 @@ import { SearchFilterBar } from '@/components/search-filter-bar'
 import { EntityShelf } from '@/components/entity-client/entity-shelf'
 import { Badge } from '@/components/ui/badge'
 import { formatDistanceToNow } from 'date-fns'
-import { Loader2, Minus, Plus } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import {
   formatActivityEvent,
   groupActivityItems,
-  getMostSignificantItem,
   filterActivityItems,
   type ActivityLogEntry,
 } from '@/lib/format-activity'
@@ -97,7 +96,6 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
   const [search, setSearch] = useState('')
   const [entityFilter, setEntityFilter] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
   const sentinelRef = useRef<HTMLDivElement>(null)
   const supabase = createClient()
 
@@ -117,15 +115,6 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
   const hasMoreRef = useRef(initialEntries.length >= 50)
   const entriesRef = useRef(entries)
   entriesRef.current = entries
-
-  function toggleGroup(groupKey: string) {
-    setExpandedGroups(prev => {
-      const next = new Set(prev)
-      if (next.has(groupKey)) next.delete(groupKey)
-      else next.add(groupKey)
-      return next
-    })
-  }
 
   /**
    * Resolve seq_ids for a batch of activity log entries.
@@ -346,77 +335,11 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
           </p>
         ) : (
           groups.map(group => {
-            // Single-item group — render exactly as before
-            if (group.items.length === 1) {
-              return renderSingleEntry(group.items[0])
-            }
-
-            // Multi-item group — collapsed/expandable row
-            const groupKey = group.firstItem.id
-            const isExpanded = expandedGroups.has(groupKey)
-            const headline = getMostSignificantItem(group.items)
-            const extraCount = group.items.length - 1
-            const isCreateWithFields = headline.event_type === 'created' && group.items.every(i => i === headline || i.event_type === 'field_updated')
-            const normalized = normalizeEntityType(group.entityType)
-            const path = getEntityPath(normalized)
-            const seqId = seqIdMap.get(group.entityId)
-            const isGroupClickable = !!path && headline.event_type !== 'deleted' && seqId != null
-
+            // Always render every item in the group so the history
+            // page shows the same verbosity as entity detail views.
             return (
-              <div key={groupKey}>
-                <div
-                  className="flex items-start gap-3 rounded-lg px-3 py-3 hover:bg-muted/40 transition-colors cursor-pointer"
-                  onClick={() => toggleGroup(groupKey)}
-                >
-                  {isExpanded
-                    ? <Minus className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-1" />
-                    : <Plus className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-1" />
-                  }
-                  <ActorChip actorId={group.firstItem.actor_id} actorType={group.firstItem.actor_type} compact />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <Badge
-                        variant="secondary"
-                        className={`text-[10px] px-1.5 py-0 ${ENTITY_COLORS[normalized] ?? 'bg-muted text-muted-foreground'}`}
-                      >
-                        {formatEntityBadge(group.entityType, seqId)}
-                      </Badge>
-                      {group.firstItem.entity_label && !['created', 'deleted'].includes(headline.event_type) && (
-                        <span className="text-xs font-medium text-muted-foreground truncate max-w-[200px]" title={group.firstItem.entity_label}>
-                          {group.firstItem.entity_label}
-                        </span>
-                      )}
-                      <span className={`text-sm ${headline.event_type === 'deleted' ? 'text-red-400' : 'text-foreground'}`}>
-                        {formatActivityEvent(headline)}
-                      </span>
-                      {extraCount > 0 && (
-                        <span className="text-xs text-muted-foreground">
-                          +{extraCount} {isCreateWithFields ? (extraCount === 1 ? 'field set' : 'fields set') : (extraCount === 1 ? 'more change' : 'more changes')}
-                        </span>
-                      )}
-                      {isGroupClickable && (
-                        <button
-                          className="text-xs text-blue-400 hover:text-blue-300 hover:underline ml-auto"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            openShelf(group.entityId, group.entityType)
-                          }}
-                        >
-                          Open
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                  <span suppressHydrationWarning className="text-xs text-muted-foreground whitespace-nowrap shrink-0">
-                    {formatDistanceToNow(new Date(group.latestItem.created_at), { addSuffix: true })}
-                  </span>
-                </div>
-
-                {isExpanded && (
-                  <div className="border-l-2 border-muted ml-6 space-y-1">
-                    {group.items.map(entry => renderSingleEntry(entry))}
-                  </div>
-                )}
+              <div key={group.firstItem.id} className="space-y-1">
+                {group.items.map(entry => renderSingleEntry(entry))}
               </div>
             )
           })
