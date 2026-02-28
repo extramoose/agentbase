@@ -10,7 +10,6 @@ import { formatDistanceToNow } from 'date-fns'
 import { Loader2 } from 'lucide-react'
 import {
   formatActivityEvent,
-  groupActivityItems,
   filterActivityItems,
   type ActivityLogEntry,
 } from '@/lib/format-activity'
@@ -87,6 +86,67 @@ const TABLE_TO_ENTITY_TYPE: Record<string, EntityType> = {
   deals: 'deal',
 }
 
+// ---------------------------------------------------------------------------
+// Consecutive event grouping — same actor + event type + entity type within 5 min
+// ---------------------------------------------------------------------------
+
+interface ConsecutiveEventGroup {
+  id: string
+  entries: ActivityLogEntry[]
+  actorId: string
+  actorType: 'human' | 'agent'
+  eventType: string
+  entityType: string // normalized
+}
+
+function groupConsecutiveEvents(entries: ActivityLogEntry[]): ConsecutiveEventGroup[] {
+  const result: ConsecutiveEventGroup[] = []
+  for (const entry of entries) {
+    const normalized = normalizeEntityType(entry.entity_type)
+    const last = result[result.length - 1]
+    if (
+      last &&
+      last.actorId === entry.actor_id &&
+      last.eventType === entry.event_type &&
+      last.entityType === normalized &&
+      Math.abs(
+        new Date(last.entries[last.entries.length - 1].created_at).getTime() -
+        new Date(entry.created_at).getTime()
+      ) <= 5 * 60 * 1000
+    ) {
+      last.entries.push(entry)
+    } else {
+      result.push({
+        id: entry.id,
+        entries: [entry],
+        actorId: entry.actor_id,
+        actorType: entry.actor_type,
+        eventType: entry.event_type,
+        entityType: normalized,
+      })
+    }
+  }
+  return result
+}
+
+function formatEventVerb(eventType: string): string {
+  switch (eventType) {
+    case 'created':          return 'created'
+    case 'deleted':          return 'deleted'
+    case 'updated':          return 'updated'
+    case 'status_changed':   return 'changed status on'
+    case 'priority_changed': return 'changed priority on'
+    case 'assignee_changed': return 'reassigned'
+    case 'commented':        return 'commented on'
+    case 'field_updated':    return 'updated'
+    case 'title_changed':    return 'renamed'
+    case 'due_date_set':     return 'set due date on'
+    case 'due_date_cleared': return 'cleared due date on'
+    case 'tags_changed':     return 'changed tags on'
+    default:                 return eventType.replace(/_/g, ' ')
+  }
+}
+
 interface HistoryClientProps {
   initialEntries: ActivityLogEntry[]
 }
@@ -105,6 +165,9 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
     entityType: EntityType
     label: string
   } | null>(null)
+
+  // Expand/collapse state for consecutive event groups
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
 
   // seq_id cache: entity UUID → seq_id (number)
   const seqIdCache = useRef<Map<string, number>>(new Map())
@@ -226,8 +289,20 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
     return () => { supabase.removeChannel(channel) }
   }, [supabase, resolveSeqIds])
 
-  // Filter internal events, then group consecutive same-entity activity items
-  const groups = useMemo(() => groupActivityItems(filterActivityItems(entries)), [entries])
+  // Group consecutive same-actor/event/entity-type entries (within 5 min)
+  const eventGroups = useMemo(
+    () => groupConsecutiveEvents(filterActivityItems(entries)),
+    [entries]
+  )
+
+  const toggleGroup = useCallback((groupId: string) => {
+    setExpandedGroups(prev => {
+      const next = new Set(prev)
+      if (next.has(groupId)) next.delete(groupId)
+      else next.add(groupId)
+      return next
+    })
+  }, [])
 
   const openShelf = useCallback(async (entityId: string, entityType: string) => {
     const normalized = normalizeEntityType(entityType)
@@ -329,17 +404,44 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
 
       {/* Activity list */}
       <div className="space-y-1">
-        {groups.length === 0 && !loading ? (
+        {eventGroups.length === 0 && !loading ? (
           <p className="text-sm text-muted-foreground py-8 text-center">
             No activity found.
           </p>
         ) : (
-          groups.map(group => {
-            // Always render every item in the group so the history
-            // page shows the same verbosity as entity detail views.
+          eventGroups.map(group => {
+            if (group.entries.length === 1) {
+              return renderSingleEntry(group.entries[0])
+            }
+            const isExpanded = expandedGroups.has(group.id)
+            const entityLabel = group.entityType.replace(/_/g, ' ')
             return (
-              <div key={group.firstItem.id} className="space-y-1">
-                {group.items.map(entry => renderSingleEntry(entry))}
+              <div key={group.id}>
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => toggleGroup(group.id)}
+                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleGroup(group.id) } }}
+                  className="flex items-center gap-3 rounded-lg px-3 py-3 hover:bg-muted/40 transition-colors cursor-pointer select-none"
+                >
+                  <ActorChip actorId={group.actorId} actorType={group.actorType} />
+                  <span className="text-sm flex-1 min-w-0">
+                    {formatEventVerb(group.eventType)}{' '}
+                    <span className="font-medium">{group.entries.length}</span>{' '}
+                    {entityLabel}
+                  </span>
+                  <span className="text-xs text-muted-foreground" aria-label={isExpanded ? 'Collapse' : 'Expand'}>
+                    {isExpanded ? '▾' : '▸'}
+                  </span>
+                  <span suppressHydrationWarning className="text-xs text-muted-foreground whitespace-nowrap shrink-0">
+                    {formatDistanceToNow(new Date(group.entries[0].created_at), { addSuffix: true })}
+                  </span>
+                </div>
+                {isExpanded && (
+                  <div className="space-y-1 ml-4 border-l border-border pl-2">
+                    {group.entries.map(entry => renderSingleEntry(entry))}
+                  </div>
+                )}
               </div>
             )
           })
