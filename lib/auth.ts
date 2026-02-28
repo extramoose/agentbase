@@ -36,21 +36,10 @@ export async function getUserProfile(): Promise<UserProfile | null> {
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) return null
-  const { data: profile } = await supabase.rpc('get_my_profile')
+  const { data: profile } = await supabase.rpc('get_my_profile_with_role')
   if (!profile) return null
 
-  const base = profile as UserProfile
-  const tenantId = base.active_tenant_id
-  if (tenantId) {
-    const { data: membership } = await supabase
-      .from('tenant_members')
-      .select('role')
-      .eq('user_id', user.id)
-      .eq('tenant_id', tenantId)
-      .single()
-    return { ...base, tenant_role: (membership?.role ?? null) as UserProfile['tenant_role'] }
-  }
-  return { ...base, tenant_role: null }
+  return profile as UserProfile
 }
 
 export async function requireAuth() {
