@@ -28,18 +28,15 @@ In the same migration or a follow-up:
 
 ### 3. API routes
 
-Create `app/api/<entity>/route.ts`:
+Create a read route `app/api/<entity>/route.ts`:
 
-- `GET` — call `resolveActorUnified`, then either direct Supabase query (human) or `rpc_list_<entity>` (agent)
+- `GET` — call `resolveActorUnified`, then either direct Supabase query (human) or RPC (agent)
+
+Create a command route `app/api/commands/create-<entity>/route.ts`:
+
 - `POST` — validate input with Zod, call `rpc_create_<entity>`
 
-Create `app/api/<entity>/[id]/route.ts`:
-
-- `GET` — fetch single entity
-- `PATCH` — for entity-specific updates (or just use `/api/commands/update`)
-- `DELETE` — call `rpc_delete_entity`
-
-Add the table name to the Zod `ALLOWED_TABLES` enum in `app/api/commands/update/route.ts` and `app/api/commands/batch-update/route.ts`.
+Add the table name to the Zod `ALLOWED_TABLES` enum in `app/api/commands/update/route.ts`, `app/api/commands/batch-update/route.ts`, and `app/api/commands/delete-entity/route.ts`.
 
 ### 4. Client component
 
