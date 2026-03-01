@@ -59,7 +59,7 @@ export interface CrmPerson extends BaseEntity {
   last_enriched: string | null
 }
 
-type DealStatus = 'prospect' | 'qualified' | 'proposal' | 'negotiation' | 'active' | 'won' | 'lost'
+type DealStatus = 'cold' | 'prospect' | 'warm' | 'active' | 'won' | 'lost' | 'paused' | 'archived'
 
 export interface CrmDeal extends BaseEntity {
   title: string
@@ -81,16 +81,17 @@ type View = 'grid' | 'table'
 // ---------------------------------------------------------------------------
 
 const DEAL_STATUS_CONFIG: Record<DealStatus, { label: string; className: string; funnelColor: string }> = {
-  prospect:    { label: 'Prospect',    className: 'bg-slate-500/20 text-slate-400',   funnelColor: 'bg-slate-500' },
-  qualified:   { label: 'Qualified',   className: 'bg-indigo-500/20 text-indigo-400', funnelColor: 'bg-indigo-500' },
-  proposal:    { label: 'Proposal',    className: 'bg-violet-500/20 text-violet-400', funnelColor: 'bg-violet-500' },
-  negotiation: { label: 'Negotiation', className: 'bg-amber-500/20 text-amber-400',   funnelColor: 'bg-amber-500' },
-  active:      { label: 'Active',      className: 'bg-blue-500/20 text-blue-400',     funnelColor: 'bg-blue-500' },
-  won:         { label: 'Won',         className: 'bg-green-500/20 text-green-400',   funnelColor: 'bg-green-500' },
-  lost:        { label: 'Lost',        className: 'bg-red-500/20 text-red-400',       funnelColor: 'bg-red-500' },
+  cold:     { label: 'Cold',     className: 'bg-gray-500/20 text-gray-400',    funnelColor: 'bg-gray-500' },
+  prospect: { label: 'Prospect', className: 'bg-slate-500/20 text-slate-400',  funnelColor: 'bg-slate-500' },
+  warm:     { label: 'Warm',     className: 'bg-amber-500/20 text-amber-400',  funnelColor: 'bg-amber-500' },
+  active:   { label: 'Active',   className: 'bg-blue-500/20 text-blue-400',    funnelColor: 'bg-blue-500' },
+  won:      { label: 'Won',      className: 'bg-green-500/20 text-green-400',  funnelColor: 'bg-green-500' },
+  lost:     { label: 'Lost',     className: 'bg-red-500/20 text-red-400',      funnelColor: 'bg-red-500' },
+  paused:   { label: 'Paused',   className: 'bg-yellow-500/20 text-yellow-400', funnelColor: 'bg-yellow-500' },
+  archived: { label: 'Archived', className: 'bg-neutral-500/20 text-neutral-400', funnelColor: 'bg-neutral-500' },
 }
 
-const DEAL_STATUS_ORDER: DealStatus[] = ['prospect', 'qualified', 'proposal', 'negotiation', 'active', 'won', 'lost']
+const DEAL_STATUS_ORDER: DealStatus[] = ['cold', 'prospect', 'warm', 'active', 'won', 'lost', 'paused', 'archived']
 
 function formatRelativeTime(iso: string): string {
   const ms = Date.now() - new Date(iso).getTime()
