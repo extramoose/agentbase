@@ -49,6 +49,7 @@ type Lane = {
   key: string
   label: string
   emoji?: string
+  helperText?: string
   tasks: StickyTask[]
   size: 'large' | 'medium' | 'small'
 }
@@ -66,44 +67,86 @@ function localDateStr(d: Date): string {
   return `${y}-${m}-${day}`
 }
 
+function fmtShort(d: Date): string {
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
 function categorizeTasks(tasks: StickyTask[]): Lane[] {
   const active = tasks.filter((t) => t.status !== 'done' && t.status !== 'cancelled')
 
   const today = startOfToday()
   const todayStr = localDateStr(today)
-  const nextWeek = new Date(today)
-  nextWeek.setDate(nextWeek.getDate() + 7)
-  const nextWeekStr = localDateStr(nextWeek)
+
+  const tomorrow = new Date(today)
+  tomorrow.setDate(tomorrow.getDate() + 1)
+  const tomorrowStr = localDateStr(tomorrow)
+
+  // End of current week (Sunday)
+  const daysUntilSunday = (7 - today.getDay()) % 7
+  const endOfWeekSunday = new Date(today)
+  endOfWeekSunday.setDate(endOfWeekSunday.getDate() + daysUntilSunday)
+  const endOfWeekStr = localDateStr(endOfWeekSunday)
+
+  // End of current month
+  const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0)
+  const endOfMonthStr = localDateStr(endOfMonth)
 
   const overdue: StickyTask[] = []
   const todayTasks: StickyTask[] = []
-  const upNext: StickyTask[] = []
-  const later: StickyTask[] = []
+  const tomorrowTasks: StickyTask[] = []
+  const thisWeekTasks: StickyTask[] = []
+  const thisMonthTasks: StickyTask[] = []
 
   for (const task of active) {
-    if (!task.due_date) {
-      later.push(task)
-      continue
-    }
+    if (!task.due_date) continue
     const d = task.due_date.slice(0, 10)
     if (d < todayStr) {
       overdue.push(task)
     } else if (d === todayStr) {
       todayTasks.push(task)
-    } else if (d <= nextWeekStr) {
-      upNext.push(task)
-    } else {
-      later.push(task)
+    } else if (d === tomorrowStr) {
+      tomorrowTasks.push(task)
+    } else if (d <= endOfWeekStr) {
+      thisWeekTasks.push(task)
+    } else if (d <= endOfMonthStr) {
+      thisMonthTasks.push(task)
     }
+    // Tasks beyond this month or with no due date are not shown
   }
 
   const lanes: Lane[] = []
+
   if (overdue.length > 0) {
-    lanes.push({ key: 'overdue', label: 'Overdue', emoji: '\ud83d\udd34', tasks: sortByPriority(overdue), size: 'large' })
+    lanes.push({ key: 'overdue', label: 'Overdue', emoji: '🔴', tasks: sortByPriority(overdue), size: 'large' })
   }
-  lanes.push({ key: 'today', label: 'Today', tasks: sortByPriority(todayTasks), size: 'large' })
-  lanes.push({ key: 'upnext', label: 'Up Next', tasks: sortByPriority(upNext), size: 'medium' })
-  lanes.push({ key: 'later', label: 'Later', tasks: sortByPriority(later), size: 'small' })
+  if (todayTasks.length > 0) {
+    lanes.push({ key: 'today', label: 'Today', helperText: fmtShort(today), tasks: sortByPriority(todayTasks), size: 'large' })
+  }
+  if (tomorrowTasks.length > 0) {
+    lanes.push({ key: 'tomorrow', label: 'Tomorrow', helperText: fmtShort(tomorrow), tasks: sortByPriority(tomorrowTasks), size: 'medium' })
+  }
+  if (thisWeekTasks.length > 0) {
+    const weekStart = new Date(tomorrow)
+    weekStart.setDate(weekStart.getDate() + 1)
+    lanes.push({
+      key: 'thisweek',
+      label: 'This Week',
+      helperText: `${fmtShort(weekStart)} – ${fmtShort(endOfWeekSunday)}`,
+      tasks: sortByPriority(thisWeekTasks),
+      size: 'medium',
+    })
+  }
+  if (thisMonthTasks.length > 0) {
+    const monthLaneStart = new Date(endOfWeekSunday)
+    monthLaneStart.setDate(monthLaneStart.getDate() + 1)
+    lanes.push({
+      key: 'thismonth',
+      label: 'This Month',
+      helperText: `${fmtShort(monthLaneStart)} – ${fmtShort(endOfMonth)}`,
+      tasks: sortByPriority(thisMonthTasks),
+      size: 'small',
+    })
+  }
 
   return lanes
 }
@@ -242,6 +285,9 @@ function SwimLane({
       <div className="flex items-center gap-1.5 mb-2">
         {lane.emoji && <span>{lane.emoji}</span>}
         <span className="font-semibold text-sm">{lane.label}</span>
+        {lane.helperText && (
+          <span className="text-xs text-muted-foreground">{lane.helperText}</span>
+        )}
         <span className="text-xs text-muted-foreground bg-muted rounded-full px-1.5 py-0.5">
           {lane.tasks.length}
         </span>
@@ -259,22 +305,16 @@ function SwimLane({
         onMouseUp={onMouseUp}
         onMouseLeave={onMouseLeave}
       >
-        {lane.tasks.length === 0 ? (
-          <div className="flex items-center justify-center h-24 text-sm text-muted-foreground">
-            No tasks
-          </div>
-        ) : (
-          <div className="flex gap-3 pb-2">
-            {lane.tasks.map((task) => (
-              <StickyCard
-                key={task.id}
-                task={task}
-                size={lane.size}
-                onClick={() => onTaskClick(task)}
-              />
-            ))}
-          </div>
-        )}
+        <div className="flex gap-3 pb-2">
+          {lane.tasks.map((task) => (
+            <StickyCard
+              key={task.id}
+              task={task}
+              size={lane.size}
+              onClick={() => onTaskClick(task)}
+            />
+          ))}
+        </div>
       </div>
     </div>
   )
