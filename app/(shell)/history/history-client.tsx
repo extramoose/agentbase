@@ -326,13 +326,8 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
     return () => observer.disconnect()
   }, [loadMore])
 
-  // Re-fetch when filter or search changes (skip initial mount — we have initialEntries)
-  const mountedRef = useRef(false)
+  // Re-fetch when filter or search changes
   useEffect(() => {
-    if (!mountedRef.current) {
-      mountedRef.current = true
-      return
-    }
     let cancelled = false
     const reload = async () => {
       loadingRef.current = true
