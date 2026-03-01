@@ -432,11 +432,13 @@ export function CrmClient({
   const allTags = useMemo(() => {
     const entities =
       section === 'deals' ? deals : section === 'companies' ? companies : people
-    const tagSet = new Set<string>()
+    const tagCount = new Map<string, number>()
     for (const e of entities) {
-      for (const t of e.tags ?? []) tagSet.add(t)
+      for (const t of e.tags ?? []) tagCount.set(t, (tagCount.get(t) ?? 0) + 1)
     }
-    return Array.from(tagSet).sort()
+    return Array.from(tagCount.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map(([tag]) => tag)
   }, [section, deals, companies, people])
 
   // ----- Filtered entities per section -----

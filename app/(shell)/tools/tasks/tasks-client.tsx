@@ -1007,11 +1007,13 @@ export function TasksClient({
 
   // ----- Collect all tags from tasks -----
   const allTags = useMemo(() => {
-    const tagSet = new Set<string>()
+    const tagCount = new Map<string, number>()
     for (const t of tasks) {
-      for (const tag of t.tags ?? []) tagSet.add(tag)
+      for (const tag of t.tags ?? []) tagCount.set(tag, (tagCount.get(tag) ?? 0) + 1)
     }
-    return Array.from(tagSet).sort()
+    return Array.from(tagCount.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map(([tag]) => tag)
   }, [tasks])
 
   // ----- Shelf open/close with URL sync (?id=seq_id via pushState) -----

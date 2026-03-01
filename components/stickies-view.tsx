@@ -197,7 +197,7 @@ function StickyCard({
     <button
       onClick={onClick}
       className={cn(
-        'flex flex-col justify-between rounded-xl border-2 shadow-md p-4 text-left transition-transform hover:scale-[1.02] hover:shadow-lg shrink-0 cursor-pointer',
+        'flex flex-col justify-between rounded-xl border-2 shadow-md p-4 text-left transition-shadow hover:shadow-lg hover:border-foreground/30 shrink-0 cursor-pointer',
         config.card,
         size === 'small'
           ? 'bg-gray-50 border-gray-200 opacity-80 dark:bg-gray-900/40 dark:border-gray-700'

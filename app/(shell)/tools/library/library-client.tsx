@@ -214,11 +214,13 @@ export function LibraryClient({ initialItems, initialItemId }: { initialItems: L
 
   // ----- Collect all tags -----
   const allTags = useMemo(() => {
-    const tagSet = new Set<string>()
+    const tagCount = new Map<string, number>()
     for (const e of items) {
-      for (const t of e.tags ?? []) tagSet.add(t)
+      for (const t of e.tags ?? []) tagCount.set(t, (tagCount.get(t) ?? 0) + 1)
     }
-    return Array.from(tagSet).sort()
+    return Array.from(tagCount.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map(([tag]) => tag)
   }, [items])
 
   // ----- Type counts -----
