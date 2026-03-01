@@ -6,7 +6,7 @@ import { ActorChip } from '@/components/actor-chip'
 import { SearchFilterBar } from '@/components/search-filter-bar'
 import { EntityShelf } from '@/components/entity-client/entity-shelf'
 import { Badge } from '@/components/ui/badge'
-import { formatDistanceToNow } from 'date-fns'
+import { formatDistanceToNow, isToday, isYesterday, format } from 'date-fns'
 import { Loader2 } from 'lucide-react'
 import {
   formatActivityEvent,
@@ -227,6 +227,22 @@ function formatEventVerb(eventType: string): string {
     case 'tags_changed':     return 'changed tags on'
     default:                 return eventType.replace(/_/g, ' ')
   }
+}
+
+function formatDateLabel(date: Date): string {
+  if (isToday(date)) return 'Today'
+  if (isYesterday(date)) return 'Yesterday'
+  return format(date, 'MMMM d, yyyy')
+}
+
+function DateDivider({ label }: { label: string }) {
+  return (
+    <div className="flex items-center gap-3 py-2">
+      <div className="flex-1 h-px bg-border" />
+      <span suppressHydrationWarning className="text-xs text-muted-foreground font-medium">{label}</span>
+      <div className="flex-1 h-px bg-border" />
+    </div>
+  )
 }
 
 interface HistoryClientProps {
@@ -513,6 +529,40 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
     )
   }
 
+  function renderBurst(burst: SessionBurst) {
+    const isBurstExpanded = expandedGroups.has(burst.id)
+    return (
+      <div key={burst.id}>
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => toggleGroup(burst.id)}
+          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleGroup(burst.id) } }}
+          className="flex items-start gap-3 rounded-lg px-3 py-3 hover:bg-muted/40 transition-colors cursor-pointer select-none"
+        >
+          <ActorChip actorId={burst.actorId} actorType={burst.actorType} compact />
+          <div className="flex-1 min-w-0">
+            <ActorChip actorId={burst.actorId} actorType={burst.actorType} nameOnly />
+            <p className="text-sm text-muted-foreground mt-0.5">
+              made <span className="font-medium">{burst.totalEntries}</span> changes
+            </p>
+            <p suppressHydrationWarning className="text-xs text-muted-foreground mt-0.5">
+              {formatDistanceToNow(new Date(burst.groups[0].entries[0].created_at), { addSuffix: true })}
+            </p>
+          </div>
+          <span className="text-xs text-muted-foreground shrink-0" aria-label={isBurstExpanded ? 'Collapse' : 'Expand'}>
+            {isBurstExpanded ? '▾' : '▸'}
+          </span>
+        </div>
+        {isBurstExpanded && (
+          <div className="space-y-1 ml-4 border-l border-border pl-2">
+            {burst.groups.map(group => renderLevel1Group(group))}
+          </div>
+        )}
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-4 sm:space-y-6">
       <h1 className="text-xl sm:text-2xl font-bold">History</h1>
@@ -554,44 +604,27 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
             No activity found.
           </p>
         ) : (
-          displayItems.map(item => {
-            if (item.type === 'flat') {
-              return renderLevel1Group(item.group)
+          (() => {
+            const elements: React.ReactNode[] = []
+            let lastDateKey = ''
+            for (const item of displayItems) {
+              const ts = item.type === 'flat'
+                ? item.group.entries[0].created_at
+                : item.groups[0].entries[0].created_at
+              const date = new Date(ts)
+              const dateKey = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`
+              if (dateKey !== lastDateKey) {
+                elements.push(<DateDivider key={`divider-${dateKey}`} label={formatDateLabel(date)} />)
+                lastDateKey = dateKey
+              }
+              if (item.type === 'flat') {
+                elements.push(renderLevel1Group(item.group))
+              } else {
+                elements.push(renderBurst(item))
+              }
             }
-            // Session burst (Level 2)
-            const burst = item
-            const isBurstExpanded = expandedGroups.has(burst.id)
-            return (
-              <div key={burst.id}>
-                <div
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => toggleGroup(burst.id)}
-                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleGroup(burst.id) } }}
-                  className="flex items-start gap-3 rounded-lg px-3 py-3 hover:bg-muted/40 transition-colors cursor-pointer select-none"
-                >
-                  <ActorChip actorId={burst.actorId} actorType={burst.actorType} compact />
-                  <div className="flex-1 min-w-0">
-                    <ActorChip actorId={burst.actorId} actorType={burst.actorType} nameOnly />
-                    <p className="text-sm text-muted-foreground mt-0.5">
-                      made <span className="font-medium">{burst.totalEntries}</span> changes
-                    </p>
-                    <p suppressHydrationWarning className="text-xs text-muted-foreground mt-0.5">
-                      {formatDistanceToNow(new Date(burst.groups[0].entries[0].created_at), { addSuffix: true })}
-                    </p>
-                  </div>
-                  <span className="text-xs text-muted-foreground shrink-0" aria-label={isBurstExpanded ? 'Collapse' : 'Expand'}>
-                    {isBurstExpanded ? '▾' : '▸'}
-                  </span>
-                </div>
-                {isBurstExpanded && (
-                  <div className="space-y-1 ml-4 border-l border-border pl-2">
-                    {burst.groups.map(group => renderLevel1Group(group))}
-                  </div>
-                )}
-              </div>
-            )
-          })
+            return elements
+          })()
         )}
       </div>
 
