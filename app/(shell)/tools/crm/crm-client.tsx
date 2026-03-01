@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Building2, Plus, Trash2, User, Handshake } from 'lucide-react'
+import { Building2, Plus, Trash2, User, Handshake, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { EntityShelf } from '@/components/entity-client/entity-shelf'
 import { EntityGrid } from '@/components/entity-client/entity-grid'
@@ -128,6 +128,9 @@ export function CrmClient({
   const [selectedTag, setSelectedTag] = useState<string | null>(null)
   const [adding, setAdding] = useState(false)
   const [newName, setNewName] = useState('')
+  const [sortKey, setSortKey] = useState<string | null>(null)
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+  const [dealStatusFilter, setDealStatusFilter] = useState<DealStatus | 'all'>('all')
   const addInputRef = useRef<HTMLInputElement>(null)
 
   const supabase = createClient()
@@ -354,8 +357,27 @@ export function CrmClient({
 
   // ----- Filtered entities per section -----
 
+  function applyCrmSort<T>(arr: T[]): T[] {
+    if (!sortKey) return arr
+    return [...arr].sort((a, b) => {
+      const av = (a as Record<string, unknown>)[sortKey]
+      const bv = (b as Record<string, unknown>)[sortKey]
+      if (av == null && bv == null) return 0
+      if (av == null) return 1
+      if (bv == null) return -1
+      if (typeof av === 'number' && typeof bv === 'number') {
+        return sortDir === 'asc' ? av - bv : bv - av
+      }
+      const cmp = String(av).localeCompare(String(bv))
+      return sortDir === 'asc' ? cmp : -cmp
+    })
+  }
+
   const filteredDeals = useMemo(() => {
     let result = deals
+    if (dealStatusFilter !== 'all') {
+      result = result.filter((d) => d.status === dealStatusFilter)
+    }
     if (search.trim()) {
       const q = search.toLowerCase()
       result = result.filter((d) =>
@@ -367,8 +389,9 @@ export function CrmClient({
     if (selectedTag) {
       result = result.filter((d) => d.tags.includes(selectedTag))
     }
-    return result
-  }, [deals, search, selectedTag])
+    return applyCrmSort(result)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deals, dealStatusFilter, search, selectedTag, sortKey, sortDir])
 
   const filteredCompanies = useMemo(() => {
     let result = companies
@@ -384,8 +407,9 @@ export function CrmClient({
     if (selectedTag) {
       result = result.filter((c) => c.tags.includes(selectedTag))
     }
-    return result
-  }, [companies, search, selectedTag])
+    return applyCrmSort(result)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [companies, search, selectedTag, sortKey, sortDir])
 
   const filteredPeople = useMemo(() => {
     let result = people
@@ -401,8 +425,9 @@ export function CrmClient({
     if (selectedTag) {
       result = result.filter((p) => p.tags.includes(selectedTag))
     }
-    return result
-  }, [people, search, selectedTag])
+    return applyCrmSort(result)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [people, search, selectedTag, sortKey, sortDir])
 
   const hasResults =
     section === 'deals'
@@ -492,7 +517,21 @@ export function CrmClient({
     setSelectedTag(null)
     setAdding(false)
     setNewName('')
+    setSortKey(null)
+    setSortDir('asc')
+    setDealStatusFilter('all')
     window.history.pushState(null, '', `/tools/crm/${newSection}`)
+  }, [])
+
+  const toggleSort = useCallback((key: string) => {
+    setSortKey((prev) => {
+      if (prev === key) {
+        setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+        return key
+      }
+      setSortDir('asc')
+      return key
+    })
   }, [])
 
   // ----- Quick-add handler -----
@@ -678,8 +717,34 @@ export function CrmClient({
         </div>
       )}
 
-      {/* Deal funnel (deals section only) */}
-      {section === 'deals' && <DealFunnel deals={deals} />}
+      {/* Deal status filter + funnel (deals section only) */}
+      {section === 'deals' && (
+        <>
+          <div className="flex items-center gap-2 flex-wrap mb-3">
+            {(['all', 'prospect', 'active', 'won', 'lost'] as const).map((s) => {
+              const count = s === 'all'
+                ? deals.length
+                : deals.filter((d) => d.status === s).length
+              const cfg = s !== 'all' ? DEAL_STATUS_CONFIG[s] : null
+              return (
+                <button
+                  key={s}
+                  onClick={() => setDealStatusFilter(s)}
+                  className={cn(
+                    'px-3 py-1.5 rounded-full text-sm font-medium transition-colors',
+                    dealStatusFilter === s
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-muted text-muted-foreground hover:text-foreground',
+                  )}
+                >
+                  {cfg?.label ?? 'All'} ({count})
+                </button>
+              )
+            })}
+          </div>
+          <DealFunnel deals={deals} />
+        </>
+      )}
 
       {/* List view */}
       <div className="flex-1 overflow-y-auto">
@@ -709,27 +774,27 @@ export function CrmClient({
                 <tr className="border-b border-border bg-muted/40">
                   {section === 'deals' && (
                     <>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Title</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Status</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Value</th>
+                      <SortTh colKey="title" label="Title" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                      <SortTh colKey="status" label="Status" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                      <SortTh colKey="value" label="Value" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                       <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Tags</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Created</th>
+                      <SortTh colKey="created_at" label="Created" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                     </>
                   )}
                   {section === 'companies' && (
                     <>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Name</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Domain</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Industry</th>
+                      <SortTh colKey="name" label="Name" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                      <SortTh colKey="domain" label="Domain" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                      <SortTh colKey="industry" label="Industry" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                       <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Tags</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Created</th>
+                      <SortTh colKey="created_at" label="Created" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                     </>
                   )}
                   {section === 'people' && (
                     <>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Name</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Email</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Title</th>
+                      <SortTh colKey="name" label="Name" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                      <SortTh colKey="email" label="Email" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                      <SortTh colKey="title" label="Title" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                       <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Tags</th>
                     </>
                   )}
@@ -797,6 +862,42 @@ export function CrmClient({
 }
 
 // ---------------------------------------------------------------------------
+// Sortable table header
+// ---------------------------------------------------------------------------
+
+function SortTh({
+  colKey,
+  label,
+  sortKey,
+  sortDir,
+  onSort,
+}: {
+  colKey: string
+  label: string
+  sortKey: string | null
+  sortDir: 'asc' | 'desc'
+  onSort: (key: string) => void
+}) {
+  const active = sortKey === colKey
+  return (
+    <th
+      onClick={() => onSort(colKey)}
+      className="px-4 py-2 text-left text-xs font-medium text-muted-foreground cursor-pointer select-none hover:text-foreground"
+    >
+      <span className="inline-flex items-center gap-1">
+        {label}
+        {active
+          ? sortDir === 'asc'
+            ? <ArrowUp className="h-3 w-3" />
+            : <ArrowDown className="h-3 w-3" />
+          : <ArrowUpDown className="h-3 w-3 opacity-40" />
+        }
+      </span>
+    </th>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Deal Funnel Visualization
 // ---------------------------------------------------------------------------
 
@@ -804,9 +905,17 @@ function DealFunnel({ deals }: { deals: CrmDeal[] }) {
   const stages: DealStatus[] = ['prospect', 'active', 'won', 'lost']
 
   const counts = useMemo(() => {
-    const map: Record<DealStatus, number> = { prospect: 0, active: 0, won: 0, lost: 0 }
+    const map: Record<DealStatus, { count: number; value: number }> = {
+      prospect: { count: 0, value: 0 },
+      active: { count: 0, value: 0 },
+      won: { count: 0, value: 0 },
+      lost: { count: 0, value: 0 },
+    }
     for (const d of deals) {
-      if (d.status in map) map[d.status]++
+      if (d.status in map) {
+        map[d.status].count++
+        map[d.status].value += Number(d.value ?? 0)
+      }
     }
     return map
   }, [deals])
@@ -816,9 +925,9 @@ function DealFunnel({ deals }: { deals: CrmDeal[] }) {
 
   return (
     <div className="mb-4">
-      <div className="flex h-8 rounded-md overflow-hidden">
+      <div className="flex h-10 rounded-md overflow-hidden">
         {stages.map((stage) => {
-          const count = counts[stage]
+          const { count, value } = counts[stage]
           if (count === 0) return null
           const pct = (count / total) * 100
           const cfg = DEAL_STATUS_CONFIG[stage]
@@ -826,13 +935,16 @@ function DealFunnel({ deals }: { deals: CrmDeal[] }) {
             <div
               key={stage}
               className={cn(
-                'flex items-center justify-center text-xs font-medium text-white',
+                'flex flex-col items-center justify-center text-white',
                 cfg.funnelColor,
               )}
-              style={{ width: `${pct}%`, minWidth: count > 0 ? '48px' : undefined }}
-              title={`${cfg.label}: ${count}`}
+              style={{ width: `${pct}%`, minWidth: count > 0 ? '64px' : undefined }}
+              title={`${cfg.label}: ${count} deal${count !== 1 ? 's' : ''} — $${value.toLocaleString()}`}
             >
-              {cfg.label} {count}
+              <span className="text-xs font-semibold leading-tight">{cfg.label} {count}</span>
+              {value > 0 && (
+                <span className="text-[10px] leading-tight opacity-80">${value.toLocaleString()}</span>
+              )}
             </div>
           )
         })}

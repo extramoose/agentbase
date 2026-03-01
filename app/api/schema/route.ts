@@ -189,11 +189,51 @@ const API_SCHEMA = {
       {
         method: 'PATCH',
         path: '/api/commands/update',
-        description: 'Update fields on any entity. See updatable_fields for allowed fields per entity type.',
+        description: 'Update fields on any entity. Send { table, id, fields } where table is the entity type, id is the UUID, and fields is a key-value map. See updatable_fields for allowed keys per table.',
         required_fields: {
           table: { type: 'string', enum: [...ENTITY_TYPES] },
           id: { type: 'string', description: 'UUID of the entity to update' },
           fields: { type: 'object', description: 'Key-value map of fields to update. See updatable_fields for valid keys per table.' },
+        },
+        optional_fields: {},
+      },
+      {
+        method: 'POST',
+        path: '/api/commands/update-task',
+        description: 'Alias for PATCH /api/commands/update with table pre-set to "tasks". Send { id, fields }.',
+        required_fields: {
+          id: { type: 'string', description: 'UUID of the task to update' },
+          fields: { type: 'object', description: 'Key-value map of fields to update. See updatable_fields.tasks for valid keys.' },
+        },
+        optional_fields: {},
+      },
+      {
+        method: 'POST',
+        path: '/api/commands/update-company',
+        description: 'Alias for PATCH /api/commands/update with table pre-set to "companies". Send { id, fields }.',
+        required_fields: {
+          id: { type: 'string', description: 'UUID of the company to update' },
+          fields: { type: 'object', description: 'Key-value map of fields to update. See updatable_fields.companies for valid keys.' },
+        },
+        optional_fields: {},
+      },
+      {
+        method: 'POST',
+        path: '/api/commands/update-person',
+        description: 'Alias for PATCH /api/commands/update with table pre-set to "people". Send { id, fields }.',
+        required_fields: {
+          id: { type: 'string', description: 'UUID of the person to update' },
+          fields: { type: 'object', description: 'Key-value map of fields to update. See updatable_fields.people for valid keys.' },
+        },
+        optional_fields: {},
+      },
+      {
+        method: 'POST',
+        path: '/api/commands/update-deal',
+        description: 'Alias for PATCH /api/commands/update with table pre-set to "deals". Send { id, fields }.',
+        required_fields: {
+          id: { type: 'string', description: 'UUID of the deal to update' },
+          fields: { type: 'object', description: 'Key-value map of fields to update. See updatable_fields.deals for valid keys.' },
         },
         optional_fields: {},
       },
@@ -354,7 +394,7 @@ const API_SCHEMA = {
         optional_fields: {
           page: { type: 'number', default: '1', description: '1-based page number' },
           limit: { type: 'number', default: '50', description: 'Items per page (max 200)' },
-          q: { type: 'string', description: 'Search query (searches name, notes)' },
+          q: { type: 'string', description: 'Search query (searches title, notes)' },
           tag: { type: 'string', description: 'Filter by tag (exact match)' },
         },
       },

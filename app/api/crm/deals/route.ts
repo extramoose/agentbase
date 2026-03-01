@@ -14,7 +14,7 @@ export async function GET(request: Request) {
       ;({ data, error } = await supabase.rpc('rpc_list_deals', { p_tenant_id: tenantId }))
       if (!error && data) {
         if (tag) data = data.filter((r: Record<string, unknown>) => Array.isArray(r.tags) && r.tags.includes(tag))
-        data = filterInMemory(data, q, ['name', 'notes'])
+        data = filterInMemory(data, q, ['title', 'notes'])
         data = paginateInMemory(data, page, limit)
       }
     } else {
@@ -22,7 +22,7 @@ export async function GET(request: Request) {
         .from('deals')
         .select('*')
       if (tag) query = query.contains('tags', [tag])
-      query = applySearch(query, q, ['name', 'notes'])
+      query = applySearch(query, q, ['title', 'notes'])
       query = query.order('created_at', { ascending: false })
       query = applyPagination(query, page, limit)
       ;({ data, error } = await query)
