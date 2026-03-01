@@ -6,7 +6,7 @@ import { ActorChip } from '@/components/actor-chip'
 import { SearchFilterBar } from '@/components/search-filter-bar'
 import { EntityShelf } from '@/components/entity-client/entity-shelf'
 import { Badge } from '@/components/ui/badge'
-import { formatDistanceToNow, isToday, isYesterday, format, startOfDay, endOfDay, addDays } from 'date-fns'
+import { formatDistanceToNow, isToday, isYesterday, format, startOfDay, addDays } from 'date-fns'
 import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
 import {
   formatActivityEvent,
@@ -301,21 +301,19 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
     let cancelled = false
     const reload = async () => {
       setLoading(true)
-      const dayStart = startOfDay(selectedDate)
+      const day = startOfDay(selectedDate).toISOString().split('T')[0]
       const { data } = await supabase.rpc('get_activity_log', {
-        p_limit: 5000,
+        p_limit: 50,
         p_offset: 0,
-        p_date_from: dayStart.toISOString().split('T')[0],
+        p_date_from: day,
+        p_date_to: day,
         ...(entityFilter ? { p_entity_type: entityFilter } : {}),
         ...(search.trim() ? { p_search: search.trim() } : {}),
       })
       if (cancelled) return
       const results = (data ?? []) as ActivityLogEntry[]
-      // Filter to end of selected day (RPC only has date_from, not date_to)
-      const dayEnd = endOfDay(selectedDate).getTime()
-      const dayResults = results.filter(e => new Date(e.created_at).getTime() <= dayEnd)
-      await resolveSeqIds(dayResults)
-      setEntries(dayResults)
+      await resolveSeqIds(results)
+      setEntries(results)
       setLoading(false)
     }
     const timeout = setTimeout(reload, search.trim() ? 300 : 0)
@@ -345,14 +343,8 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
 
   // Filter to selected day, then two-pass grouping
   const displayItems = useMemo(() => {
-    const dayStart = startOfDay(selectedDate).getTime()
-    const dayEnd = endOfDay(selectedDate).getTime()
-    const dayEntries = filterActivityItems(entries).filter(e => {
-      const t = new Date(e.created_at).getTime()
-      return t >= dayStart && t <= dayEnd
-    })
-    return groupSessionBursts(groupConsecutiveEvents(dayEntries))
-  }, [entries, selectedDate])
+    return groupSessionBursts(groupConsecutiveEvents(filterActivityItems(entries)))
+  }, [entries])
 
   const toggleGroup = useCallback((groupId: string) => {
     setExpandedGroups(prev => {
