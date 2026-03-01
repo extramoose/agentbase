@@ -17,6 +17,11 @@ export default async function ShellLayout({
     redirect('/onboarding')
   }
 
+  // If user hasn't completed profile setup, send back to onboarding
+  if (!profile?.full_name) {
+    redirect('/onboarding?step=profile')
+  }
+
   const { data: workspaces } = await supabase.rpc('rpc_list_my_workspaces')
 
   return (

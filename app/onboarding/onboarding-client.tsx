@@ -29,15 +29,17 @@ export function OnboardingClient({ skipWorkspace }: { skipWorkspace?: boolean })
   const router = useRouter()
   const searchParams = useSearchParams()
   const joined = searchParams.get('joined') === 'true' || skipWorkspace
+  const stepParam = searchParams.get('step')
 
-  const [step, setStep] = useState<Step>(joined ? 'profile' : 'workspace')
+  const skipWs = joined || stepParam === 'profile'
+  const [step, setStep] = useState<Step>(skipWs ? 'profile' : 'workspace')
   const [workspaceName, setWorkspaceName] = useState('')
   const [profileName, setProfileName] = useState('')
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
-  const steps: Step[] = joined
+  const steps: Step[] = skipWs
     ? ['profile', 'intro-you', 'intro-agents']
     : ['workspace', 'profile', 'intro-you', 'intro-agents']
   const stepIndex = steps.indexOf(step)

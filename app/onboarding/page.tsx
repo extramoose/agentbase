@@ -19,7 +19,9 @@ export default async function OnboardingPage({
   // If user already has a tenant, skip onboarding entirely
   const supabase = await createClient()
   const { data: tenantId } = await supabase.rpc('get_my_tenant_id')
-  if (tenantId) {
+  const { data: profile } = await supabase.rpc('get_my_profile_with_role')
+  const hasName = profile && (profile as { full_name?: string }).full_name
+  if (tenantId && hasName) {
     redirect('/')
   }
 
