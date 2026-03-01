@@ -7,6 +7,10 @@
 // - Click suggestion or press Enter to link
 // - Press Backspace on empty input to remove last chip
 // - Click X on chip to unlink
+//
+// Two modes:
+// - Live mode (sourceType + sourceId): fetches/creates links via API
+// - Pending mode (value + onChange): controlled component, no API calls
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { X, Loader2 } from 'lucide-react'
@@ -34,15 +38,8 @@ const TABLE_LABELS: Record<string, string> = {
   deals:         'Deal',
 }
 
-interface ResolvedLink {
-  link_id: string
-  target_type: string
-  target_id: string
-  name: string
-}
-
 // ---------------------------------------------------------------------------
-// Name resolution
+// Name resolution (live mode)
 // ---------------------------------------------------------------------------
 
 interface RawLink {
@@ -110,23 +107,62 @@ async function resolveNames(links: RawLink[]): Promise<Map<string, string>> {
 }
 
 // ---------------------------------------------------------------------------
+// Batch link creation helper
+// ---------------------------------------------------------------------------
+
+export async function batchCreateLinks(
+  sourceType: string,
+  sourceId: string,
+  links: EntitySearchResult[],
+) {
+  await Promise.all(
+    links.map(link =>
+      fetch('/api/commands/create-entity-link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          source_type: sourceType,
+          source_id: sourceId,
+          target_type: link.type,
+          target_id: link.id,
+        }),
+      })
+    )
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
 interface LinkPickerProps {
-  sourceType: string   // table name: 'tasks', 'library_items', etc.
-  sourceId: string
+  // Live mode: provide sourceType + sourceId
+  sourceType?: string
+  sourceId?: string
+  // Pending mode: provide value + onChange (controlled, no API calls)
+  value?: EntitySearchResult[]
+  onChange?: (links: EntitySearchResult[]) => void
   className?: string
+}
+
+// Unified chip type for rendering
+interface ChipLink {
+  key: string
+  entityType: string
+  entityId: string
+  name: string
 }
 
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
-export function LinkPicker({ sourceType, sourceId, className }: LinkPickerProps) {
-  // Current links
-  const [links, setLinks] = useState<ResolvedLink[]>([])
-  const [loadingLinks, setLoadingLinks] = useState(true)
+export function LinkPicker({ sourceType, sourceId, value, onChange, className }: LinkPickerProps) {
+  const isPending = value !== undefined && onChange !== undefined
+
+  // Live-mode state
+  const [liveLinks, setLiveLinks] = useState<{ link_id: string; target_type: string; target_id: string; name: string }[]>([])
+  const [loadingLinks, setLoadingLinks] = useState(!isPending)
 
   // Combobox state
   const [inputValue, setInputValue] = useState('')
@@ -138,26 +174,35 @@ export function LinkPicker({ sourceType, sourceId, className }: LinkPickerProps)
   // Entity search via shared hook
   const { results, recentResults, loading: searching } = useEntitySearch(inputValue)
 
-  // Stable set of linked entity keys for filtering
-  const linkedKeys = useMemo(
-    () => new Set(links.map(l => `${l.target_type}:${l.target_id}`)),
-    [links],
+  // Unified chip list for display
+  const chips: ChipLink[] = useMemo(() =>
+    isPending
+      ? value.map(v => ({ key: `${v.type}-${v.id}`, entityType: v.type, entityId: v.id, name: v.name }))
+      : liveLinks.map(l => ({ key: l.link_id, entityType: l.target_type, entityId: l.target_id, name: l.name })),
+    [isPending, value, liveLinks],
   )
 
-  // ------- Fetch current links -------
+  // Stable set of linked entity keys for filtering
+  const linkedKeys = useMemo(
+    () => new Set(chips.map(c => `${c.entityType}:${c.entityId}`)),
+    [chips],
+  )
+
+  // ------- Fetch current links (live mode only) -------
 
   const fetchLinks = useCallback(async () => {
+    if (isPending) return
     try {
       const res = await fetch(`/api/entity-links?sourceType=${sourceType}&sourceId=${sourceId}`)
       if (!res.ok) { setLoadingLinks(false); return }
       const { data } = (await res.json()) as { data: RawLink[] }
       if (!data || data.length === 0) {
-        setLinks([])
+        setLiveLinks([])
         setLoadingLinks(false)
         return
       }
       const nameMap = await resolveNames(data)
-      setLinks(
+      setLiveLinks(
         data.map(link => ({
           link_id: link.link_id,
           target_type: link.target_type,
@@ -168,29 +213,33 @@ export function LinkPicker({ sourceType, sourceId, className }: LinkPickerProps)
     } finally {
       setLoadingLinks(false)
     }
-  }, [sourceType, sourceId])
+  }, [sourceType, sourceId, isPending])
 
   useEffect(() => {
+    if (isPending) return
     setLoadingLinks(true)
     fetchLinks()
-  }, [fetchLinks])
+  }, [fetchLinks, isPending])
 
   // ------- Compute display items (filter out already-linked and self) -------
 
   const isSearching = inputValue.trim().length >= 2
   const displayItems = useMemo(() => {
     const items = isSearching ? results : recentResults
-    return items.filter(item =>
-      !linkedKeys.has(`${item.type}:${item.id}`) &&
-      !(item.type === sourceType && item.id === sourceId)
-    )
-  }, [isSearching, results, recentResults, linkedKeys, sourceType, sourceId])
+    return items.filter(item => {
+      if (linkedKeys.has(`${item.type}:${item.id}`)) return false
+      if (!isPending && item.type === sourceType && item.id === sourceId) return false
+      return true
+    })
+  }, [isSearching, results, recentResults, linkedKeys, sourceType, sourceId, isPending])
 
-  // ------- Create link -------
+  // ------- Add / remove handlers -------
 
-  const addLink = useCallback(async (result: EntitySearchResult) => {
-    try {
-      const res = await fetch('/api/commands/create-entity-link', {
+  const handleAdd = useCallback((result: EntitySearchResult) => {
+    if (isPending) {
+      onChange([...value, result])
+    } else {
+      fetch('/api/commands/create-entity-link', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -199,34 +248,36 @@ export function LinkPicker({ sourceType, sourceId, className }: LinkPickerProps)
           target_type: result.type,
           target_id: result.id,
         }),
-      })
-      if (res.ok) {
-        setInputValue('')
-        setOpen(false)
-        fetchLinks()
-      }
-    } catch { /* ignore */ }
+      }).then(res => {
+        if (res.ok) fetchLinks()
+      }).catch(() => {})
+    }
+    setInputValue('')
+    setOpen(false)
     inputRef.current?.focus()
-  }, [sourceType, sourceId, fetchLinks])
+  }, [isPending, value, onChange, sourceType, sourceId, fetchLinks])
 
-  // ------- Delete link (optimistic) -------
+  const handleRemove = useCallback((chip: ChipLink) => {
+    if (isPending) {
+      onChange(value.filter(v => !(v.type === chip.entityType && v.id === chip.entityId)))
+    } else {
+      // Optimistic remove
+      setLiveLinks(prev => prev.filter(l => l.link_id !== chip.key))
 
-  const removeLink = useCallback(async (link: ResolvedLink) => {
-    setLinks(prev => prev.filter(l => l.link_id !== link.link_id))
-
-    const res = await fetch('/api/commands/delete-entity-link', {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        source_type: sourceType,
-        source_id: sourceId,
-        target_type: link.target_type,
-        target_id: link.target_id,
-      }),
-    })
-
-    if (!res.ok) fetchLinks() // revert on failure
-  }, [sourceType, sourceId, fetchLinks])
+      fetch('/api/commands/delete-entity-link', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          source_type: sourceType,
+          source_id: sourceId,
+          target_type: chip.entityType,
+          target_id: chip.entityId,
+        }),
+      }).then(res => {
+        if (!res.ok) fetchLinks() // revert on failure
+      })
+    }
+  }, [isPending, value, onChange, sourceType, sourceId, fetchLinks])
 
   // ------- Keyboard handling -------
 
@@ -234,10 +285,10 @@ export function LinkPicker({ sourceType, sourceId, className }: LinkPickerProps)
     if (e.key === 'Enter') {
       e.preventDefault()
       if (activeIndex >= 0 && displayItems[activeIndex]) {
-        addLink(displayItems[activeIndex])
+        handleAdd(displayItems[activeIndex])
       }
-    } else if (e.key === 'Backspace' && !inputValue && links.length > 0) {
-      removeLink(links[links.length - 1])
+    } else if (e.key === 'Backspace' && !inputValue && chips.length > 0) {
+      handleRemove(chips[chips.length - 1])
     } else if (e.key === 'ArrowDown') {
       e.preventDefault()
       setActiveIndex(i => Math.min(i + 1, displayItems.length - 1))
@@ -249,17 +300,9 @@ export function LinkPicker({ sourceType, sourceId, className }: LinkPickerProps)
     }
   }
 
-  // ------- Focus / blur handlers -------
+  // ------- Loading state (live mode only) -------
 
-  function handleFocus() {
-    setOpen(true)
-  }
-
-  function handleClick() {
-    setOpen(true)
-  }
-
-  if (loadingLinks) {
+  if (!isPending && loadingLinks) {
     return (
       <div className={cn('flex items-center min-h-9', className)}>
         <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
@@ -274,20 +317,20 @@ export function LinkPicker({ sourceType, sourceId, className }: LinkPickerProps)
         className="flex flex-wrap gap-1 min-h-9 w-full rounded-md border border-input bg-transparent px-2 py-1.5 text-sm cursor-text focus-within:ring-1 focus-within:ring-ring"
         onClick={() => inputRef.current?.focus()}
       >
-        {links.map(link => {
-          const colors = ENTITY_COLORS[link.target_type] ?? 'bg-zinc-500/20 text-zinc-400'
+        {chips.map(chip => {
+          const colors = ENTITY_COLORS[chip.entityType] ?? 'bg-zinc-500/20 text-zinc-400'
           return (
             <span
-              key={link.link_id}
+              key={chip.key}
               className="inline-flex items-center gap-1 rounded-sm bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground"
             >
               <span className={cn('rounded px-1 py-0 text-[10px] font-medium leading-tight', colors)}>
-                {TABLE_LABELS[link.target_type] ?? link.target_type}
+                {TABLE_LABELS[chip.entityType] ?? chip.entityType}
               </span>
-              <span className="truncate max-w-[150px]">{link.name}</span>
+              <span className="truncate max-w-[150px]">{chip.name}</span>
               <button
                 type="button"
-                onClick={(e) => { e.stopPropagation(); removeLink(link) }}
+                onClick={(e) => { e.stopPropagation(); handleRemove(chip) }}
                 className="hover:text-foreground transition-colors"
               >
                 <X className="h-3 w-3" />
@@ -300,10 +343,10 @@ export function LinkPicker({ sourceType, sourceId, className }: LinkPickerProps)
           value={inputValue}
           onChange={e => setInputValue(e.target.value)}
           onKeyDown={handleKeyDown}
-          onFocus={handleFocus}
-          onClick={handleClick}
+          onFocus={() => setOpen(true)}
+          onClick={() => setOpen(true)}
           onBlur={() => setTimeout(() => setOpen(false), 150)}
-          placeholder={links.length === 0 ? 'Link entities...' : ''}
+          placeholder={chips.length === 0 ? 'Link entities...' : ''}
           className="flex-1 min-w-[80px] bg-transparent outline-none placeholder:text-muted-foreground text-sm"
         />
         {searching && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground shrink-0 self-center" />}
@@ -327,7 +370,7 @@ export function LinkPicker({ sourceType, sourceId, className }: LinkPickerProps)
                     'px-3 py-1.5 text-sm cursor-pointer flex items-center gap-2',
                     i === activeIndex ? 'bg-accent text-accent-foreground' : 'hover:bg-accent/50',
                   )}
-                  onMouseDown={(e) => { e.preventDefault(); addLink(item) }}
+                  onMouseDown={(e) => { e.preventDefault(); handleAdd(item) }}
                 >
                   <span className={cn('rounded px-1.5 py-0.5 text-[10px] font-medium shrink-0', colors)}>
                     {TABLE_LABELS[item.type] ?? item.type}

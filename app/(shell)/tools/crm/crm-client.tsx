@@ -8,6 +8,7 @@ import { EntityGrid } from '@/components/entity-client/entity-grid'
 import { ViewToggle } from '@/components/entity-client/view-toggle'
 import { SearchFilterBar } from '@/components/search-filter-bar'
 import { TagCombobox } from '@/components/tag-combobox'
+import { batchCreateLinks } from '@/components/entity-client/link-picker'
 import { AssigneePicker } from '@/components/assignee-picker'
 import { toast } from '@/hooks/use-toast'
 import { Button } from '@/components/ui/button'
@@ -17,6 +18,7 @@ import { RichTextEditor } from '@/components/rich-text-editor'
 import { UnfurlInput } from '@/components/unfurl-input'
 import { cn } from '@/lib/utils'
 import { type BaseEntity, type EntityType } from '@/types/entities'
+import { type EntitySearchResult } from '@/hooks/use-entity-search'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -245,7 +247,7 @@ export function CrmClient({
     [],
   )
 
-  const createCompany = useCallback(async (name: string) => {
+  const createCompany = useCallback(async (name: string, links?: EntitySearchResult[]) => {
     const tempId = `temp-${Date.now()}`
     const optimistic: CrmCompany = {
       id: tempId, seq_id: null, tenant_id: '', name, domain: null, industry: null, notes: null,
@@ -262,7 +264,9 @@ export function CrmClient({
       })
       const json: Record<string, unknown> = await res.json()
       if (!res.ok) throw new Error((json.error as string) ?? 'Failed to create company')
-      setCompanies((prev) => prev.map((c) => (c.id === tempId ? (json.data as CrmCompany) : c)))
+      const created = json.data as CrmCompany
+      setCompanies((prev) => prev.map((c) => (c.id === tempId ? created : c)))
+      if (links?.length) batchCreateLinks('companies', created.id, links)
       toast({ type: 'success', message: 'Company created' })
     } catch (err) {
       setCompanies((prev) => prev.filter((c) => c.id !== tempId))
@@ -270,7 +274,7 @@ export function CrmClient({
     }
   }, [])
 
-  const createPerson = useCallback(async (name: string) => {
+  const createPerson = useCallback(async (name: string, links?: EntitySearchResult[]) => {
     const tempId = `temp-${Date.now()}`
     const optimistic: CrmPerson = {
       id: tempId, seq_id: null, tenant_id: '', name, email: null, phone: null, title: null, notes: null,
@@ -287,7 +291,9 @@ export function CrmClient({
       })
       const json: Record<string, unknown> = await res.json()
       if (!res.ok) throw new Error((json.error as string) ?? 'Failed to create person')
-      setPeople((prev) => prev.map((p) => (p.id === tempId ? (json.data as CrmPerson) : p)))
+      const created = json.data as CrmPerson
+      setPeople((prev) => prev.map((p) => (p.id === tempId ? created : p)))
+      if (links?.length) batchCreateLinks('people', created.id, links)
       toast({ type: 'success', message: 'Person created' })
     } catch (err) {
       setPeople((prev) => prev.filter((p) => p.id !== tempId))
@@ -295,7 +301,7 @@ export function CrmClient({
     }
   }, [])
 
-  const createDeal = useCallback(async (dealTitle: string) => {
+  const createDeal = useCallback(async (dealTitle: string, links?: EntitySearchResult[]) => {
     const tempId = `temp-${Date.now()}`
     const optimistic: CrmDeal = {
       id: tempId, seq_id: null, tenant_id: '', title: dealTitle, status: 'prospect', value: null, notes: null,
@@ -312,7 +318,9 @@ export function CrmClient({
       })
       const json: Record<string, unknown> = await res.json()
       if (!res.ok) throw new Error((json.error as string) ?? 'Failed to create deal')
-      setDeals((prev) => prev.map((d) => (d.id === tempId ? (json.data as CrmDeal) : d)))
+      const created = json.data as CrmDeal
+      setDeals((prev) => prev.map((d) => (d.id === tempId ? created : d)))
+      if (links?.length) batchCreateLinks('deals', created.id, links)
       toast({ type: 'success', message: 'Deal created' })
     } catch (err) {
       setDeals((prev) => prev.filter((d) => d.id !== tempId))

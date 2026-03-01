@@ -35,9 +35,11 @@ import { ActorChip } from '@/components/actor-chip'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import { AssigneePicker } from '@/components/assignee-picker'
 import { TagCombobox } from '@/components/tag-combobox'
+import { LinkPicker, batchCreateLinks } from '@/components/entity-client/link-picker'
 import { RichTextEditor } from '@/components/rich-text-editor'
 import { cn } from '@/lib/utils'
 import { type BaseEntity } from '@/types/entities'
+import { type EntitySearchResult } from '@/hooks/use-entity-search'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -391,12 +393,13 @@ function PriorityGroup({
   onTaskClick: (task: Task) => void
   addingTo: boolean
   onStartAdding: () => void
-  onCreateTask: (title: string, priority: Priority) => void
+  onCreateTask: (title: string, priority: Priority, links?: EntitySearchResult[]) => void
   selectedIds: Set<string>
   onToggleSelection: (id: string) => void
 }) {
   const [collapsed, setCollapsed] = useState(false)
   const [newTitle, setNewTitle] = useState('')
+  const [pendingLinks, setPendingLinks] = useState<EntitySearchResult[]>([])
   const inputRef = useRef<HTMLInputElement>(null)
   const cfg = PRIORITY_CONFIG[priority]
   const { setNodeRef } = useDroppable({ id: `droppable-${priority}` })
@@ -408,8 +411,9 @@ function PriorityGroup({
   function handleCreate() {
     const trimmed = newTitle.trim()
     if (!trimmed) return
-    onCreateTask(trimmed, priority)
+    onCreateTask(trimmed, priority, pendingLinks.length > 0 ? pendingLinks : undefined)
     setNewTitle('')
+    setPendingLinks([])
   }
 
   return (
@@ -435,21 +439,24 @@ function PriorityGroup({
         <div ref={setNodeRef} className="ml-1 min-h-[2px]">
           {/* Quick-add input */}
           {addingTo && (
-            <div className="flex items-center gap-2 px-3 py-1.5">
-              <Input
-                ref={inputRef}
-                value={newTitle}
-                onChange={(e) => setNewTitle(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleCreate()
-                  if (e.key === 'Escape') setNewTitle('')
-                }}
-                placeholder="Task title — press Enter to save"
-                className="flex-1 text-sm"
-              />
-              <Button size="sm" onClick={handleCreate} disabled={!newTitle.trim()}>
-                Add
-              </Button>
+            <div className="px-3 py-1.5 space-y-2">
+              <div className="flex items-center gap-2">
+                <Input
+                  ref={inputRef}
+                  value={newTitle}
+                  onChange={(e) => setNewTitle(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleCreate()
+                    if (e.key === 'Escape') setNewTitle('')
+                  }}
+                  placeholder="Task title — press Enter to save"
+                  className="flex-1 text-sm"
+                />
+                <Button size="sm" onClick={handleCreate} disabled={!newTitle.trim()}>
+                  Add
+                </Button>
+              </div>
+              <LinkPicker value={pendingLinks} onChange={setPendingLinks} />
             </div>
           )}
 
@@ -1033,7 +1040,7 @@ export function TasksClient({
   // ----- Create task -----
 
   const createTask = useCallback(
-    async (title: string, priority: Priority) => {
+    async (title: string, priority: Priority, links?: EntitySearchResult[]) => {
       // Optimistic: add a placeholder
       const tempId = `temp-${Date.now()}`
       const optimistic: Task = {
@@ -1072,9 +1079,13 @@ export function TasksClient({
         if (!res.ok) throw new Error(json.error ?? 'Failed to create task')
 
         // Replace optimistic with real
+        const created = json.data as Task
         setTasks((prev) =>
-          prev.map((t) => (t.id === tempId ? (json.data as Task) : t))
+          prev.map((t) => (t.id === tempId ? created : t))
         )
+        if (links?.length) {
+          batchCreateLinks('tasks', created.id, links)
+        }
         toast({ type: 'success', message: 'Task created' })
       } catch (err) {
         // Remove optimistic on failure
