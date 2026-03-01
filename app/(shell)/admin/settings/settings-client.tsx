@@ -11,10 +11,9 @@ type ModelOption = { id: string; name: string }
 
 interface SettingsClientProps {
   settings: Record<string, unknown> | null
-  supabaseProjectId: string
 }
 
-export function SettingsClient({ settings, supabaseProjectId }: SettingsClientProps) {
+export function SettingsClient({ settings }: SettingsClientProps) {
   // Workspace
   const [name, setName] = useState((settings?.name as string) ?? '')
   const [nameSaved, setNameSaved] = useState(false)
@@ -156,21 +155,14 @@ export function SettingsClient({ settings, supabaseProjectId }: SettingsClientPr
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="supabase-project">Project ID</Label>
-            <Input
-              id="supabase-project"
-              value={supabaseProjectId}
-              readOnly
-              className="bg-muted/40 cursor-not-allowed font-mono text-sm"
-            />
-            <p className="text-xs text-muted-foreground">Read-only. Derived from environment.</p>
-          </div>
         </section>
 
         {/* AI / LLM section */}
-        <section className="rounded-lg border border-border p-3 sm:p-5 space-y-4">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">AI / LLM</h2>
+        <section className="rounded-lg border border-border p-3 sm:p-5 space-y-4 opacity-50 pointer-events-none">
+          <div className="flex items-center gap-2">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">AI / LLM</h2>
+            <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">Coming soon</span>
+          </div>
 
           <div className="space-y-2">
             <Label htmlFor="openrouter-key">OpenRouter API Key</Label>
@@ -260,17 +252,6 @@ export function SettingsClient({ settings, supabaseProjectId }: SettingsClientPr
           </div>
         </section>
 
-        {/* Deals label section */}
-        <section className="rounded-lg border border-border p-3 sm:p-5 space-y-2">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Labels</h2>
-          <div className="space-y-1">
-            <Label>Deal Label</Label>
-            <p className="text-sm">&ldquo;Deal&rdquo;</p>
-            <p className="text-xs text-muted-foreground">
-              Configurable via <code className="text-xs bg-muted px-1 rounded">DEAL_LABEL</code> environment variable.
-            </p>
-          </div>
-        </section>
       </div>
     </div>
   )

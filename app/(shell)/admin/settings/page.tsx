@@ -8,14 +8,9 @@ export default async function AdminSettingsPage() {
 
   const { data: settings } = await supabase.rpc('get_workspace_settings')
 
-  const supabaseProjectId = process.env.NEXT_PUBLIC_SUPABASE_URL
-    ? new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).hostname.split('.')[0]
-    : 'unknown'
-
   return (
     <SettingsClient
       settings={settings as Record<string, unknown> | null}
-      supabaseProjectId={supabaseProjectId}
     />
   )
 }
