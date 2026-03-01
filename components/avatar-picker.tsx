@@ -19,6 +19,7 @@ interface AvatarPickerProps {
 
 export function AvatarPicker({ selected, onSelect, onUpload }: AvatarPickerProps) {
   const inputRef = useRef<HTMLInputElement>(null)
+  const isCustom = selected && !AVATAR_PRESETS.includes(selected)
 
   return (
     <div className="space-y-3">
@@ -39,15 +40,24 @@ export function AvatarPicker({ selected, onSelect, onUpload }: AvatarPickerProps
           </button>
         ))}
       </div>
-      <Button
-        variant="outline"
-        size="sm"
-        className="w-full"
-        onClick={() => inputRef.current?.click()}
-      >
-        <Upload className="h-4 w-4" />
-        Upload custom
-      </Button>
+      <div className="flex items-center gap-2">
+        {isCustom && (
+          <div className="ring-2 ring-white ring-offset-2 ring-offset-background rounded-full">
+            <Avatar className="h-10 w-10">
+              <AvatarImage src={selected} alt="Custom avatar" />
+            </Avatar>
+          </div>
+        )}
+        <Button
+          variant="outline"
+          size="sm"
+          className="flex-1"
+          onClick={() => inputRef.current?.click()}
+        >
+          <Upload className="h-4 w-4" />
+          {isCustom ? 'Change custom' : 'Upload custom'}
+        </Button>
+      </div>
       <input
         ref={inputRef}
         type="file"
