@@ -450,7 +450,7 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
     return (
       <div
         key={entry.id}
-        className={`flex items-start gap-3 rounded-lg px-3 py-3 hover:bg-muted/40 transition-colors${isClickable ? ' cursor-pointer' : ''}`}
+        className={`flex items-start gap-3 rounded-lg px-3 py-3 ml-7 hover:bg-muted/40 transition-colors${isClickable ? ' cursor-pointer' : ''}`}
         onClick={isClickable ? () => handleEntityClick(entry) : undefined}
       >
         <ActorChip actorId={entry.actor_id} actorType={entry.actor_type} compact />
