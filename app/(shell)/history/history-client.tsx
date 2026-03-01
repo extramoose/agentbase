@@ -258,7 +258,7 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
   // Refs to decouple loadMore identity from rapidly-changing state.
   const loadingRef = useRef(false)
   const countUniqueEntities = (items: ActivityLogEntry[]) => new Set(items.map(e => e.entity_id)).size
-  const hasMoreRef = useRef(countUniqueEntities(initialEntries) >= 200)
+  const hasMoreRef = useRef(countUniqueEntities(initialEntries) >= 50)
   const entriesRef = useRef(entries)
   entriesRef.current = entries
 
@@ -303,7 +303,7 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
     setLoading(true)
     const entityOffset = countUniqueEntities(entriesRef.current)
     const { data } = await supabase.rpc('get_activity_log', {
-      p_limit: 200,
+      p_limit: 50,
       p_offset: entityOffset,
       ...(entityFilter ? { p_entity_type: entityFilter } : {}),
       ...(search.trim() ? { p_search: search.trim() } : {}),
@@ -311,7 +311,7 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
     const newEntries = (data ?? []) as ActivityLogEntry[]
     await resolveSeqIds(newEntries)
     setEntries(prev => [...prev, ...newEntries])
-    hasMoreRef.current = countUniqueEntities(newEntries) >= 200
+    hasMoreRef.current = countUniqueEntities(newEntries) >= 50
     loadingRef.current = false
     setLoading(false)
   }, [entityFilter, search, supabase, resolveSeqIds])
@@ -335,7 +335,7 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
       loadingRef.current = true
       setLoading(true)
       const { data } = await supabase.rpc('get_activity_log', {
-        p_limit: 200,
+        p_limit: 50,
         p_offset: 0,
         ...(entityFilter ? { p_entity_type: entityFilter } : {}),
         ...(search.trim() ? { p_search: search.trim() } : {}),
@@ -344,7 +344,7 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
       const results = (data ?? []) as ActivityLogEntry[]
       await resolveSeqIds(results)
       setEntries(results)
-      hasMoreRef.current = countUniqueEntities(results) >= 200
+      hasMoreRef.current = countUniqueEntities(results) >= 50
       loadingRef.current = false
       setLoading(false)
     }
