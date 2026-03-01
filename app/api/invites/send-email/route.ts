@@ -39,10 +39,12 @@ export async function POST(request: Request) {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          from: 'AgentBase <noreply@agentbase.hah.to>',
+          from: 'AgentBase <noreply@hah.to>',
           to: [email],
           subject: 'You\'ve been invited to AgentBase',
-          html: `<p>You've been invited to join a workspace on AgentBase.</p><p><a href="${inviteUrl}">Accept invite</a></p><p>Or copy this link: ${inviteUrl}</p>`,
+          text: `You've been invited to join a workspace on AgentBase.
+
+Accept your invite: ${inviteUrl}`,
         }),
       })
       if (!emailRes.ok) {
