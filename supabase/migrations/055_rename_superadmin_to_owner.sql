@@ -1,3 +1,6 @@
+-- SUPERSEDED BY 057 — do not run this migration
+-- Had errors: agent_owners table doesnt exist, constraint ordering issues
+
 -- #222: Rename 'superadmin' role to 'owner' everywhere
 -- Run this in Supabase SQL editor
 
