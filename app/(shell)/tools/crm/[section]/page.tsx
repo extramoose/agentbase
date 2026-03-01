@@ -16,9 +16,9 @@ export default async function CrmSectionPage({
   const supabase = await createClient()
 
   const [{ data: companies }, { data: people }, { data: deals }] = await Promise.all([
-    supabase.from('companies').select('*').order('name'),
-    supabase.from('people').select('*').order('name'),
-    supabase.from('deals').select('*').order('created_at', { ascending: false }),
+    supabase.from('companies').select('*').is('deleted_at', null).order('name'),
+    supabase.from('people').select('*').is('deleted_at', null).order('name'),
+    supabase.from('deals').select('*').is('deleted_at', null).order('created_at', { ascending: false }),
   ])
 
   const idParam = typeof sp.id === 'string' ? Number(sp.id) : undefined
