@@ -332,7 +332,7 @@ export function LinkPicker({ sourceType, sourceId, className }: LinkPickerProps)
                   <span className={cn('rounded px-1.5 py-0.5 text-[10px] font-medium shrink-0', colors)}>
                     {TABLE_LABELS[item.type] ?? item.type}
                   </span>
-                  <span className="truncate">{item.name}</span>
+                  <span className="truncate">{item.subtitle ? <><span className="text-muted-foreground">{item.subtitle}</span>{" — "}{item.name}</> : item.name}</span>
                 </li>
               )
             })}

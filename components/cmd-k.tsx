@@ -7,7 +7,6 @@ import {
   ArrowRight, Building2, User, Loader2, Hash, Handshake
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { createClient } from '@/lib/supabase/client'
 import { useEntitySearch, type EntitySearchResult } from '@/hooks/use-entity-search'
 
 type SearchResult = {
@@ -25,8 +24,6 @@ const NAV_ITEMS = [
   { id: 'crm',      label: 'CRM',      icon: Users,       href: '/tools/crm' },
   { id: 'history',  label: 'History',  icon: Clock,       href: '/history' },
 ]
-
-const TASK_NUM_RE = /^#?(\d+)$/
 
 const ENTITY_ICON: Record<string, React.ElementType> = {
   tasks: CheckSquare,
@@ -70,12 +67,8 @@ export function CmdK() {
     setSelected(0)
   }, [])
 
-  // Detect task number pattern
-  const taskNumMatch = query.match(TASK_NUM_RE)
-  const taskNum = taskNumMatch ? parseInt(taskNumMatch[1], 10) : null
-
-  // Entity search via shared hook (skip for task-number queries)
-  const { results: entityResults, loading } = useEntitySearch(taskNumMatch ? '' : query)
+  // Entity search via shared hook
+  const { results: entityResults, loading } = useEntitySearch(query)
 
   // Map entity results to cmd-k SearchResult format
   const searchResults: SearchResult[] = entityResults.map(entity => ({
@@ -117,41 +110,14 @@ export function CmdK() {
       action: () => { router.push(n.href); close() },
     }))
 
-  // Task number jump item
-  const taskJumpItem: SearchResult | null = taskNum !== null
-    ? {
-        id: `jump-task-${taskNum}`,
-        label: `Jump to task #${taskNum}`,
-        subtitle: 'Task lookup',
-        icon: Hash,
-        section: 'tasks' as const,
-        action: async () => {
-          const supabase = createClient()
-          const { data } = await supabase
-            .from('tasks')
-            .select('id,title,ticket_id')
-            .eq('ticket_id', taskNum)
-            .single()
-          if (data) {
-            router.push(`/tools/tasks/${data.ticket_id}`)
-          }
-          close()
-        },
-      }
-    : null
-
   // Combine all items
   const allItems: SearchResult[] = [
-    ...(taskJumpItem ? [taskJumpItem] : []),
     ...navItems,
     ...searchResults,
   ]
 
   // Group search results by section for display
   const sections: { key: string; title: string; items: SearchResult[] }[] = []
-
-  const taskJumpItems = allItems.filter(i => i.id.startsWith('jump-task-'))
-  if (taskJumpItems.length > 0) sections.push({ key: 'jump', title: 'Quick Jump', items: taskJumpItems })
 
   const navGroup = allItems.filter(i => i.section === 'nav')
   if (navGroup.length > 0) sections.push({ key: 'nav', title: 'Navigation', items: navGroup })
@@ -235,7 +201,7 @@ export function CmdK() {
                     >
                       <Icon className="h-4 w-4 text-muted-foreground shrink-0" />
                       <div className="flex-1 min-w-0">
-                        <span className="truncate block">{item.label}</span>
+                        <span className="truncate block">{item.subtitle && item.section === 'tasks' ? <>{item.subtitle} — {item.label}</> : item.label}</span>
                         {item.subtitle && (
                           <span className="text-xs text-muted-foreground">{item.subtitle}</span>
                         )}
