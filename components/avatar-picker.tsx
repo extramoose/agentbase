@@ -22,7 +22,7 @@ export function AvatarPicker({ selected, onSelect, onUpload }: AvatarPickerProps
 
   return (
     <div className="space-y-3">
-      <div className="grid grid-cols-4 gap-3">
+      <div className="grid grid-cols-4 gap-3 p-1">
         {AVATAR_PRESETS.map((url) => (
           <button
             key={url}
