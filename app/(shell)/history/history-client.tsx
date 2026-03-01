@@ -6,8 +6,8 @@ import { ActorChip } from '@/components/actor-chip'
 import { SearchFilterBar } from '@/components/search-filter-bar'
 import { EntityShelf } from '@/components/entity-client/entity-shelf'
 import { Badge } from '@/components/ui/badge'
-import { formatDistanceToNow, isToday, isYesterday, format } from 'date-fns'
-import { Loader2 } from 'lucide-react'
+import { formatDistanceToNow, isToday, isYesterday, format, startOfDay, endOfDay, addDays } from 'date-fns'
+import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
 import {
   formatActivityEvent,
   filterActivityItems,
@@ -235,16 +235,6 @@ function formatDateLabel(date: Date): string {
   return format(date, 'MMMM d, yyyy')
 }
 
-function DateDivider({ label }: { label: string }) {
-  return (
-    <div className="flex items-center gap-3 py-2">
-      <div className="flex-1 h-px bg-border" />
-      <span suppressHydrationWarning className="text-xs text-muted-foreground font-medium">{label}</span>
-      <div className="flex-1 h-px bg-border" />
-    </div>
-  )
-}
-
 interface HistoryClientProps {
   initialEntries: ActivityLogEntry[]
 }
@@ -254,7 +244,7 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
   const [search, setSearch] = useState('')
   const [entityFilter, setEntityFilter] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-  const sentinelRef = useRef<HTMLDivElement>(null)
+  const [selectedDate, setSelectedDate] = useState(new Date())
   const supabase = createClient()
 
   // Inline shelf state
@@ -271,12 +261,6 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
   const seqIdCache = useRef<Map<string, number>>(new Map())
   const [seqIdMap, setSeqIdMap] = useState<Map<string, number>>(new Map())
 
-  // Refs to decouple loadMore identity from rapidly-changing state.
-  const loadingRef = useRef(false)
-  const countUniqueEntities = (items: ActivityLogEntry[]) => new Set(items.map(e => e.entity_id)).size
-  const hasMoreRef = useRef(countUniqueEntities(initialEntries) >= 50)
-  const entriesRef = useRef(entries)
-  entriesRef.current = entries
 
   /**
    * Resolve seq_ids for a batch of activity log entries.
@@ -312,46 +296,13 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
     resolveSeqIds(initialEntries)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Load more entries — stable identity (only changes on filter/search)
-  const loadMore = useCallback(async () => {
-    if (loadingRef.current || !hasMoreRef.current) return
-    loadingRef.current = true
-    setLoading(true)
-    const entityOffset = countUniqueEntities(entriesRef.current)
-    const { data } = await supabase.rpc('get_activity_log', {
-      p_limit: 50,
-      p_offset: entityOffset,
-      ...(entityFilter ? { p_entity_type: entityFilter } : {}),
-      ...(search.trim() ? { p_search: search.trim() } : {}),
-    })
-    const newEntries = (data ?? []) as ActivityLogEntry[]
-    await resolveSeqIds(newEntries)
-    setEntries(prev => [...prev, ...newEntries])
-    hasMoreRef.current = countUniqueEntities(newEntries) >= 50
-    loadingRef.current = false
-    setLoading(false)
-  }, [entityFilter, search, supabase, resolveSeqIds])
-
-  // Infinite scroll observer
-  useEffect(() => {
-    const sentinel = sentinelRef.current
-    if (!sentinel) return
-    const observer = new IntersectionObserver(
-      ([entry]) => { if (entry.isIntersecting) loadMore() },
-      { rootMargin: '200px' }
-    )
-    observer.observe(sentinel)
-    return () => observer.disconnect()
-  }, [loadMore])
-
   // Re-fetch when filter or search changes
   useEffect(() => {
     let cancelled = false
     const reload = async () => {
-      loadingRef.current = true
       setLoading(true)
       const { data } = await supabase.rpc('get_activity_log', {
-        p_limit: 50,
+        p_limit: 500,
         p_offset: 0,
         ...(entityFilter ? { p_entity_type: entityFilter } : {}),
         ...(search.trim() ? { p_search: search.trim() } : {}),
@@ -360,8 +311,6 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
       const results = (data ?? []) as ActivityLogEntry[]
       await resolveSeqIds(results)
       setEntries(results)
-      hasMoreRef.current = countUniqueEntities(results) >= 50
-      loadingRef.current = false
       setLoading(false)
     }
     const timeout = setTimeout(reload, search.trim() ? 300 : 0)
@@ -389,11 +338,16 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
     return () => { supabase.removeChannel(channel) }
   }, [supabase, resolveSeqIds])
 
-  // Two-pass grouping: Level 1 (consecutive events) → Level 2 (session bursts)
-  const displayItems = useMemo(
-    () => groupSessionBursts(groupConsecutiveEvents(filterActivityItems(entries))),
-    [entries]
-  )
+  // Filter to selected day, then two-pass grouping
+  const displayItems = useMemo(() => {
+    const dayStart = startOfDay(selectedDate).getTime()
+    const dayEnd = endOfDay(selectedDate).getTime()
+    const dayEntries = filterActivityItems(entries).filter(e => {
+      const t = new Date(e.created_at).getTime()
+      return t >= dayStart && t <= dayEnd
+    })
+    return groupSessionBursts(groupConsecutiveEvents(dayEntries))
+  }, [entries, selectedDate])
 
   const toggleGroup = useCallback((groupId: string) => {
     setExpandedGroups(prev => {
@@ -597,40 +551,45 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
         ))}
       </SearchFilterBar>
 
-      {/* Activity list */}
-      <div className="space-y-1">
-        {displayItems.length === 0 && !loading ? (
-          <p className="text-sm text-muted-foreground py-8 text-center">
-            No activity found.
-          </p>
-        ) : (
-          (() => {
-            const elements: React.ReactNode[] = []
-            let lastDateKey = ''
-            for (const item of displayItems) {
-              const ts = item.type === 'flat'
-                ? item.group.entries[0].created_at
-                : item.groups[0].entries[0].created_at
-              const date = new Date(ts)
-              const dateKey = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`
-              if (dateKey !== lastDateKey) {
-                elements.push(<DateDivider key={`divider-${dateKey}`} label={formatDateLabel(date)} />)
-                lastDateKey = dateKey
-              }
-              if (item.type === 'flat') {
-                elements.push(renderLevel1Group(item.group))
-              } else {
-                elements.push(renderBurst(item))
-              }
-            }
-            return elements
-          })()
-        )}
+      {/* Day navigation */}
+      <div className="flex items-center justify-between px-2">
+        <button
+          onClick={() => setSelectedDate(d => addDays(d, -1))}
+          className="p-1 rounded hover:bg-muted transition-colors"
+          aria-label="Previous day"
+        >
+          <ChevronLeft className="h-5 w-5" />
+        </button>
+        <span suppressHydrationWarning className="text-sm font-medium">
+          {formatDateLabel(selectedDate)}
+        </span>
+        <button
+          onClick={() => setSelectedDate(d => addDays(d, 1))}
+          disabled={isToday(selectedDate)}
+          className="p-1 rounded hover:bg-muted transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+          aria-label="Next day"
+        >
+          <ChevronRight className="h-5 w-5" />
+        </button>
       </div>
 
-      {/* Infinite scroll sentinel */}
-      <div ref={sentinelRef} className="flex justify-center py-4">
-        {loading && <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />}
+      {/* Activity list */}
+      <div className="space-y-1">
+        {loading ? (
+          <div className="flex justify-center py-8">
+            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+          </div>
+        ) : displayItems.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-8 text-center">
+            No activity for this day.
+          </p>
+        ) : (
+          displayItems.map(item =>
+            item.type === 'flat'
+              ? renderLevel1Group(item.group)
+              : renderBurst(item)
+          )
+        )}
       </div>
 
       {/* Inline entity shelf */}
