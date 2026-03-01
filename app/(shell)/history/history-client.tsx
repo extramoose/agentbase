@@ -384,13 +384,12 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
   // IntersectionObserver to trigger loadMore when sentinel is visible
   useEffect(() => {
     const sentinel = sentinelRef.current
-    const scrollContainer = scrollContainerRef.current
-    if (!sentinel || !scrollContainer) return
+    if (!sentinel) return
     const observer = new IntersectionObserver(
       (observerEntries) => {
         if (observerEntries[0]?.isIntersecting) loadMore()
       },
-      { root: scrollContainer, rootMargin: '200px' },
+      { rootMargin: '200px' },
     )
     observer.observe(sentinel)
     return () => observer.disconnect()
