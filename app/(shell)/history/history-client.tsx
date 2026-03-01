@@ -329,26 +329,7 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
     return () => { cancelled = true; clearTimeout(timeout) }
   }, [entityFilter, search, selectedDate]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Realtime subscription — prepend new entries
-  useEffect(() => {
-    const channel = supabase
-      .channel('history:realtime')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'activity_log' },
-        async (payload) => {
-          const newEntry = payload.new as ActivityLogEntry
-          await resolveSeqIds([newEntry])
-          setEntries(prev => {
-            if (prev.some(e => e.id === newEntry.id)) return prev
-            return [newEntry, ...prev]
-          })
-        }
-      )
-      .subscribe()
-
-    return () => { supabase.removeChannel(channel) }
-  }, [supabase, resolveSeqIds])
+  
 
   // Load next page of events within the same selected day
   const loadMore = useCallback(async () => {
