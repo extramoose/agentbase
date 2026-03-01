@@ -81,7 +81,17 @@ export function ActorChip({ actorId, actorType, compact = false, nameOnly = fals
         const resolved = { id: agent.id, displayName: agent.name, avatar_url: agent.avatar_url }
         actorCache.set(actorId, resolved)
         setActor(resolved)
+        return
       }
+
+      // All lookups failed — cache a friendly fallback so we don't retry forever
+      const fallback: ActorDisplay = {
+        id: actorId,
+        displayName: actorType === 'agent' ? 'Agent' : 'Unknown',
+        avatar_url: null,
+      }
+      actorCache.set(actorId, fallback)
+      setActor(fallback)
     }
 
     resolve()

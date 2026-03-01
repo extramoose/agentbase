@@ -65,7 +65,7 @@ export function OnboardingClient() {
 
           <Button
             type="submit"
-            className="w-full bg-primary text-primary-foreground"
+            className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
             disabled={loading || !name.trim()}
           >
             {loading ? (
