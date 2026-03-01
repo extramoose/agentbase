@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 
@@ -31,6 +31,20 @@ const PRIORITY_STYLES: Record<Priority, string> = {
   none: 'bg-gray-50 border-gray-200 opacity-80 dark:bg-gray-900/40 dark:border-gray-700',
 }
 
+const PRIORITY_ORDER: Record<Priority, number> = {
+  urgent: 0,
+  high: 1,
+  medium: 2,
+  low: 3,
+  none: 4,
+}
+
+function sortByPriority(tasks: StickyTask[]): StickyTask[] {
+  return [...tasks].sort(
+    (a, b) => PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority],
+  )
+}
+
 type Lane = {
   key: string
   label: string
@@ -45,14 +59,21 @@ function startOfToday(): Date {
   return d
 }
 
+function localDateStr(d: Date): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
 function categorizeTasks(tasks: StickyTask[]): Lane[] {
   const active = tasks.filter((t) => t.status !== 'done' && t.status !== 'cancelled')
 
   const today = startOfToday()
-  const todayStr = today.toISOString().slice(0, 10)
+  const todayStr = localDateStr(today)
   const nextWeek = new Date(today)
   nextWeek.setDate(nextWeek.getDate() + 7)
-  const nextWeekStr = nextWeek.toISOString().slice(0, 10)
+  const nextWeekStr = localDateStr(nextWeek)
 
   const overdue: StickyTask[] = []
   const todayTasks: StickyTask[] = []
@@ -78,17 +99,17 @@ function categorizeTasks(tasks: StickyTask[]): Lane[] {
 
   const lanes: Lane[] = []
   if (overdue.length > 0) {
-    lanes.push({ key: 'overdue', label: 'Overdue', emoji: '\ud83d\udd34', tasks: overdue, size: 'large' })
+    lanes.push({ key: 'overdue', label: 'Overdue', emoji: '\ud83d\udd34', tasks: sortByPriority(overdue), size: 'large' })
   }
-  lanes.push({ key: 'today', label: 'Today', tasks: todayTasks, size: 'large' })
-  lanes.push({ key: 'upnext', label: 'Up Next', tasks: upNext, size: 'medium' })
-  lanes.push({ key: 'later', label: 'Later', tasks: later, size: 'small' })
+  lanes.push({ key: 'today', label: 'Today', tasks: sortByPriority(todayTasks), size: 'large' })
+  lanes.push({ key: 'upnext', label: 'Up Next', tasks: sortByPriority(upNext), size: 'medium' })
+  lanes.push({ key: 'later', label: 'Later', tasks: sortByPriority(later), size: 'small' })
 
   return lanes
 }
 
 function formatDueDate(dateStr: string): string {
-  const date = new Date(dateStr + 'T00:00:00')
+  const date = new Date(dateStr.slice(0, 10) + 'T00:00:00')
   const today = startOfToday()
   const diffMs = date.getTime() - today.getTime()
   const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24))
@@ -135,7 +156,9 @@ function StickyCard({
       className={cn(
         'flex flex-col justify-between rounded-xl border-2 shadow-md p-4 text-left transition-transform hover:scale-[1.02] hover:shadow-lg shrink-0 cursor-pointer',
         config.card,
-        PRIORITY_STYLES[task.priority],
+        size === 'small'
+          ? 'bg-gray-50 border-gray-200 opacity-80 dark:bg-gray-900/40 dark:border-gray-700'
+          : PRIORITY_STYLES[task.priority],
       )}
     >
       <div className="flex-1 min-h-0">
@@ -183,39 +206,75 @@ function SwimLane({
   lane: Lane
   onTaskClick: (task: any) => void
 }) {
-  return (
-    <div className="border-b border-border last:border-b-0">
-      <div className="flex items-start gap-4 py-4">
-        {/* Sticky lane header */}
-        <div className="shrink-0 w-28 pt-2 sticky left-0">
-          <div className="flex items-center gap-1.5">
-            {lane.emoji && <span>{lane.emoji}</span>}
-            <span className="font-semibold text-sm">{lane.label}</span>
-            <span className="text-xs text-muted-foreground bg-muted rounded-full px-1.5 py-0.5">
-              {lane.tasks.length}
-            </span>
-          </div>
-        </div>
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const [isGrabbing, setIsGrabbing] = useState(false)
+  const dragRef = useRef({ isDragging: false, startX: 0, scrollLeft: 0 })
 
-        {/* Horizontal scroll of stickies */}
-        <div className="flex-1 overflow-x-auto min-w-0">
-          {lane.tasks.length === 0 ? (
-            <div className="flex items-center justify-center h-24 text-sm text-muted-foreground">
-              No tasks
-            </div>
-          ) : (
-            <div className="flex gap-3 pb-2">
-              {lane.tasks.map((task) => (
-                <StickyCard
-                  key={task.id}
-                  task={task}
-                  size={lane.size}
-                  onClick={() => onTaskClick(task)}
-                />
-              ))}
-            </div>
-          )}
-        </div>
+  const onMouseDown = (e: React.MouseEvent) => {
+    const el = scrollRef.current
+    if (!el) return
+    dragRef.current = { isDragging: true, startX: e.pageX, scrollLeft: el.scrollLeft }
+    setIsGrabbing(true)
+  }
+
+  const onMouseMove = (e: React.MouseEvent) => {
+    if (!dragRef.current.isDragging) return
+    e.preventDefault()
+    const el = scrollRef.current
+    if (!el) return
+    const dx = e.pageX - dragRef.current.startX
+    el.scrollLeft = dragRef.current.scrollLeft - dx
+  }
+
+  const onMouseUp = () => {
+    dragRef.current.isDragging = false
+    setIsGrabbing(false)
+  }
+
+  const onMouseLeave = () => {
+    dragRef.current.isDragging = false
+    setIsGrabbing(false)
+  }
+
+  return (
+    <div className="border-b border-border last:border-b-0 py-4">
+      {/* Lane header */}
+      <div className="flex items-center gap-1.5 mb-2">
+        {lane.emoji && <span>{lane.emoji}</span>}
+        <span className="font-semibold text-sm">{lane.label}</span>
+        <span className="text-xs text-muted-foreground bg-muted rounded-full px-1.5 py-0.5">
+          {lane.tasks.length}
+        </span>
+      </div>
+
+      {/* Horizontal scroll of stickies */}
+      <div
+        ref={scrollRef}
+        className={cn(
+          'overflow-x-auto select-none',
+          isGrabbing ? 'cursor-grabbing' : 'cursor-grab',
+        )}
+        onMouseDown={onMouseDown}
+        onMouseMove={onMouseMove}
+        onMouseUp={onMouseUp}
+        onMouseLeave={onMouseLeave}
+      >
+        {lane.tasks.length === 0 ? (
+          <div className="flex items-center justify-center h-24 text-sm text-muted-foreground">
+            No tasks
+          </div>
+        ) : (
+          <div className="flex gap-3 pb-2">
+            {lane.tasks.map((task) => (
+              <StickyCard
+                key={task.id}
+                task={task}
+                size={lane.size}
+                onClick={() => onTaskClick(task)}
+              />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )
