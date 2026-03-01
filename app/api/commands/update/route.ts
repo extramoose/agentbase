@@ -51,6 +51,12 @@ export async function PATCH(request: Request) {
       input.fields.tags = (input.fields.tags as string[]).map(t => t.toLowerCase())
     }
 
+    // Strip task-only fields from non-task tables
+    if (input.table !== 'tasks') {
+      delete input.fields.assignee_id
+      delete input.fields.assignee_type
+    }
+
     const { data, error } = await supabase.rpc('rpc_update_entity', {
       p_table: input.table,
       p_entity_id: input.id,
