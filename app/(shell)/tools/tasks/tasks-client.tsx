@@ -895,6 +895,8 @@ function NewTaskShelf({
 // Main client component
 // ---------------------------------------------------------------------------
 
+const BASE_PATH = '/tools/tasks'
+
 export function TasksClient({
   initialTasks,
   currentUser: _currentUser,
@@ -974,7 +976,7 @@ export function TasksClient({
       isFirstRender.current = false
       return
     }
-    window.history.replaceState(null, '', `${window.location.pathname}${buildQs()}`)
+    window.history.replaceState(null, '', `${BASE_PATH}${buildQs()}`)
   }, [buildQs])
 
   // Hydration guard — defer dnd-kit tree to avoid SSR ID mismatch
@@ -1050,7 +1052,7 @@ export function TasksClient({
     const params = new URLSearchParams(window.location.search)
     params.set('id', String(task.seq_id ?? task.ticket_id))
     const qs = params.toString()
-    window.history.pushState(null, '', `${window.location.pathname}${qs ? `?${qs}` : ''}`)
+    window.history.pushState(null, '', `${BASE_PATH}${qs ? `?${qs}` : ''}`)
   }, [])
 
   const handleShelfClose = useCallback(() => {
@@ -1058,7 +1060,7 @@ export function TasksClient({
     const params = new URLSearchParams(window.location.search)
     params.delete('id')
     const qs = params.toString()
-    window.history.pushState(null, '', `${window.location.pathname}${qs ? `?${qs}` : ''}`)
+    window.history.pushState(null, '', `${BASE_PATH}${qs ? `?${qs}` : ''}`)
   }, [])
 
   // Handle browser back/forward button
@@ -1882,7 +1884,7 @@ export function TasksClient({
             const params = new URLSearchParams(window.location.search)
             params.set('id', String(created.seq_id ?? created.ticket_id))
             const qs = params.toString()
-            window.history.pushState(null, '', `${window.location.pathname}${qs ? `?${qs}` : ''}`)
+            window.history.pushState(null, '', `${BASE_PATH}${qs ? `?${qs}` : ''}`)
           }}
         />
       )}
