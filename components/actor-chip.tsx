@@ -14,6 +14,12 @@ type ActorDisplay = {
 // Simple in-memory cache
 const actorCache = new Map<string, ActorDisplay>()
 
+export function seedActorCache(id: string, displayName: string, avatar_url: string | null) {
+  if (!actorCache.has(id)) {
+    actorCache.set(id, { id, displayName, avatar_url })
+  }
+}
+
 interface ActorChipProps {
   actorId: string
   actorType?: 'human' | 'agent'

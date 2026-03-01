@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { ActorChip } from '@/components/actor-chip'
+import { ActorChip, seedActorCache } from '@/components/actor-chip'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { formatDistanceToNow } from 'date-fns'
@@ -31,6 +31,7 @@ export function ActivityAndComments({ entityType, entityId, currentUserId, noCol
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
   const supabase = createClient()
   const bottomRef = useRef<HTMLDivElement>(null)
+  const resolvedUserId = useRef(currentUserId ?? '')
 
   function toggleGroup(groupKey: string) {
     setExpandedGroups(prev => {
@@ -40,6 +41,24 @@ export function ActivityAndComments({ entityType, entityId, currentUserId, noCol
       return next
     })
   }
+
+  // Seed actor cache with current user's profile so optimistic comments show the correct avatar
+  useEffect(() => {
+    async function seed() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      resolvedUserId.current = user.id
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('id, full_name, avatar_url, email')
+        .eq('id', user.id)
+        .single()
+      if (profile) {
+        seedActorCache(profile.id, profile.full_name ?? profile.email?.split('@')[0] ?? '?', profile.avatar_url)
+      }
+    }
+    seed()
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Initial load
   useEffect(() => {
@@ -87,7 +106,7 @@ export function ActivityAndComments({ entityType, entityId, currentUserId, noCol
       entity_id: entityId,
       entity_label: null,
       event_type: 'commented',
-      actor_id: currentUserId ?? '',
+      actor_id: currentUserId || resolvedUserId.current,
       actor_type: 'human',
       old_value: null,
       new_value: null,
@@ -114,7 +133,7 @@ export function ActivityAndComments({ entityType, entityId, currentUserId, noCol
   function renderSingleEntry(entry: ActivityLogEntry) {
     return (
       <div key={entry.id} className="flex gap-3">
-        <ActorChip actorId={entry.actor_id} actorType={entry.actor_type} compact />
+        <ActorChip actorId={entry.actor_id} actorType={entry.actor_type} />
         <div className="flex-1 min-w-0">
           {entry.event_type === 'commented' ? (
             <div className="rounded-lg bg-muted/40 px-3 py-2 text-sm">
@@ -200,7 +219,8 @@ export function ActivityAndComments({ entityType, entityId, currentUserId, noCol
                   className="flex gap-3 cursor-pointer rounded-lg px-2 py-1.5 -mx-2 hover:bg-muted/40 transition-colors"
                   onClick={() => toggleGroup(groupKey)}
                 >
-                  <ActorChip actorId={group.firstItem.actor_id} actorType={group.firstItem.actor_type} compact />
+                  <ChevronRight className={`h-4 w-4 text-muted-foreground shrink-0 mt-0.5 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+                  <ActorChip actorId={group.firstItem.actor_id} actorType={group.firstItem.actor_type} />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-muted-foreground">
                       {formatActivityEvent(headline)}
@@ -214,7 +234,6 @@ export function ActivityAndComments({ entityType, entityId, currentUserId, noCol
                       {formatDistanceToNow(new Date(group.latestItem.created_at), { addSuffix: true })}
                     </p>
                   </div>
-                  <ChevronRight className={`h-4 w-4 text-muted-foreground shrink-0 mt-0.5 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
                 </div>
 
                 {isExpanded && (

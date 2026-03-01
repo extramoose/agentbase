@@ -368,7 +368,7 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
         className={`flex items-start gap-3 rounded-lg px-3 py-3 hover:bg-muted/40 transition-colors${isClickable ? ' cursor-pointer' : ''}`}
         onClick={isClickable ? () => handleEntityClick(entry) : undefined}
       >
-        <ActorChip actorId={entry.actor_id} actorType={entry.actor_type} compact />
+        <ActorChip actorId={entry.actor_id} actorType={entry.actor_type} />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <Badge
