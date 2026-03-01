@@ -1,6 +1,7 @@
 'use client'
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import Link from 'next/link'
 import { Building2, Plus, Trash2, User, Handshake, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { EntityShelf } from '@/components/entity-client/entity-shelf'
@@ -113,6 +114,28 @@ const SECTIONS: Array<{ value: Section; label: string }> = [
   { value: 'people', label: 'People' },
 ]
 
+type EntityLinkChip = { type: string; id: string; name: string; seq_id: number | null }
+
+const LINK_CHIP_COLORS: Record<string, string> = {
+  tasks:         'bg-blue-500/20 text-blue-400',
+  library_items: 'bg-yellow-500/20 text-yellow-400',
+  companies:     'bg-red-500/20 text-red-400',
+  people:        'bg-pink-500/20 text-pink-400',
+  deals:         'bg-emerald-500/20 text-emerald-400',
+}
+
+const LINK_CHIP_LABELS: Record<string, string> = {
+  tasks: 'Task', library_items: 'Library', companies: 'Co', people: 'Person', deals: 'Deal',
+}
+
+const LINK_CHIP_PATHS: Record<string, string> = {
+  tasks:         '/tools/tasks',
+  library_items: '/tools/library',
+  companies:     '/tools/crm/companies',
+  people:        '/tools/crm/people',
+  deals:         '/tools/crm/deals',
+}
+
 function readParam(key: string): string | null {
   if (typeof window === 'undefined') return null
   return new URLSearchParams(window.location.search).get(key)
@@ -155,7 +178,7 @@ export function CrmClient({
   const [sortKey, setSortKey] = useState<string | null>(null)
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
   const [dealStatusFilter, setDealStatusFilter] = useState<DealStatus | 'all'>('all')
-  const [_entityLinksMap, setEntityLinksMap] = useState<Record<string, Array<{ type: string; name: string }>>>({})
+  const [entityLinksMap, setEntityLinksMap] = useState<Record<string, Array<{ type: string; id: string; name: string; seq_id: number | null }>>>({})
   const addInputRef = useRef<HTMLInputElement>(null)
 
   const supabase = createClient()
@@ -249,21 +272,21 @@ export function CrmClient({
       if (!data) return
 
       // Build name lookup from in-memory entities
-      const nameMap = new Map<string, string>()
-      for (const c of companies) nameMap.set(c.id, c.name)
-      for (const p of people) nameMap.set(p.id, p.name)
-      for (const d of deals) nameMap.set(d.id, d.title)
+      const nameMap = new Map<string, { name: string; seq_id: number | null }>()
+      for (const c of companies) nameMap.set(c.id, { name: c.name, seq_id: c.seq_id })
+      for (const p of people) nameMap.set(p.id, { name: p.name, seq_id: p.seq_id })
+      for (const d of deals) nameMap.set(d.id, { name: d.title, seq_id: d.seq_id })
 
-      const map: Record<string, Array<{ type: string; name: string }>> = {}
+      const map: Record<string, Array<{ type: string; id: string; name: string; seq_id: number | null }>> = {}
       for (const link of data as Array<{ source_type: string; source_id: string; target_type: string; target_id: string }>) {
-        // Skip self-links and links where target is same entity type as source (bidirectional dupes)
+        // Skip self-links
         if (link.source_id === link.target_id) continue
-        const name = nameMap.get(link.target_id)
-        if (!name) continue
+        const resolved = nameMap.get(link.target_id)
+        if (!resolved) continue
         const arr = map[link.source_id] ?? []
         // Avoid duplicate chips for the same target
-        if (!arr.some((l) => l.name === name && l.type === link.target_type)) {
-          arr.push({ type: link.target_type, name })
+        if (!arr.some((l) => l.id === link.target_id && l.type === link.target_type)) {
+          arr.push({ type: link.target_type, id: link.target_id, name: resolved.name, seq_id: resolved.seq_id })
         }
         map[link.source_id] = arr
       }
@@ -859,6 +882,7 @@ export function CrmClient({
                       <SortTh colKey="title" label="Title" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                       <SortTh colKey="status" label="Status" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                       <SortTh colKey="value" label="Value" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                      <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Links</th>
                       <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Tags</th>
                       <SortTh colKey="created_at" label="Created" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                     </>
@@ -868,6 +892,7 @@ export function CrmClient({
                       <SortTh colKey="name" label="Name" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                       <SortTh colKey="domain" label="Domain" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                       <SortTh colKey="industry" label="Industry" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                      <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Links</th>
                       <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Tags</th>
                       <SortTh colKey="created_at" label="Created" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                     </>
@@ -877,6 +902,7 @@ export function CrmClient({
                       <SortTh colKey="name" label="Name" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                       <SortTh colKey="email" label="Email" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                       <SortTh colKey="title" label="Title" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                      <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Links</th>
                       <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Tags</th>
                     </>
                   )}
@@ -890,18 +916,18 @@ export function CrmClient({
                     return (
                       <Fragment key={status}>
                         <tr className="bg-muted/20">
-                          <td colSpan={5} className="px-4 py-1.5">
+                          <td colSpan={6} className="px-4 py-1.5">
                             <span className="text-xs font-medium">{cfg.label}</span>
                             <span className="text-xs text-muted-foreground ml-2">({groupDeals.length})</span>
                           </td>
                         </tr>
                         {groupDeals.length > 0 ? (
                           groupDeals.map((d) => (
-                            <DealTableRow key={d.id} deal={d} onClick={() => openShelf(d)} />
+                            <DealTableRow key={d.id} deal={d} links={entityLinksMap[d.id]} onClick={() => openShelf(d)} />
                           ))
                         ) : (
                           <tr>
-                            <td colSpan={5} className="px-4 py-1.5 text-xs text-muted-foreground/60">No items</td>
+                            <td colSpan={6} className="px-4 py-1.5 text-xs text-muted-foreground/60">No items</td>
                           </tr>
                         )}
                       </Fragment>
@@ -909,11 +935,11 @@ export function CrmClient({
                   })}
                 {section === 'companies' &&
                   filteredCompanies.map((c) => (
-                    <CompanyTableRow key={c.id} company={c} onClick={() => openShelf(c)} />
+                    <CompanyTableRow key={c.id} company={c} links={entityLinksMap[c.id]} onClick={() => openShelf(c)} />
                   ))}
                 {section === 'people' &&
                   filteredPeople.map((p) => (
-                    <PersonTableRow key={p.id} person={p} onClick={() => openShelf(p)} />
+                    <PersonTableRow key={p.id} person={p} links={entityLinksMap[p.id]} onClick={() => openShelf(p)} />
                   ))}
               </tbody>
             </table>
@@ -1158,10 +1184,64 @@ function PersonGridCard({ person, onClick }: { person: CrmPerson; onClick: () =>
 }
 
 // ---------------------------------------------------------------------------
+// Linked Entity Chips (shared by table rows)
+// ---------------------------------------------------------------------------
+
+const MAX_VISIBLE_CHIPS = 2
+
+function LinkedEntityChips({ links }: { links?: EntityLinkChip[] }) {
+  if (!links || links.length === 0) return <span className="text-muted-foreground">{'\u2014'}</span>
+
+  const visible = links.slice(0, MAX_VISIBLE_CHIPS)
+  const remaining = links.length - MAX_VISIBLE_CHIPS
+
+  return (
+    <div className="flex gap-1 items-center overflow-hidden">
+      {visible.map((link) => {
+        const colors = LINK_CHIP_COLORS[link.type] ?? 'bg-zinc-500/20 text-zinc-400'
+        const label = LINK_CHIP_LABELS[link.type] ?? link.type
+        const basePath = LINK_CHIP_PATHS[link.type]
+        const href = basePath && link.seq_id != null ? `${basePath}?id=${link.seq_id}` : null
+
+        const inner = (
+          <>
+            <span className={cn('rounded px-1 py-0 text-[10px] font-medium leading-tight', colors)}>
+              {label}
+            </span>
+            <span className="truncate">{link.name}</span>
+          </>
+        )
+
+        return href ? (
+          <Link
+            key={`${link.type}:${link.id}`}
+            href={href}
+            onClick={(e) => e.stopPropagation()}
+            className="inline-flex items-center gap-1 rounded-sm bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors max-w-[140px] shrink-0"
+          >
+            {inner}
+          </Link>
+        ) : (
+          <span
+            key={`${link.type}:${link.id}`}
+            className="inline-flex items-center gap-1 rounded-sm bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground max-w-[140px] shrink-0"
+          >
+            {inner}
+          </span>
+        )
+      })}
+      {remaining > 0 && (
+        <span className="text-xs text-muted-foreground shrink-0">+{remaining}</span>
+      )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Table Rows
 // ---------------------------------------------------------------------------
 
-function DealTableRow({ deal, onClick }: { deal: CrmDeal; onClick: () => void }) {
+function DealTableRow({ deal, links, onClick }: { deal: CrmDeal; links?: EntityLinkChip[]; onClick: () => void }) {
   const statusCfg = DEAL_STATUS_CONFIG[deal.status]
   return (
     <tr
@@ -1181,6 +1261,9 @@ function DealTableRow({ deal, onClick }: { deal: CrmDeal; onClick: () => void })
       </td>
       <td className="px-4 py-2 text-muted-foreground">
         {deal.value != null ? `$${Number(deal.value).toLocaleString()}` : '\u2014'}
+      </td>
+      <td className="px-4 py-2">
+        <LinkedEntityChips links={links} />
       </td>
       <td className="px-4 py-2">
         <div className="flex gap-1 overflow-hidden">
@@ -1204,7 +1287,7 @@ function DealTableRow({ deal, onClick }: { deal: CrmDeal; onClick: () => void })
   )
 }
 
-function CompanyTableRow({ company, onClick }: { company: CrmCompany; onClick: () => void }) {
+function CompanyTableRow({ company, links, onClick }: { company: CrmCompany; links?: EntityLinkChip[]; onClick: () => void }) {
   return (
     <tr
       onClick={onClick}
@@ -1218,6 +1301,9 @@ function CompanyTableRow({ company, onClick }: { company: CrmCompany; onClick: (
       </td>
       <td className="px-4 py-2 text-muted-foreground truncate">{company.domain ?? '\u2014'}</td>
       <td className="px-4 py-2 text-muted-foreground truncate">{company.industry ?? '\u2014'}</td>
+      <td className="px-4 py-2">
+        <LinkedEntityChips links={links} />
+      </td>
       <td className="px-4 py-2">
         <div className="flex gap-1 overflow-hidden">
           {company.tags.slice(0, 2).map((tag) => (
@@ -1243,7 +1329,7 @@ function CompanyTableRow({ company, onClick }: { company: CrmCompany; onClick: (
   )
 }
 
-function PersonTableRow({ person, onClick }: { person: CrmPerson; onClick: () => void }) {
+function PersonTableRow({ person, links, onClick }: { person: CrmPerson; links?: EntityLinkChip[]; onClick: () => void }) {
   return (
     <tr
       onClick={onClick}
@@ -1257,6 +1343,9 @@ function PersonTableRow({ person, onClick }: { person: CrmPerson; onClick: () =>
       </td>
       <td className="px-4 py-2 text-muted-foreground truncate">{person.email ?? '\u2014'}</td>
       <td className="px-4 py-2 text-muted-foreground truncate">{person.title ?? '\u2014'}</td>
+      <td className="px-4 py-2">
+        <LinkedEntityChips links={links} />
+      </td>
       <td className="px-4 py-2">
         <div className="flex gap-1 overflow-hidden">
           {person.tags.slice(0, 2).map((tag) => (
