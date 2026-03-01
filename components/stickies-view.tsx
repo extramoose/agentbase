@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 
@@ -53,6 +54,7 @@ type Lane = {
   helperText?: string
   tasks: StickyTask[]
   size: 'large' | 'medium' | 'small'
+  overflow?: number
 }
 
 function startOfToday(): Date {
@@ -149,6 +151,14 @@ function categorizeTasks(tasks: StickyTask[]): Lane[] {
     })
   }
 
+  const CAP = 20
+  for (const lane of lanes) {
+    if (lane.size === 'small' && lane.tasks.length > CAP) {
+      lane.overflow = lane.tasks.length - CAP
+      lane.tasks = lane.tasks.slice(0, CAP)
+    }
+  }
+
   return lanes
 }
 
@@ -167,6 +177,15 @@ function categorizeByStatus(tasks: StickyTask[]): Lane[] {
       lanes.push({ key: bucket.key, label: bucket.label, tasks: matching, size: bucket.size })
     }
   }
+
+  const CAP = 20
+  for (const lane of lanes) {
+    if ((lane.key === 'backlog' || lane.key === 'done' || lane.size === 'small') && lane.tasks.length > CAP) {
+      lane.overflow = lane.tasks.length - CAP
+      lane.tasks = lane.tasks.slice(0, CAP)
+    }
+  }
+
   return lanes
 }
 
@@ -268,6 +287,7 @@ function SwimLane({
   lane: Lane
   onTaskClick: (task: any) => void
 }) {
+  const router = useRouter()
   const scrollRef = useRef<HTMLDivElement>(null)
   const [isGrabbing, setIsGrabbing] = useState(false)
   const dragRef = useRef({ isDragging: false, startX: 0, scrollLeft: 0 })
@@ -308,7 +328,7 @@ function SwimLane({
           <span className="text-xs text-muted-foreground">{lane.helperText}</span>
         )}
         <span className="text-xs text-muted-foreground bg-muted rounded-full px-1.5 py-0.5">
-          {lane.tasks.length}
+          {lane.tasks.length + (lane.overflow ?? 0)}
         </span>
       </div>
 
@@ -333,6 +353,17 @@ function SwimLane({
               onClick={() => onTaskClick(task)}
             />
           ))}
+          {lane.overflow != null && lane.overflow > 0 && (
+            <button
+              onClick={() => router.push(`/tools/tasks?status=${lane.key}&view=table`)}
+              className={cn(
+                'flex items-center justify-center rounded-xl border-2 border-dashed border-muted-foreground/30 text-muted-foreground text-sm text-center p-4 shrink-0 cursor-pointer hover:border-muted-foreground/50 transition-colors',
+                SIZE_CONFIG[lane.size].card,
+              )}
+            >
+              and {lane.overflow} more — view all in list
+            </button>
+          )}
         </div>
       </div>
     </div>
