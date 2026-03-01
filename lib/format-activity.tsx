@@ -237,13 +237,15 @@ export function formatActivityEvent(event: {
       return entity_label ? <>deleted &ldquo;{entity_label}&rdquo;</> : <>deleted</>
     case 'linked': {
       const linkedType = String(payload?.linked_type ?? 'entity')
+      const linkedName = payload?.linked_name ? String(payload.linked_name) : null
       const linkedId = payload?.linked_id ? String(payload.linked_id).slice(0, 8) : '?'
-      return <>linked <span className="text-foreground font-medium">{formatLabel(linkedType)}</span> #{linkedId}</>
+      return <>linked {formatLabel(linkedType)} <span className="text-foreground font-medium">{linkedName ?? `#${linkedId}`}</span></>
     }
     case 'unlinked': {
       const unlinkedType = String(payload?.unlinked_type ?? 'entity')
+      const unlinkedName = payload?.unlinked_name ? String(payload.unlinked_name) : null
       const unlinkedId = payload?.unlinked_id ? String(payload.unlinked_id).slice(0, 8) : '?'
-      return <>unlinked <span className="text-foreground font-medium">{formatLabel(unlinkedType)}</span> #{unlinkedId}</>
+      return <>unlinked {formatLabel(unlinkedType)} <span className="text-foreground font-medium">{unlinkedName ?? `#${unlinkedId}`}</span></>
     }
     case 'commented':
       return <>commented</>
