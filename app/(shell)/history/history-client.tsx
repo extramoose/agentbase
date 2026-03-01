@@ -611,7 +611,7 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
       </div>
 
       {/* Day navigation */}
-      <div className="flex items-center justify-between px-2 mb-4">
+      <div className="flex items-center justify-between px-3 py-2 mb-4 bg-muted/50 rounded-lg">
         <button
           onClick={() => setSelectedDate(d => addDays(d, -1))}
           className="p-1 rounded hover:bg-muted transition-colors"
