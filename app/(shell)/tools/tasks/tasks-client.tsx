@@ -1491,6 +1491,52 @@ export function TasksClient({
         </div>
       </div>
 
+      {/* Shared filter bar: assignee + type */}
+      <div className="flex items-center gap-1 mb-4 flex-wrap">
+        {workspaceMembers.length > 0 && (
+          <>
+            <div className="flex -space-x-1">
+              {workspaceMembers.map((m) => (
+                <button
+                  key={m.id}
+                  onClick={() => setAssigneeFilter(assigneeFilter === m.id ? null : m.id)}
+                  title={m.name}
+                  className="relative rounded-full transition-transform hover:z-10 hover:scale-110"
+                >
+                  <Avatar className={cn(
+                    'h-6 w-6 ring-2 transition-colors',
+                    assigneeFilter === m.id
+                      ? 'ring-primary'
+                      : 'ring-background hover:ring-muted-foreground/40'
+                  )}>
+                    <AvatarImage src={m.avatarUrl ?? undefined} alt={m.name} />
+                    <AvatarFallback className="text-[9px]">{m.name.slice(0, 2).toUpperCase()}</AvatarFallback>
+                  </Avatar>
+                </button>
+              ))}
+            </div>
+            <div className="w-px h-5 bg-border mx-1" />
+          </>
+        )}
+
+        {TASK_TYPE_TABS.map((tab) => (
+          <button
+            key={tab.value}
+            onClick={() => setTypeFilter(tab.value)}
+            className={cn(
+              'px-2.5 py-1 text-xs rounded-md transition-colors',
+              typeFilter === tab.value
+                ? tab.value === 'all'
+                  ? 'bg-muted text-foreground font-medium'
+                  : cn('font-medium', TASK_TYPE_CONFIG[tab.value].className)
+                : 'bg-zinc-800 text-zinc-500'
+            )}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
       {/* Table view: tabs + priority groups + drag */}
       {view === 'table' && (
         <>
@@ -1545,51 +1591,6 @@ export function TasksClient({
               </DropdownMenuContent>
             </DropdownMenu>
 
-            {/* Assignee face pile + type filter chips */}
-            <div className="sm:ml-auto flex items-center gap-1 flex-wrap">
-              {workspaceMembers.length > 0 && (
-                <>
-                  <div className="flex -space-x-1">
-                    {workspaceMembers.map((m) => (
-                      <button
-                        key={m.id}
-                        onClick={() => setAssigneeFilter(assigneeFilter === m.id ? null : m.id)}
-                        title={m.name}
-                        className="relative rounded-full transition-transform hover:z-10 hover:scale-110"
-                      >
-                        <Avatar className={cn(
-                          'h-6 w-6 ring-2 transition-colors',
-                          assigneeFilter === m.id
-                            ? 'ring-primary'
-                            : 'ring-background hover:ring-muted-foreground/40'
-                        )}>
-                          <AvatarImage src={m.avatarUrl ?? undefined} alt={m.name} />
-                          <AvatarFallback className="text-[9px]">{m.name.slice(0, 2).toUpperCase()}</AvatarFallback>
-                        </Avatar>
-                      </button>
-                    ))}
-                  </div>
-                  <div className="w-px h-5 bg-border mx-1" />
-                </>
-              )}
-
-              {TASK_TYPE_TABS.map((tab) => (
-                <button
-                  key={tab.value}
-                  onClick={() => setTypeFilter(tab.value)}
-                  className={cn(
-                    'px-2.5 py-1 text-xs rounded-md transition-colors',
-                    typeFilter === tab.value
-                      ? tab.value === 'all'
-                        ? 'bg-muted text-foreground font-medium'
-                        : cn('font-medium', TASK_TYPE_CONFIG[tab.value].className)
-                      : 'bg-zinc-800 text-zinc-500'
-                  )}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
           </div>
 
           {/* Select-all row */}
