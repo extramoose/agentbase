@@ -2,11 +2,15 @@ import { requireAuthApi } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { apiError } from '@/lib/api/errors'
 
-const STARTER_TASKS = [
-  { title: 'Add your first agent', priority: 'medium', tags: ['onboarding'] },
-  { title: 'Invite a teammate', priority: 'medium', tags: ['onboarding'] },
-  { title: 'Create your first task', priority: 'low', tags: ['onboarding'] },
-] as const
+function starterTasks() {
+  const today = new Date().toISOString().split('T')[0]
+  const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0]
+  return [
+    { title: 'Add your first agent', priority: 'urgent', tags: ['onboarding'], due_date: today },
+    { title: 'Invite a teammate', priority: 'high', tags: ['onboarding'], due_date: today },
+    { title: 'Create your first task', priority: 'medium', tags: ['onboarding'], due_date: tomorrow },
+  ] as const
+}
 
 export async function POST(request: Request) {
   try {
@@ -23,7 +27,7 @@ export async function POST(request: Request) {
 
     // Create starter tasks
     const tenantId = (data as { tenant_id: string }).tenant_id ?? data
-    for (const task of STARTER_TASKS) {
+    for (const task of starterTasks()) {
       await supabase.rpc('rpc_create_task', {
         p_tenant_id: tenantId,
         p_actor_id: user.id,
@@ -36,7 +40,7 @@ export async function POST(request: Request) {
         p_assignee_type: null,
         p_type: null,
         p_tags: [...task.tags],
-        p_due_date: null,
+        p_due_date: task.due_date,
         p_idempotency_key: null,
       })
     }
