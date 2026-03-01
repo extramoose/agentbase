@@ -296,26 +296,31 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
     resolveSeqIds(initialEntries)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Re-fetch when filter or search changes
+  // Re-fetch when filter, search, or selected date changes
   useEffect(() => {
     let cancelled = false
     const reload = async () => {
       setLoading(true)
+      const dayStart = startOfDay(selectedDate)
       const { data } = await supabase.rpc('get_activity_log', {
-        p_limit: 500,
+        p_limit: 5000,
         p_offset: 0,
+        p_date_from: dayStart.toISOString().split('T')[0],
         ...(entityFilter ? { p_entity_type: entityFilter } : {}),
         ...(search.trim() ? { p_search: search.trim() } : {}),
       })
       if (cancelled) return
       const results = (data ?? []) as ActivityLogEntry[]
-      await resolveSeqIds(results)
-      setEntries(results)
+      // Filter to end of selected day (RPC only has date_from, not date_to)
+      const dayEnd = endOfDay(selectedDate).getTime()
+      const dayResults = results.filter(e => new Date(e.created_at).getTime() <= dayEnd)
+      await resolveSeqIds(dayResults)
+      setEntries(dayResults)
       setLoading(false)
     }
     const timeout = setTimeout(reload, search.trim() ? 300 : 0)
     return () => { cancelled = true; clearTimeout(timeout) }
-  }, [entityFilter, search]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [entityFilter, search, selectedDate]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Realtime subscription — prepend new entries
   useEffect(() => {
