@@ -1,7 +1,6 @@
 import { requireAdminApi } from '@/lib/auth'
 import { apiError, apiResponse, ApiError } from '@/lib/api/errors'
 import { createClient } from '@/lib/supabase/server'
-import { createAdminClient } from '@/lib/supabase/admin'
 import { z } from 'zod'
 import { headers } from 'next/headers'
 
@@ -23,35 +22,40 @@ export async function POST(request: Request) {
     if (error) throw new ApiError(error.message)
     const invite = data as { token: string; id: string }
 
-    // 2. Store email on the invite record via admin client (bypasses RLS)
-    const admin = createAdminClient()
-    await admin
-      .from('workspace_invites')
-      .update({ email })
-      .eq('id', invite.id)
+    // 2. Build the invite URL
+    const h = await headers()
+    const host = h.get('x-forwarded-host') ?? h.get('host') ?? 'localhost:3000'
+    const proto = h.get('x-forwarded-proto') ?? 'http'
+    const origin = `${proto}://${host}`
+    const inviteUrl = `${origin}/invite/${invite.token}`
+
+    // 3. Send email via Resend API (no service_role needed)
+    const resendKey = process.env.RESEND_API_KEY
+    if (resendKey) {
+      const emailRes = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${resendKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          from: 'AgentBase <noreply@agentbase.hah.to>',
+          to: [email],
+          subject: 'You\'ve been invited to AgentBase',
+          html: `<p>You've been invited to join a workspace on AgentBase.</p><p><a href="${inviteUrl}">Accept invite</a></p><p>Or copy this link: ${inviteUrl}</p>`,
+        }),
+      })
+      if (!emailRes.ok) {
+        const errBody = await emailRes.text()
+        console.error('Resend error:', errBody)
+        // Don't throw — still return the link as fallback
+      }
+    }
 
     // TODO: store role on invite once role column is added to workspace_invites
     void role
 
-    // 3. Send Supabase auth invite email with redirect to our invite page
-    const h = await headers()
-    const origin = h.get('origin') ?? h.get('x-forwarded-host') ?? ''
-    const redirectTo = `${origin}/invite/${invite.token}`
-
-    const { error: inviteError } = await admin.auth.admin.inviteUserByEmail(
-      email,
-      { redirectTo }
-    )
-    if (inviteError) {
-      // Clean up the invite if email send fails
-      await admin
-        .from('workspace_invites')
-        .delete()
-        .eq('id', invite.id)
-      throw new ApiError(inviteError.message)
-    }
-
-    return apiResponse({ id: invite.id, token: invite.token })
+    return apiResponse({ id: invite.id, token: invite.token, url: inviteUrl, email_sent: !!resendKey })
   } catch (err) {
     return apiError(err)
   }
