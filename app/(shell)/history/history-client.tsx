@@ -257,6 +257,11 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
   // Expand/collapse state for consecutive event groups
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
 
+  // Infinite scroll refs
+  const hasMoreRef = useRef<boolean>(true)
+  const loadingRef = useRef<boolean>(false)
+  const sentinelRef = useRef<HTMLDivElement>(null)
+
   // seq_id cache: entity UUID → seq_id (number)
   const seqIdCache = useRef<Map<string, number>>(new Map())
   const [seqIdMap, setSeqIdMap] = useState<Map<string, number>>(new Map())
@@ -314,6 +319,7 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
       const results = (data ?? []) as ActivityLogEntry[]
       await resolveSeqIds(results)
       setEntries(results)
+      hasMoreRef.current = results.length >= 50
       setLoading(false)
     }
     const timeout = setTimeout(reload, search.trim() ? 300 : 0)
@@ -340,6 +346,42 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
 
     return () => { supabase.removeChannel(channel) }
   }, [supabase, resolveSeqIds])
+
+  // Load next page of events within the same selected day
+  const loadMore = useCallback(async () => {
+    if (!hasMoreRef.current || loadingRef.current) return
+    loadingRef.current = true
+    const day = startOfDay(selectedDate).toISOString().split('T')[0]
+    const { data } = await supabase.rpc('get_activity_log', {
+      p_limit: 50,
+      p_offset: entries.length,
+      p_date_from: day,
+      p_date_to: day,
+      ...(entityFilter ? { p_entity_type: entityFilter } : {}),
+      ...(search.trim() ? { p_search: search.trim() } : {}),
+    })
+    const results = (data ?? []) as ActivityLogEntry[]
+    if (results.length < 50) hasMoreRef.current = false
+    if (results.length > 0) {
+      await resolveSeqIds(results)
+      setEntries(prev => [...prev, ...results])
+    }
+    loadingRef.current = false
+  }, [selectedDate, entries.length, entityFilter, search, supabase, resolveSeqIds])
+
+  // IntersectionObserver to trigger loadMore when sentinel is visible
+  useEffect(() => {
+    const sentinel = sentinelRef.current
+    if (!sentinel) return
+    const observer = new IntersectionObserver(
+      (observerEntries) => {
+        if (observerEntries[0]?.isIntersecting) loadMore()
+      },
+      { rootMargin: '200px' },
+    )
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [loadMore])
 
   // Filter to selected day, then two-pass grouping
   const displayItems = useMemo(() => {
@@ -581,11 +623,14 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
             No activity for this day.
           </p>
         ) : (
-          displayItems.map(item =>
-            item.type === 'flat'
-              ? renderLevel1Group(item.group)
-              : renderBurst(item)
-          )
+          <>
+            {displayItems.map(item =>
+              item.type === 'flat'
+                ? renderLevel1Group(item.group)
+                : renderBurst(item)
+            )}
+            <div ref={sentinelRef} />
+          </>
         )}
       </div>
 
