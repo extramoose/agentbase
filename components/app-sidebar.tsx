@@ -142,7 +142,7 @@ export function AppSidebar({ profile, workspaces, onNavigate }: { profile: UserP
         throw new Error(body.error || 'Failed to create workspace')
       }
       closeDialog()
-      router.refresh()
+      window.location.href = "/tools/tasks"
     } catch (err) {
       setDialogError(err instanceof Error ? err.message : 'Something went wrong')
     } finally {
