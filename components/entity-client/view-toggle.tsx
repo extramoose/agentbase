@@ -54,7 +54,7 @@ export function ViewToggle({
       <button
         onClick={() => toggle('grid')}
         className={cn(
-          'p-2.5 rounded-l-md transition-colors',
+          'p-2 rounded-l-md transition-colors',
           view === 'grid'
             ? 'bg-muted text-foreground'
             : 'text-muted-foreground hover:text-foreground',
@@ -66,7 +66,7 @@ export function ViewToggle({
       <button
         onClick={() => toggle('table')}
         className={cn(
-          'p-2.5 transition-colors',
+          'p-2 transition-colors',
           !showStickies && 'rounded-r-md',
           view === 'table'
             ? 'bg-muted text-foreground'
@@ -80,7 +80,7 @@ export function ViewToggle({
         <button
           onClick={() => toggle('stickies')}
           className={cn(
-            'p-2.5 rounded-r-md transition-colors',
+            'p-2 rounded-r-md transition-colors',
             view === 'stickies'
               ? 'bg-muted text-foreground'
               : 'text-muted-foreground hover:text-foreground',
