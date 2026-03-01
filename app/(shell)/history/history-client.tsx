@@ -609,7 +609,6 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
           {shelfData.entityType === 'task' && (
             <TaskShelfContent
               task={shelfData.entity as Task}
-              onClose={() => setShelfData(null)}
             />
           )}
           {shelfData.entityType === 'deal' && (

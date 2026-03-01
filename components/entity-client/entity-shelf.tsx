@@ -17,6 +17,8 @@ interface EntityShelfProps<T extends BaseEntity> {
   title?: string
   /** Optional content rendered to the right of the title (e.g. delete button) */
   headerRight?: React.ReactNode
+  /** Optional footer rendered below activity (e.g. delete button) */
+  footer?: React.ReactNode
 }
 
 export function EntityShelf<T extends BaseEntity>({
@@ -26,6 +28,7 @@ export function EntityShelf<T extends BaseEntity>({
   children,
   title,
   headerRight,
+  footer,
 }: EntityShelfProps<T>) {
   // Close on Escape
   useEffect(() => {
@@ -82,6 +85,12 @@ export function EntityShelf<T extends BaseEntity>({
               noCollapse
             />
           </div>
+
+          {footer && (
+            <div className="p-4 sm:p-6 border-t border-border">
+              {footer}
+            </div>
+          )}
         </div>
       </div>
     </>

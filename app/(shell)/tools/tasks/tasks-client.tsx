@@ -35,11 +35,9 @@ import { ActorChip } from '@/components/actor-chip'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import { AssigneePicker } from '@/components/assignee-picker'
 import { TagCombobox } from '@/components/tag-combobox'
-import { LinkPicker, batchCreateLinks } from '@/components/entity-client/link-picker'
 import { RichTextEditor } from '@/components/rich-text-editor'
 import { cn } from '@/lib/utils'
 import { type BaseEntity } from '@/types/entities'
-import { type EntitySearchResult } from '@/hooks/use-entity-search'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -393,13 +391,12 @@ function PriorityGroup({
   onTaskClick: (task: Task) => void
   addingTo: boolean
   onStartAdding: () => void
-  onCreateTask: (title: string, priority: Priority, links?: EntitySearchResult[]) => void
+  onCreateTask: (title: string, priority: Priority) => void
   selectedIds: Set<string>
   onToggleSelection: (id: string) => void
 }) {
   const [collapsed, setCollapsed] = useState(false)
   const [newTitle, setNewTitle] = useState('')
-  const [pendingLinks, setPendingLinks] = useState<EntitySearchResult[]>([])
   const inputRef = useRef<HTMLInputElement>(null)
   const cfg = PRIORITY_CONFIG[priority]
   const { setNodeRef } = useDroppable({ id: `droppable-${priority}` })
@@ -411,9 +408,8 @@ function PriorityGroup({
   function handleCreate() {
     const trimmed = newTitle.trim()
     if (!trimmed) return
-    onCreateTask(trimmed, priority, pendingLinks.length > 0 ? pendingLinks : undefined)
+    onCreateTask(trimmed, priority)
     setNewTitle('')
-    setPendingLinks([])
   }
 
   return (
@@ -456,7 +452,6 @@ function PriorityGroup({
                   Add
                 </Button>
               </div>
-              <LinkPicker value={pendingLinks} onChange={setPendingLinks} />
             </div>
           )}
 
@@ -498,10 +493,8 @@ function PriorityGroup({
 
 export function TaskShelfContent({
   task,
-  onClose,
 }: {
   task: Task
-  onClose: () => void
 }) {
   const [title, setTitle] = useState(task.title)
   const [status, setStatus] = useState<Status>(task.status)
@@ -539,27 +532,6 @@ export function TaskShelfContent({
       toast({
         type: 'error',
         message: err instanceof Error ? err.message : 'Update failed',
-      })
-    }
-  }
-
-  async function handleDelete() {
-    if (!window.confirm('Delete this task? This cannot be undone.')) return
-    try {
-      const res = await fetch('/api/commands/delete-entity', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ table: 'tasks', id: task.id }),
-      })
-      if (!res.ok) {
-        const json = await res.json()
-        throw new Error(json.error ?? 'Delete failed')
-      }
-      onClose()
-    } catch (err) {
-      toast({
-        type: 'error',
-        message: err instanceof Error ? err.message : 'Delete failed',
       })
     }
   }
@@ -718,18 +690,6 @@ export function TaskShelfContent({
         />
       </div>
 
-      {/* Delete */}
-      <div className="pt-2 border-t border-border">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={handleDelete}
-          className="text-muted-foreground hover:text-red-400"
-        >
-          <Trash2 className="h-4 w-4 mr-1" />
-          Delete task
-        </Button>
-      </div>
     </div>
   )
 }
@@ -1040,7 +1000,7 @@ export function TasksClient({
   // ----- Create task -----
 
   const createTask = useCallback(
-    async (title: string, priority: Priority, links?: EntitySearchResult[]) => {
+    async (title: string, priority: Priority) => {
       // Optimistic: add a placeholder
       const tempId = `temp-${Date.now()}`
       const optimistic: Task = {
@@ -1083,9 +1043,6 @@ export function TasksClient({
         setTasks((prev) =>
           prev.map((t) => (t.id === tempId ? created : t))
         )
-        if (links?.length) {
-          batchCreateLinks('tasks', created.id, links)
-        }
         toast({ type: 'success', message: 'Task created' })
       } catch (err) {
         // Remove optimistic on failure
@@ -1592,8 +1549,38 @@ export function TasksClient({
           entity={selectedTask}
           entityType="task"
           onClose={handleShelfClose}
+          footer={
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={async () => {
+                if (!window.confirm('Delete this task? This cannot be undone.')) return
+                try {
+                  const res = await fetch('/api/commands/delete-entity', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ table: 'tasks', id: selectedTask.id }),
+                  })
+                  if (!res.ok) {
+                    const json = await res.json()
+                    throw new Error(json.error ?? 'Delete failed')
+                  }
+                  handleShelfClose()
+                } catch (err) {
+                  toast({
+                    type: 'error',
+                    message: err instanceof Error ? err.message : 'Delete failed',
+                  })
+                }
+              }}
+              className="text-muted-foreground hover:text-red-400"
+            >
+              <Trash2 className="h-4 w-4 mr-1" />
+              Delete task
+            </Button>
+          }
         >
-          <TaskShelfContent task={selectedTask} onClose={handleShelfClose} />
+          <TaskShelfContent task={selectedTask} />
         </EntityShelf>
       )}
 
