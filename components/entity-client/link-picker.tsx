@@ -13,6 +13,7 @@
 // - Pending mode (value + onChange): controlled component, no API calls
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import Link from 'next/link'
 import { X, Loader2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
@@ -38,6 +39,20 @@ const TABLE_LABELS: Record<string, string> = {
   deals:         'Deal',
 }
 
+const ENTITY_PATH: Record<string, string> = {
+  tasks:         '/tools/tasks',
+  library_items: '/tools/library',
+  companies:     '/tools/crm/companies',
+  people:        '/tools/crm/people',
+  deals:         '/tools/crm/deals',
+}
+
+function getChipHref(entityType: string, seqId?: number): string | null {
+  const base = ENTITY_PATH[entityType]
+  if (!base || seqId == null) return null
+  return `${base}?id=${seqId}`
+}
+
 // ---------------------------------------------------------------------------
 // Name resolution (live mode)
 // ---------------------------------------------------------------------------
@@ -49,9 +64,14 @@ interface RawLink {
   created_at: string
 }
 
-async function resolveNames(links: RawLink[]): Promise<Map<string, string>> {
+interface ResolvedEntity {
+  name: string
+  seqId?: number
+}
+
+async function resolveNames(links: RawLink[]): Promise<Map<string, ResolvedEntity>> {
   const supabase = createClient()
-  const nameMap = new Map<string, string>()
+  const nameMap = new Map<string, ResolvedEntity>()
 
   const byType = new Map<string, string[]>()
   for (const link of links) {
@@ -66,37 +86,37 @@ async function resolveNames(links: RawLink[]): Promise<Map<string, string>> {
     const uniqueIds = [...new Set(ids)]
     if (type === 'tasks') {
       queries.push(
-        supabase.from('tasks').select('id,title,ticket_id').in('id', uniqueIds)
+        supabase.from('tasks').select('id,title,ticket_id,seq_id').in('id', uniqueIds)
           .then(({ data }) => {
-            for (const row of data ?? []) nameMap.set(`tasks:${row.id}`, `Task #${row.ticket_id}: ${row.title}`)
+            for (const row of data ?? []) nameMap.set(`tasks:${row.id}`, { name: `Task #${row.ticket_id}: ${row.title}`, seqId: row.seq_id ?? undefined })
           })
       )
     } else if (type === 'companies') {
       queries.push(
-        supabase.from('companies').select('id,name').in('id', uniqueIds)
+        supabase.from('companies').select('id,name,seq_id').in('id', uniqueIds)
           .then(({ data }) => {
-            for (const row of data ?? []) nameMap.set(`companies:${row.id}`, row.name)
+            for (const row of data ?? []) nameMap.set(`companies:${row.id}`, { name: row.name, seqId: row.seq_id ?? undefined })
           })
       )
     } else if (type === 'people') {
       queries.push(
-        supabase.from('people').select('id,name').in('id', uniqueIds)
+        supabase.from('people').select('id,name,seq_id').in('id', uniqueIds)
           .then(({ data }) => {
-            for (const row of data ?? []) nameMap.set(`people:${row.id}`, row.name)
+            for (const row of data ?? []) nameMap.set(`people:${row.id}`, { name: row.name, seqId: row.seq_id ?? undefined })
           })
       )
     } else if (type === 'library_items') {
       queries.push(
-        supabase.from('library_items').select('id,title').in('id', uniqueIds)
+        supabase.from('library_items').select('id,title,seq_id').in('id', uniqueIds)
           .then(({ data }) => {
-            for (const row of data ?? []) nameMap.set(`library_items:${row.id}`, row.title)
+            for (const row of data ?? []) nameMap.set(`library_items:${row.id}`, { name: row.title, seqId: row.seq_id ?? undefined })
           })
       )
     } else if (type === 'deals') {
       queries.push(
-        supabase.from('deals').select('id,title').in('id', uniqueIds)
+        supabase.from('deals').select('id,title,seq_id').in('id', uniqueIds)
           .then(({ data }) => {
-            for (const row of data ?? []) nameMap.set(`deals:${row.id}`, row.title)
+            for (const row of data ?? []) nameMap.set(`deals:${row.id}`, { name: row.title, seqId: row.seq_id ?? undefined })
           })
       )
     }
@@ -151,6 +171,7 @@ interface ChipLink {
   entityType: string
   entityId: string
   name: string
+  seqId?: number
 }
 
 // ---------------------------------------------------------------------------
@@ -161,7 +182,7 @@ export function LinkPicker({ sourceType, sourceId, value, onChange, className }:
   const isPending = value !== undefined && onChange !== undefined
 
   // Live-mode state
-  const [liveLinks, setLiveLinks] = useState<{ link_id: string; target_type: string; target_id: string; name: string }[]>([])
+  const [liveLinks, setLiveLinks] = useState<{ link_id: string; target_type: string; target_id: string; name: string; seq_id?: number }[]>([])
   const [loadingLinks, setLoadingLinks] = useState(!isPending)
 
   // Combobox state
@@ -177,8 +198,8 @@ export function LinkPicker({ sourceType, sourceId, value, onChange, className }:
   // Unified chip list for display
   const chips: ChipLink[] = useMemo(() =>
     isPending
-      ? value.map(v => ({ key: `${v.type}-${v.id}`, entityType: v.type, entityId: v.id, name: v.name }))
-      : liveLinks.map(l => ({ key: l.link_id, entityType: l.target_type, entityId: l.target_id, name: l.name })),
+      ? value.map(v => ({ key: `${v.type}-${v.id}`, entityType: v.type, entityId: v.id, name: v.name, seqId: v.seq_id }))
+      : liveLinks.map(l => ({ key: l.link_id, entityType: l.target_type, entityId: l.target_id, name: l.name, seqId: l.seq_id })),
     [isPending, value, liveLinks],
   )
 
@@ -203,12 +224,16 @@ export function LinkPicker({ sourceType, sourceId, value, onChange, className }:
       }
       const nameMap = await resolveNames(data)
       setLiveLinks(
-        data.map(link => ({
-          link_id: link.link_id,
-          target_type: link.target_type,
-          target_id: link.target_id,
-          name: nameMap.get(`${link.target_type}:${link.target_id}`) ?? 'Unknown',
-        })),
+        data.map(link => {
+          const resolved = nameMap.get(`${link.target_type}:${link.target_id}`)
+          return {
+            link_id: link.link_id,
+            target_type: link.target_type,
+            target_id: link.target_id,
+            name: resolved?.name ?? 'Unknown',
+            seq_id: resolved?.seqId,
+          }
+        }),
       )
     } finally {
       setLoadingLinks(false)
@@ -319,15 +344,31 @@ export function LinkPicker({ sourceType, sourceId, value, onChange, className }:
       >
         {chips.map(chip => {
           const colors = ENTITY_COLORS[chip.entityType] ?? 'bg-zinc-500/20 text-zinc-400'
+          const href = getChipHref(chip.entityType, chip.seqId)
+          const inner = (
+            <>
+              <span className={cn('rounded px-1 py-0 text-[10px] font-medium leading-tight', colors)}>
+                {TABLE_LABELS[chip.entityType] ?? chip.entityType}
+              </span>
+              <span className="truncate max-w-[150px]">{chip.name}</span>
+            </>
+          )
           return (
             <span
               key={chip.key}
               className="inline-flex items-center gap-1 rounded-sm bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground"
             >
-              <span className={cn('rounded px-1 py-0 text-[10px] font-medium leading-tight', colors)}>
-                {TABLE_LABELS[chip.entityType] ?? chip.entityType}
-              </span>
-              <span className="truncate max-w-[150px]">{chip.name}</span>
+              {href ? (
+                <Link
+                  href={href}
+                  onClick={(e) => e.stopPropagation()}
+                  className="inline-flex items-center gap-1 hover:text-foreground transition-colors"
+                >
+                  {inner}
+                </Link>
+              ) : (
+                <span className="inline-flex items-center gap-1">{inner}</span>
+              )}
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); handleRemove(chip) }}

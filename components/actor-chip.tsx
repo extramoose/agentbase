@@ -24,10 +24,11 @@ interface ActorChipProps {
   actorId: string
   actorType?: 'human' | 'agent'
   compact?: boolean
+  nameOnly?: boolean
   className?: string
 }
 
-export function ActorChip({ actorId, actorType, compact = false, className }: ActorChipProps) {
+export function ActorChip({ actorId, actorType, compact = false, nameOnly = false, className }: ActorChipProps) {
   const [actor, setActor] = useState<ActorDisplay | null>(actorCache.get(actorId) ?? null)
   const [imgError, setImgError] = useState(false)
   const supabase = createClient()
@@ -108,6 +109,10 @@ export function ActorChip({ actorId, actorType, compact = false, className }: Ac
         {avatarContent}
       </Avatar>
     )
+  }
+
+  if (nameOnly) {
+    return <span className={cn('text-sm font-medium text-foreground truncate', className)}>{displayName}</span>
   }
 
   return (

@@ -133,18 +133,19 @@ export function ActivityAndComments({ entityType, entityId, currentUserId, noCol
   function renderSingleEntry(entry: ActivityLogEntry) {
     return (
       <div key={entry.id} className="flex gap-3">
-        <ActorChip actorId={entry.actor_id} actorType={entry.actor_type} />
+        <ActorChip actorId={entry.actor_id} actorType={entry.actor_type} compact />
         <div className="flex-1 min-w-0">
+          <ActorChip actorId={entry.actor_id} actorType={entry.actor_type} nameOnly />
           {entry.event_type === 'commented' ? (
-            <div className="rounded-lg bg-muted/40 px-3 py-2 text-sm overflow-hidden break-words">
+            <div className="rounded-lg bg-muted/40 px-3 py-2 text-sm overflow-hidden break-words mt-0.5">
               <MarkdownRenderer content={entry.body ?? ''} />
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-muted-foreground mt-0.5">
               {formatActivityEvent(entry)}
             </p>
           )}
-          <p suppressHydrationWarning className="text-xs text-muted-foreground mt-1">
+          <p suppressHydrationWarning className="text-xs text-muted-foreground mt-0.5">
             {formatDistanceToNow(new Date(entry.created_at), { addSuffix: true })}
           </p>
         </div>
@@ -220,9 +221,10 @@ export function ActivityAndComments({ entityType, entityId, currentUserId, noCol
                   onClick={() => toggleGroup(groupKey)}
                 >
                   <ChevronRight className={`h-4 w-4 text-muted-foreground shrink-0 mt-0.5 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
-                  <ActorChip actorId={group.firstItem.actor_id} actorType={group.firstItem.actor_type} />
+                  <ActorChip actorId={group.firstItem.actor_id} actorType={group.firstItem.actor_type} compact />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm text-muted-foreground">
+                    <ActorChip actorId={group.firstItem.actor_id} actorType={group.firstItem.actor_type} nameOnly />
+                    <p className="text-sm text-muted-foreground mt-0.5">
                       {formatActivityEvent(headline)}
                       {extraCount > 0 && (
                         <span className="text-xs ml-2">
@@ -230,7 +232,7 @@ export function ActivityAndComments({ entityType, entityId, currentUserId, noCol
                         </span>
                       )}
                     </p>
-                    <p suppressHydrationWarning className="text-xs text-muted-foreground mt-1">
+                    <p suppressHydrationWarning className="text-xs text-muted-foreground mt-0.5">
                       {formatDistanceToNow(new Date(group.latestItem.created_at), { addSuffix: true })}
                     </p>
                   </div>

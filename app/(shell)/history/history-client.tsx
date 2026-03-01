@@ -439,9 +439,10 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
         className={`flex items-start gap-3 rounded-lg px-3 py-3 hover:bg-muted/40 transition-colors${isClickable ? ' cursor-pointer' : ''}`}
         onClick={isClickable ? () => handleEntityClick(entry) : undefined}
       >
-        <ActorChip actorId={entry.actor_id} actorType={entry.actor_type} />
+        <ActorChip actorId={entry.actor_id} actorType={entry.actor_type} compact />
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2">
+            <ActorChip actorId={entry.actor_id} actorType={entry.actor_type} nameOnly />
             <Badge
               variant="secondary"
               className={`text-[10px] px-1.5 py-0 ${ENTITY_COLORS[normalized] ?? 'bg-muted text-muted-foreground'}`}
@@ -453,19 +454,19 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
                 {entry.entity_label}
               </span>
             )}
-            <span className={`text-sm ${isDeleted ? 'text-red-400' : 'text-foreground'}`}>
-              {formatActivityEvent(entry)}
-            </span>
           </div>
+          <p className={`text-sm mt-0.5 ${isDeleted ? 'text-red-400' : 'text-muted-foreground'}`}>
+            {formatActivityEvent(entry)}
+          </p>
           {entry.event_type === 'commented' && entry.body && (
             <div className="mt-1 rounded-md bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
               <MarkdownRenderer content={entry.body} />
             </div>
           )}
+          <p suppressHydrationWarning className="text-xs text-muted-foreground mt-0.5">
+            {formatDistanceToNow(new Date(entry.created_at), { addSuffix: true })}
+          </p>
         </div>
-        <span suppressHydrationWarning className="text-xs text-muted-foreground whitespace-nowrap shrink-0">
-          {formatDistanceToNow(new Date(entry.created_at), { addSuffix: true })}
-        </span>
       </div>
     )
   }
@@ -483,19 +484,22 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
           tabIndex={0}
           onClick={() => toggleGroup(group.id)}
           onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleGroup(group.id) } }}
-          className="flex items-center gap-3 rounded-lg px-3 py-3 hover:bg-muted/40 transition-colors cursor-pointer select-none"
+          className="flex items-start gap-3 rounded-lg px-3 py-3 hover:bg-muted/40 transition-colors cursor-pointer select-none"
         >
-          <ActorChip actorId={group.actorId} actorType={group.actorType} />
-          <span className="text-sm flex-1 min-w-0">
-            {formatEventVerb(group.eventType)}{' '}
-            <span className="font-medium">{group.entries.length}</span>{' '}
-            {entityLabel}
-          </span>
-          <span className="text-xs text-muted-foreground" aria-label={isExpanded ? 'Collapse' : 'Expand'}>
+          <ActorChip actorId={group.actorId} actorType={group.actorType} compact />
+          <div className="flex-1 min-w-0">
+            <ActorChip actorId={group.actorId} actorType={group.actorType} nameOnly />
+            <p className="text-sm text-muted-foreground mt-0.5">
+              {formatEventVerb(group.eventType)}{' '}
+              <span className="font-medium">{group.entries.length}</span>{' '}
+              {entityLabel}
+            </p>
+            <p suppressHydrationWarning className="text-xs text-muted-foreground mt-0.5">
+              {formatDistanceToNow(new Date(group.entries[0].created_at), { addSuffix: true })}
+            </p>
+          </div>
+          <span className="text-xs text-muted-foreground shrink-0" aria-label={isExpanded ? 'Collapse' : 'Expand'}>
             {isExpanded ? '▾' : '▸'}
-          </span>
-          <span suppressHydrationWarning className="text-xs text-muted-foreground whitespace-nowrap shrink-0">
-            {formatDistanceToNow(new Date(group.entries[0].created_at), { addSuffix: true })}
           </span>
         </div>
         {isExpanded && (
@@ -562,17 +566,20 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
                   tabIndex={0}
                   onClick={() => toggleGroup(burst.id)}
                   onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleGroup(burst.id) } }}
-                  className="flex items-center gap-3 rounded-lg px-3 py-3 hover:bg-muted/40 transition-colors cursor-pointer select-none"
+                  className="flex items-start gap-3 rounded-lg px-3 py-3 hover:bg-muted/40 transition-colors cursor-pointer select-none"
                 >
-                  <ActorChip actorId={burst.actorId} actorType={burst.actorType} />
-                  <span className="text-sm flex-1 min-w-0">
-                    made <span className="font-medium">{burst.totalEntries}</span> changes
-                  </span>
-                  <span className="text-xs text-muted-foreground" aria-label={isBurstExpanded ? 'Collapse' : 'Expand'}>
+                  <ActorChip actorId={burst.actorId} actorType={burst.actorType} compact />
+                  <div className="flex-1 min-w-0">
+                    <ActorChip actorId={burst.actorId} actorType={burst.actorType} nameOnly />
+                    <p className="text-sm text-muted-foreground mt-0.5">
+                      made <span className="font-medium">{burst.totalEntries}</span> changes
+                    </p>
+                    <p suppressHydrationWarning className="text-xs text-muted-foreground mt-0.5">
+                      {formatDistanceToNow(new Date(burst.groups[0].entries[0].created_at), { addSuffix: true })}
+                    </p>
+                  </div>
+                  <span className="text-xs text-muted-foreground shrink-0" aria-label={isBurstExpanded ? 'Collapse' : 'Expand'}>
                     {isBurstExpanded ? '▾' : '▸'}
-                  </span>
-                  <span suppressHydrationWarning className="text-xs text-muted-foreground whitespace-nowrap shrink-0">
-                    {formatDistanceToNow(new Date(burst.groups[0].entries[0].created_at), { addSuffix: true })}
                   </span>
                 </div>
                 {isBurstExpanded && (
