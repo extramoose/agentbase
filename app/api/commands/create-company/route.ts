@@ -9,6 +9,12 @@ const schema = z.object({
   notes: z.string().optional(),
   tags: z.array(z.string()).optional().default([]),
   idempotency_key: z.string().max(128).optional(),
+  website: z.string().optional(),
+  linkedin: z.string().optional(),
+  twitter: z.string().optional(),
+  instagram: z.string().optional(),
+  location: z.string().optional(),
+  source: z.string().optional(),
 })
 
 export async function POST(request: Request) {
@@ -27,6 +33,12 @@ export async function POST(request: Request) {
       p_notes: input.notes ?? null,
       p_tags: input.tags.map(t => t.toLowerCase()),
       p_idempotency_key: input.idempotency_key ?? null,
+      p_website: input.website ?? null,
+      p_linkedin: input.linkedin ?? null,
+      p_twitter: input.twitter ?? null,
+      p_instagram: input.instagram ?? null,
+      p_location: input.location ?? null,
+      p_source: input.source ?? null,
     })
     if (error) throw error
     return Response.json({ data }, { status: 201 })

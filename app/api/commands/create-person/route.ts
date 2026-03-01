@@ -2,6 +2,8 @@ import { resolveActorUnified } from '@/lib/api/resolve-actor'
 import { apiError } from '@/lib/api/errors'
 import { z } from 'zod'
 
+const labelValueArray = z.array(z.object({ label: z.string(), value: z.string() }))
+
 const schema = z.object({
   name: z.string().min(1).max(500),
   email: z.string().optional(),
@@ -10,6 +12,12 @@ const schema = z.object({
   notes: z.string().optional(),
   tags: z.array(z.string()).optional().default([]),
   idempotency_key: z.string().max(128).optional(),
+  emails: labelValueArray.optional().default([]),
+  phones: labelValueArray.optional().default([]),
+  linkedin: z.string().optional(),
+  twitter: z.string().optional(),
+  instagram: z.string().optional(),
+  source: z.string().optional(),
 })
 
 export async function POST(request: Request) {
@@ -29,6 +37,12 @@ export async function POST(request: Request) {
       p_notes: input.notes ?? null,
       p_tags: input.tags.map(t => t.toLowerCase()),
       p_idempotency_key: input.idempotency_key ?? null,
+      p_emails: input.emails,
+      p_phones: input.phones,
+      p_linkedin: input.linkedin ?? null,
+      p_twitter: input.twitter ?? null,
+      p_instagram: input.instagram ?? null,
+      p_source: input.source ?? null,
     })
     if (error) throw error
     return Response.json({ data }, { status: 201 })

@@ -22,11 +22,22 @@ import { type BaseEntity, type EntityType } from '@/types/entities'
 // Types
 // ---------------------------------------------------------------------------
 
+interface LabelValue {
+  label: string
+  value: string
+}
+
 interface CrmCompany extends BaseEntity {
   name: string
   domain: string | null
   industry: string | null
   notes: string | null
+  website: string | null
+  linkedin: string | null
+  twitter: string | null
+  instagram: string | null
+  location: string | null
+  source: string | null
 }
 
 interface CrmPerson extends BaseEntity {
@@ -35,6 +46,12 @@ interface CrmPerson extends BaseEntity {
   phone: string | null
   title: string | null
   notes: string | null
+  emails: LabelValue[]
+  phones: LabelValue[]
+  linkedin: string | null
+  twitter: string | null
+  instagram: string | null
+  source: string | null
 }
 
 type DealStatus = 'prospect' | 'active' | 'won' | 'lost'
@@ -44,6 +61,10 @@ interface CrmDeal extends BaseEntity {
   status: DealStatus
   value: number | null
   notes: string | null
+  follow_up_date: string | null
+  source: string | null
+  primary_contact_id: string | null
+  expected_close_date: string | null
 }
 
 type Section = 'deals' | 'companies' | 'people'
@@ -228,6 +249,7 @@ export function CrmClient({
     const tempId = `temp-${Date.now()}`
     const optimistic: CrmCompany = {
       id: tempId, seq_id: null, tenant_id: '', name, domain: null, industry: null, notes: null,
+      website: null, linkedin: null, twitter: null, instagram: null, location: null, source: null,
       tags: [], assignee_id: null, assignee_type: null,
       created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
     }
@@ -252,6 +274,7 @@ export function CrmClient({
     const tempId = `temp-${Date.now()}`
     const optimistic: CrmPerson = {
       id: tempId, seq_id: null, tenant_id: '', name, email: null, phone: null, title: null, notes: null,
+      emails: [], phones: [], linkedin: null, twitter: null, instagram: null, source: null,
       tags: [], assignee_id: null, assignee_type: null,
       created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
     }
@@ -276,6 +299,7 @@ export function CrmClient({
     const tempId = `temp-${Date.now()}`
     const optimistic: CrmDeal = {
       id: tempId, seq_id: null, tenant_id: '', title: dealTitle, status: 'prospect', value: null, notes: null,
+      follow_up_date: null, source: null, primary_contact_id: null, expected_close_date: null,
       tags: [], assignee_id: null, assignee_type: null,
       created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
     }
@@ -1031,6 +1055,75 @@ function PersonTableRow({ person, onClick }: { person: CrmPerson; onClick: () =>
 }
 
 // ---------------------------------------------------------------------------
+// Label+Value List (for emails/phones arrays)
+// ---------------------------------------------------------------------------
+
+function LabelValueListField({
+  label,
+  items,
+  onChange,
+  valuePlaceholder,
+}: {
+  label: string
+  items: LabelValue[]
+  onChange: (items: LabelValue[]) => void
+  valuePlaceholder?: string
+}) {
+  function updateItem(index: number, field: 'label' | 'value', val: string) {
+    const updated = items.map((item, i) => (i === index ? { ...item, [field]: val } : item))
+    onChange(updated)
+  }
+
+  function removeItem(index: number) {
+    onChange(items.filter((_, i) => i !== index))
+  }
+
+  function addItem() {
+    onChange([...items, { label: '', value: '' }])
+  }
+
+  return (
+    <div>
+      <label className="text-xs text-muted-foreground font-medium mb-1 block">{label}</label>
+      <div className="space-y-2">
+        {items.map((item, i) => (
+          <div key={i} className="flex gap-2 items-center">
+            <Input
+              value={item.label}
+              onChange={(e) => updateItem(i, 'label', e.target.value)}
+              placeholder="Label"
+              className="text-sm w-24 shrink-0"
+            />
+            <Input
+              value={item.value}
+              onChange={(e) => updateItem(i, 'value', e.target.value)}
+              placeholder={valuePlaceholder}
+              className="text-sm flex-1"
+            />
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
+              onClick={() => removeItem(i)}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        ))}
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-xs text-muted-foreground h-7"
+          onClick={addItem}
+        >
+          <Plus className="h-3 w-3 mr-1" /> Add
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Shelf Content — Deal
 // ---------------------------------------------------------------------------
 
@@ -1046,6 +1139,9 @@ function DealShelfContent({
   const [value, setValue] = useState(deal.value != null ? String(deal.value) : '')
   const [notes, setNotes] = useState(deal.notes ?? '')
   const [tags, setTags] = useState<string[]>(deal.tags)
+  const [followUpDate, setFollowUpDate] = useState(deal.follow_up_date ?? '')
+  const [dealSource, setDealSource] = useState(deal.source ?? '')
+  const [expectedCloseDate, setExpectedCloseDate] = useState(deal.expected_close_date ?? '')
 
   useEffect(() => {
     setTitle(deal.title)
@@ -1053,6 +1149,9 @@ function DealShelfContent({
     setValue(deal.value != null ? String(deal.value) : '')
     setNotes(deal.notes ?? '')
     setTags(deal.tags)
+    setFollowUpDate(deal.follow_up_date ?? '')
+    setDealSource(deal.source ?? '')
+    setExpectedCloseDate(deal.expected_close_date ?? '')
   }, [deal])
 
   function saveField(fields: Record<string, unknown>) {
@@ -1113,6 +1212,44 @@ function DealShelfContent({
             />
           </div>
         </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="text-xs text-muted-foreground font-medium mb-1 block">Follow-up Date</label>
+          <Input
+            type="date"
+            value={followUpDate}
+            onChange={(e) => {
+              setFollowUpDate(e.target.value)
+              saveField({ follow_up_date: e.target.value || null })
+            }}
+            className="text-sm"
+          />
+        </div>
+        <div>
+          <label className="text-xs text-muted-foreground font-medium mb-1 block">Expected Close</label>
+          <Input
+            type="date"
+            value={expectedCloseDate}
+            onChange={(e) => {
+              setExpectedCloseDate(e.target.value)
+              saveField({ expected_close_date: e.target.value || null })
+            }}
+            className="text-sm"
+          />
+        </div>
+      </div>
+
+      <div>
+        <label className="text-xs text-muted-foreground font-medium mb-1 block">Source</label>
+        <Input
+          value={dealSource}
+          onChange={(e) => setDealSource(e.target.value)}
+          onBlur={(e) => saveField({ source: e.target.value || null })}
+          placeholder="e.g. referral, cold, event, inbound"
+          className="text-sm"
+        />
       </div>
 
       <div>
@@ -1176,6 +1313,12 @@ function CompanyShelfContent({
   const [industry, setIndustry] = useState(company.industry ?? '')
   const [notes, setNotes] = useState(company.notes ?? '')
   const [tags, setTags] = useState<string[]>(company.tags)
+  const [website, setWebsite] = useState(company.website ?? '')
+  const [linkedin, setLinkedin] = useState(company.linkedin ?? '')
+  const [twitter, setTwitter] = useState(company.twitter ?? '')
+  const [instagram, setInstagram] = useState(company.instagram ?? '')
+  const [companyLocation, setCompanyLocation] = useState(company.location ?? '')
+  const [companySource, setCompanySource] = useState(company.source ?? '')
 
   useEffect(() => {
     setName(company.name)
@@ -1183,6 +1326,12 @@ function CompanyShelfContent({
     setIndustry(company.industry ?? '')
     setNotes(company.notes ?? '')
     setTags(company.tags)
+    setWebsite(company.website ?? '')
+    setLinkedin(company.linkedin ?? '')
+    setTwitter(company.twitter ?? '')
+    setInstagram(company.instagram ?? '')
+    setCompanyLocation(company.location ?? '')
+    setCompanySource(company.source ?? '')
   }, [company])
 
   function saveField(fields: Record<string, unknown>) {
@@ -1216,6 +1365,73 @@ function CompanyShelfContent({
             onChange={(e) => setIndustry(e.target.value)}
             onBlur={(e) => saveField({ industry: e.target.value || null })}
             placeholder="e.g. Technology"
+            className="text-sm"
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="text-xs text-muted-foreground font-medium mb-1 block">Website</label>
+          <Input
+            value={website}
+            onChange={(e) => setWebsite(e.target.value)}
+            onBlur={(e) => saveField({ website: e.target.value || null })}
+            placeholder="https://example.com"
+            className="text-sm"
+          />
+        </div>
+        <div>
+          <label className="text-xs text-muted-foreground font-medium mb-1 block">Location</label>
+          <Input
+            value={companyLocation}
+            onChange={(e) => setCompanyLocation(e.target.value)}
+            onBlur={(e) => saveField({ location: e.target.value || null })}
+            placeholder="e.g. San Francisco, CA"
+            className="text-sm"
+          />
+        </div>
+      </div>
+
+      <div>
+        <label className="text-xs text-muted-foreground font-medium mb-1 block">Source</label>
+        <Input
+          value={companySource}
+          onChange={(e) => setCompanySource(e.target.value)}
+          onBlur={(e) => saveField({ source: e.target.value || null })}
+          placeholder="e.g. referral, event, inbound"
+          className="text-sm"
+        />
+      </div>
+
+      <div className="grid grid-cols-3 gap-3">
+        <div>
+          <label className="text-xs text-muted-foreground font-medium mb-1 block">LinkedIn</label>
+          <Input
+            value={linkedin}
+            onChange={(e) => setLinkedin(e.target.value)}
+            onBlur={(e) => saveField({ linkedin: e.target.value || null })}
+            placeholder="LinkedIn URL"
+            className="text-sm"
+          />
+        </div>
+        <div>
+          <label className="text-xs text-muted-foreground font-medium mb-1 block">Twitter</label>
+          <Input
+            value={twitter}
+            onChange={(e) => setTwitter(e.target.value)}
+            onBlur={(e) => saveField({ twitter: e.target.value || null })}
+            placeholder="@handle"
+            className="text-sm"
+          />
+        </div>
+        <div>
+          <label className="text-xs text-muted-foreground font-medium mb-1 block">Instagram</label>
+          <Input
+            value={instagram}
+            onChange={(e) => setInstagram(e.target.value)}
+            onBlur={(e) => saveField({ instagram: e.target.value || null })}
+            placeholder="@handle"
             className="text-sm"
           />
         </div>
@@ -1283,6 +1499,12 @@ function PersonShelfContent({
   const [personTitle, setPersonTitle] = useState(person.title ?? '')
   const [notes, setNotes] = useState(person.notes ?? '')
   const [tags, setTags] = useState<string[]>(person.tags)
+  const [emails, setEmails] = useState<LabelValue[]>(person.emails ?? [])
+  const [phones, setPhones] = useState<LabelValue[]>(person.phones ?? [])
+  const [linkedin, setLinkedin] = useState(person.linkedin ?? '')
+  const [twitter, setTwitter] = useState(person.twitter ?? '')
+  const [instagram, setInstagram] = useState(person.instagram ?? '')
+  const [personSource, setPersonSource] = useState(person.source ?? '')
 
   useEffect(() => {
     setName(person.name)
@@ -1291,6 +1513,12 @@ function PersonShelfContent({
     setPersonTitle(person.title ?? '')
     setNotes(person.notes ?? '')
     setTags(person.tags)
+    setEmails(person.emails ?? [])
+    setPhones(person.phones ?? [])
+    setLinkedin(person.linkedin ?? '')
+    setTwitter(person.twitter ?? '')
+    setInstagram(person.instagram ?? '')
+    setPersonSource(person.source ?? '')
   }, [person])
 
   function saveField(fields: Record<string, unknown>) {
@@ -1342,6 +1570,70 @@ function PersonShelfContent({
           placeholder="e.g. VP of Engineering"
           className="text-sm"
         />
+      </div>
+
+      <LabelValueListField
+        label="Additional Emails"
+        items={emails}
+        onChange={(updated) => {
+          setEmails(updated)
+          saveField({ emails: updated })
+        }}
+        valuePlaceholder="email@example.com"
+      />
+
+      <LabelValueListField
+        label="Additional Phones"
+        items={phones}
+        onChange={(updated) => {
+          setPhones(updated)
+          saveField({ phones: updated })
+        }}
+        valuePlaceholder="+1 234 567 890"
+      />
+
+      <div>
+        <label className="text-xs text-muted-foreground font-medium mb-1 block">Source</label>
+        <Input
+          value={personSource}
+          onChange={(e) => setPersonSource(e.target.value)}
+          onBlur={(e) => saveField({ source: e.target.value || null })}
+          placeholder="e.g. Overland Expo, cold outreach, referral"
+          className="text-sm"
+        />
+      </div>
+
+      <div className="grid grid-cols-3 gap-3">
+        <div>
+          <label className="text-xs text-muted-foreground font-medium mb-1 block">LinkedIn</label>
+          <Input
+            value={linkedin}
+            onChange={(e) => setLinkedin(e.target.value)}
+            onBlur={(e) => saveField({ linkedin: e.target.value || null })}
+            placeholder="LinkedIn URL"
+            className="text-sm"
+          />
+        </div>
+        <div>
+          <label className="text-xs text-muted-foreground font-medium mb-1 block">Twitter</label>
+          <Input
+            value={twitter}
+            onChange={(e) => setTwitter(e.target.value)}
+            onBlur={(e) => saveField({ twitter: e.target.value || null })}
+            placeholder="@handle"
+            className="text-sm"
+          />
+        </div>
+        <div>
+          <label className="text-xs text-muted-foreground font-medium mb-1 block">Instagram</label>
+          <Input
+            value={instagram}
+            onChange={(e) => setInstagram(e.target.value)}
+            onBlur={(e) => saveField({ instagram: e.target.value || null })}
+            placeholder="@handle"
+            className="text-sm"
+          />
+        </div>
       </div>
 
       <div>

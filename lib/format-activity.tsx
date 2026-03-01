@@ -41,6 +41,22 @@ const FIELD_LABELS: Record<string, string> = {
   phase: 'phase',
   start_time: 'start time',
   end_time: 'end time',
+  emails: 'emails',
+  phones: 'phones',
+  linkedin: 'LinkedIn',
+  twitter: 'Twitter',
+  instagram: 'Instagram',
+  source: 'source',
+  website: 'website',
+  follow_up_date: 'follow-up date',
+  primary_contact_id: 'primary contact',
+  expected_close_date: 'expected close date',
+  domain: 'domain',
+  industry: 'industry',
+  email: 'email',
+  phone: 'phone',
+  value: 'value',
+  status: 'status',
 }
 
 function formatLabel(value: string): string {
