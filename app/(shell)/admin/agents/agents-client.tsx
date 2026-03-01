@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from 'react'
 import { AvatarUpload } from '@/components/avatar-upload'
+import { AVATAR_PRESETS } from '@/components/avatar-picker'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -53,6 +54,7 @@ export function AgentsClient({ agents: initialAgents, currentUserName, currentUs
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: name.trim(),
+          avatar_url: AVATAR_PRESETS[Math.floor(Math.random() * AVATAR_PRESETS.length)],
         }),
       })
       const json = await res.json()

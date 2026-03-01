@@ -41,6 +41,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { toast } from '@/hooks/use-toast'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import type { UserProfile } from '@/lib/auth'
@@ -70,6 +71,9 @@ export function AppSidebar({ profile, workspaces, onNavigate }: { profile: UserP
   const pathname = usePathname()
   const router = useRouter()
   const [switching, setSwitching] = useState(false)
+  const [profileDialogOpen, setProfileDialogOpen] = useState(false)
+  const [profileName, setProfileName] = useState(profile?.full_name ?? '')
+  const [profileSaving, setProfileSaving] = useState(false)
 
   function isActive(href: string) {
     return pathname === href || pathname.startsWith(href + '/')
@@ -352,9 +356,17 @@ export function AppSidebar({ profile, workspaces, onNavigate }: { profile: UserP
           currentUrl={profile?.avatar_url ?? null}
           name={profile?.full_name ?? profile?.email ?? 'User'}
           uploadUrl="/api/profile/avatar"
+          presetUrl="/api/profile/avatar-preset"
           size="sm"
         />
-        <div className="flex-1 truncate">
+        <button
+          type="button"
+          className="flex-1 truncate text-left"
+          onClick={() => {
+            setProfileName(profile?.full_name ?? '')
+            setProfileDialogOpen(true)
+          }}
+        >
           <p className="text-sm font-medium text-foreground truncate">
             {profile?.full_name ?? profile?.email ?? 'User'}
           </p>
@@ -363,7 +375,7 @@ export function AppSidebar({ profile, workspaces, onNavigate }: { profile: UserP
               {profile.email}
             </p>
           )}
-        </div>
+        </button>
         <Button
           variant="ghost"
           size="icon"
@@ -475,6 +487,60 @@ export function AppSidebar({ profile, workspaces, onNavigate }: { profile: UserP
             <Button variant="ghost" onClick={closeDialog}>Cancel</Button>
             <Button variant="destructive" onClick={handleLeaveWorkspace} disabled={dialogLoading}>
               {dialogLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Leave'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit profile dialog */}
+      <Dialog open={profileDialogOpen} onOpenChange={(open) => { if (!open) setProfileDialogOpen(false) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit profile</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4">
+            <div className="flex justify-center">
+              <AvatarUpload
+                currentUrl={profile?.avatar_url ?? null}
+                name={profile?.full_name ?? profile?.email ?? 'User'}
+                uploadUrl="/api/profile/avatar"
+                presetUrl="/api/profile/avatar-preset"
+                size="lg"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="profile-name">Name</Label>
+              <Input
+                id="profile-name"
+                value={profileName}
+                onChange={(e) => setProfileName(e.target.value)}
+                placeholder="Your name"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setProfileDialogOpen(false)}>Cancel</Button>
+            <Button
+              disabled={profileSaving || !profileName.trim()}
+              onClick={async () => {
+                setProfileSaving(true)
+                try {
+                  const res = await fetch('/api/profile', {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ full_name: profileName.trim() }),
+                  })
+                  if (!res.ok) throw new Error('Failed to update profile')
+                  setProfileDialogOpen(false)
+                  window.location.reload()
+                } catch {
+                  toast({ type: 'error', message: 'Failed to update profile' })
+                } finally {
+                  setProfileSaving(false)
+                }
+              }}
+            >
+              {profileSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save'}
             </Button>
           </DialogFooter>
         </DialogContent>

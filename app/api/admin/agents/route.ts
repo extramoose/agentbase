@@ -6,7 +6,7 @@ import { randomBytes, createHash } from 'crypto'
 
 const schema = z.object({
   name: z.string().min(1).max(100),
-  avatar_url: z.string().url().optional().nullable(),
+  avatar_url: z.string().max(500).optional().nullable(),
 })
 
 export async function POST(request: Request) {
