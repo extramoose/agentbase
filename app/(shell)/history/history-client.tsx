@@ -258,6 +258,10 @@ interface HistoryClientProps {
 }
 
 const USER_TZ = Intl.DateTimeFormat().resolvedOptions().timeZone
+  // Format date as YYYY-MM-DD in local timezone (not UTC)
+  const localDateStr = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+
 
 export function HistoryClient({ initialEntries }: HistoryClientProps) {
   const [entries, setEntries] = useState<ActivityLogEntry[]>(initialEntries)
@@ -326,7 +330,7 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
     let cancelled = false
     const reload = async () => {
       setLoading(true)
-      const day = startOfDay(selectedDate).toISOString().split('T')[0]
+      const day = localDateStr(selectedDate)
       const { data } = await supabase.rpc('get_activity_log', {
         p_limit: 50,
         p_offset: 0,
@@ -353,7 +357,7 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
   const loadMore = useCallback(async () => {
     if (!hasMoreRef.current || loadingRef.current) return
     loadingRef.current = true
-    const day = startOfDay(selectedDate).toISOString().split('T')[0]
+    const day = localDateStr(selectedDate)
     const { data } = await supabase.rpc('get_activity_log', {
       p_limit: 50,
       p_offset: entries.length,
