@@ -14,7 +14,7 @@ const schema = z.object({
     .optional()
     .default('todo'),
   body: z.string().optional(),
-  assignee_id: z.union([z.string().uuid(), z.literal('unassigned')]),
+  assignee_id: z.union([z.string().uuid(), z.literal('unassigned')]).default('unassigned'),
   type: z.enum(['bug', 'improvement', 'feature']).optional().nullable(),
   tags: z.array(z.string()).optional().default([]),
   due_date: z.string().optional().nullable(),

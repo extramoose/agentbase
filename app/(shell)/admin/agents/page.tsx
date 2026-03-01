@@ -6,9 +6,13 @@ export default async function AdminAgentsPage() {
   await requireAdmin()
   const supabase = await createClient()
 
+  // Get current user's tenant to scope query (defense-in-depth alongside RLS)
+  const { data: tenantId } = await supabase.rpc('get_my_tenant_id')
+
   const { data: agents } = await supabase
     .from('agents')
     .select('id, name, avatar_url, owner_id, last_seen_at, revoked_at, created_at')
+    .eq('tenant_id', tenantId)
     .order('created_at', { ascending: false })
 
   // Get owner profiles
