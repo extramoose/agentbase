@@ -7,7 +7,7 @@ import { SearchFilterBar } from '@/components/search-filter-bar'
 import { EntityShelf } from '@/components/entity-client/entity-shelf'
 import { Badge } from '@/components/ui/badge'
 import { formatDistanceToNow, isToday, isYesterday, format, startOfDay, addDays } from 'date-fns'
-import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Loader2, Plus, Minus } from 'lucide-react'
 import {
   formatActivityEvent,
   filterActivityItems,
@@ -239,6 +239,8 @@ interface HistoryClientProps {
   initialEntries: ActivityLogEntry[]
 }
 
+const USER_TZ = Intl.DateTimeFormat().resolvedOptions().timeZone
+
 export function HistoryClient({ initialEntries }: HistoryClientProps) {
   const [entries, setEntries] = useState<ActivityLogEntry[]>(initialEntries)
   const [search, setSearch] = useState('')
@@ -312,6 +314,7 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
         p_offset: 0,
         p_date_from: day,
         p_date_to: day,
+        p_tz: USER_TZ,
         ...(entityFilter ? { p_entity_type: entityFilter } : {}),
         ...(search.trim() ? { p_search: search.trim() } : {}),
       })
@@ -357,6 +360,7 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
       p_offset: entries.length,
       p_date_from: day,
       p_date_to: day,
+      p_tz: USER_TZ,
       ...(entityFilter ? { p_entity_type: entityFilter } : {}),
       ...(search.trim() ? { p_search: search.trim() } : {}),
     })
@@ -495,8 +499,11 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
           tabIndex={0}
           onClick={() => toggleGroup(group.id)}
           onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleGroup(group.id) } }}
-          className="flex items-start gap-3 rounded-lg px-3 py-3 hover:bg-muted/40 transition-colors cursor-pointer select-none"
+          className="flex items-center gap-3 rounded-lg px-3 py-3 hover:bg-muted/40 transition-colors cursor-pointer select-none"
         >
+          {isExpanded
+            ? <Minus className="h-5 w-5 shrink-0 text-muted-foreground" aria-label="Collapse" />
+            : <Plus className="h-5 w-5 shrink-0 text-muted-foreground" aria-label="Expand" />}
           <ActorChip actorId={group.actorId} actorType={group.actorType} compact />
           <div className="flex-1 min-w-0">
             <ActorChip actorId={group.actorId} actorType={group.actorType} nameOnly />
@@ -509,9 +516,6 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
               {formatDistanceToNow(new Date(group.entries[0].created_at), { addSuffix: true })}
             </p>
           </div>
-          <span className="text-xs text-muted-foreground shrink-0" aria-label={isExpanded ? 'Collapse' : 'Expand'}>
-            {isExpanded ? '▾' : '▸'}
-          </span>
         </div>
         {isExpanded && (
           <div className="space-y-1 ml-4 border-l border-border pl-2">
@@ -531,8 +535,11 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
           tabIndex={0}
           onClick={() => toggleGroup(burst.id)}
           onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleGroup(burst.id) } }}
-          className="flex items-start gap-3 rounded-lg px-3 py-3 hover:bg-muted/40 transition-colors cursor-pointer select-none"
+          className="flex items-center gap-3 rounded-lg px-3 py-3 hover:bg-muted/40 transition-colors cursor-pointer select-none"
         >
+          {isBurstExpanded
+            ? <Minus className="h-5 w-5 shrink-0 text-muted-foreground" aria-label="Collapse" />
+            : <Plus className="h-5 w-5 shrink-0 text-muted-foreground" aria-label="Expand" />}
           <ActorChip actorId={burst.actorId} actorType={burst.actorType} compact />
           <div className="flex-1 min-w-0">
             <ActorChip actorId={burst.actorId} actorType={burst.actorType} nameOnly />
@@ -543,9 +550,6 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
               {formatDistanceToNow(new Date(burst.groups[0].entries[0].created_at), { addSuffix: true })}
             </p>
           </div>
-          <span className="text-xs text-muted-foreground shrink-0" aria-label={isBurstExpanded ? 'Collapse' : 'Expand'}>
-            {isBurstExpanded ? '▾' : '▸'}
-          </span>
         </div>
         {isBurstExpanded && (
           <div className="space-y-1 ml-4 border-l border-border pl-2">
