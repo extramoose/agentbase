@@ -29,6 +29,11 @@ export async function GET(request: Request) {
     return NextResponse.redirect(`${origin}/sign-in?error=auth_failed`)
   }
 
+  // If next is an invite link, always follow it (user may not have a workspace yet)
+  if (next.startsWith('/invite')) {
+    return NextResponse.redirect(`${origin}${next}`)
+  }
+
   // Check if user has a workspace
   const { data: tenantId } = await supabase.rpc('get_my_tenant_id')
   if (!tenantId) {
