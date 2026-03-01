@@ -381,20 +381,20 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
     loadingRef.current = false
   }, [selectedDate, entityFilter, search, supabase, resolveSeqIds])
 
-  // IntersectionObserver to trigger loadMore when sentinel is visible
+  // Scroll listener to trigger loadMore near bottom of page
   useEffect(() => {
-    const sentinel = sentinelRef.current
-    console.log('[history] observer setup, sentinel:', !!sentinel)
-    if (!sentinel) return
-    const observer = new IntersectionObserver(
-      (observerEntries) => {
-        console.log('[history] observer fired, isIntersecting:', observerEntries[0]?.isIntersecting)
-        if (observerEntries[0]?.isIntersecting) loadMore()
-      },
-      { rootMargin: '200px' },
-    )
-    observer.observe(sentinel)
-    return () => observer.disconnect()
+    const handleScroll = () => {
+      const sentinel = sentinelRef.current
+      if (!sentinel) return
+      const rect = sentinel.getBoundingClientRect()
+      if (rect.top < window.innerHeight + 200) {
+        loadMore()
+      }
+    }
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    // Check immediately in case content is short
+    handleScroll()
+    return () => window.removeEventListener('scroll', handleScroll)
   }, [loadMore])
 
   // Filter to selected day, then two-pass grouping
