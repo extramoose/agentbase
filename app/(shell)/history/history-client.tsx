@@ -211,6 +211,24 @@ function groupSessionBursts(groups: ConsecutiveEventGroup[]): DisplayItem[] {
   return result
 }
 
+function buildBurstSummary(burst: SessionBurst): string[] {
+  const counts = new Map<string, number>()
+  for (const group of burst.groups) {
+    for (const entry of group.entries) {
+      const verb = formatEventVerb(entry.event_type)
+      const entityLabel = normalizeEntityType(entry.entity_type).replace(/_/g, ' ')
+      const key = `${verb}\0${entityLabel}`
+      counts.set(key, (counts.get(key) ?? 0) + 1)
+    }
+  }
+  return Array.from(counts.entries())
+    .sort((a, b) => b[1] - a[1])
+    .map(([key, count]) => {
+      const [verb, entityLabel] = key.split('\0')
+      return `${verb.charAt(0).toUpperCase()}${verb.slice(1)} ${count} ${entityLabel}`
+    })
+}
+
 function formatEventVerb(eventType: string): string {
   switch (eventType) {
     case 'created':          return 'created'
@@ -509,6 +527,7 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
 
   function renderBurst(burst: SessionBurst) {
     const isBurstExpanded = expandedGroups.has(burst.id)
+    const summary = buildBurstSummary(burst)
     return (
       <div key={burst.id}>
         <div
@@ -516,20 +535,32 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
           tabIndex={0}
           onClick={() => toggleGroup(burst.id)}
           onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleGroup(burst.id) } }}
-          className="flex items-center gap-3 rounded-lg px-3 py-3 hover:bg-muted/40 transition-colors cursor-pointer select-none"
+          className="flex items-start gap-3 rounded-lg px-3 py-3 hover:bg-muted/40 transition-colors cursor-pointer select-none"
         >
           {isBurstExpanded
-            ? <Minus className="h-5 w-5 shrink-0 text-muted-foreground" aria-label="Collapse" />
-            : <Plus className="h-5 w-5 shrink-0 text-muted-foreground" aria-label="Expand" />}
+            ? <Minus className="h-5 w-5 shrink-0 mt-0.5 text-muted-foreground" aria-label="Collapse" />
+            : <Plus className="h-5 w-5 shrink-0 mt-0.5 text-muted-foreground" aria-label="Expand" />}
           <ActorChip actorId={burst.actorId} actorType={burst.actorType} compact />
           <div className="flex-1 min-w-0">
-            <ActorChip actorId={burst.actorId} actorType={burst.actorType} nameOnly />
-            <p className="text-sm text-muted-foreground mt-0.5">
-              made <span className="font-medium">{burst.totalEntries}</span> changes
-            </p>
-            <p suppressHydrationWarning className="text-xs text-muted-foreground mt-0.5">
-              {formatDistanceToNow(new Date(burst.groups[0].entries[0].created_at), { addSuffix: true })}
-            </p>
+            <div className="flex items-center gap-2">
+              <ActorChip actorId={burst.actorId} actorType={burst.actorType} nameOnly />
+              <span className="text-sm text-muted-foreground">
+                made <span className="font-medium">{burst.totalEntries}</span> changes
+              </span>
+              <span suppressHydrationWarning className="text-xs text-muted-foreground">
+                {formatDistanceToNow(new Date(burst.groups[0].entries[0].created_at), { addSuffix: true })}
+              </span>
+            </div>
+            {!isBurstExpanded && (
+              <ul className="mt-1.5 space-y-0.5">
+                {summary.map(line => (
+                  <li key={line} className="text-xs text-muted-foreground flex items-start gap-1.5">
+                    <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-muted-foreground/50" />
+                    {line}
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         </div>
         {isBurstExpanded && (
