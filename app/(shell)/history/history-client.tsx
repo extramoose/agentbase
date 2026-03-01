@@ -587,7 +587,7 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="space-y-4">
       {/* Title row */}
       <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-4 mb-4">
         <h1 className="text-xl sm:text-2xl font-bold shrink-0">History</h1>
@@ -647,7 +647,7 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
       </div>
 
       {/* Activity list */}
-      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto space-y-1">
+      <div ref={scrollContainerRef} className="space-y-1">
         {loading ? (
           <div className="flex justify-center py-8">
             <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
