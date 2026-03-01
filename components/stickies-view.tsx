@@ -154,9 +154,9 @@ function categorizeTasks(tasks: StickyTask[]): Lane[] {
 
 function categorizeByStatus(tasks: StickyTask[]): Lane[] {
   const buckets: { key: string; label: string; status: Status; size: Lane['size'] }[] = [
-    { key: 'backlog', label: 'Backlog', status: 'backlog', size: 'small' },
-    { key: 'todo', label: 'To Do', status: 'todo', size: 'large' },
     { key: 'in_progress', label: 'In Progress', status: 'in_progress', size: 'large' },
+    { key: 'todo', label: 'To Do', status: 'todo', size: 'large' },
+    { key: 'backlog', label: 'Backlog', status: 'backlog', size: 'small' },
     { key: 'done', label: 'Done', status: 'done', size: 'small' },
   ]
 
