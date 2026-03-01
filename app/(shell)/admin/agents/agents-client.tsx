@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { AvatarUpload } from '@/components/avatar-upload'
 import { AVATAR_PRESETS } from '@/components/avatar-picker'
 import { Badge } from '@/components/ui/badge'
@@ -30,7 +31,8 @@ interface AgentsClientProps {
 
 export function AgentsClient({ agents: initialAgents, currentUserName, currentUserId, isOwner }: AgentsClientProps) {
   const [agents, setAgents] = useState(initialAgents)
-  const [showCreate, setShowCreate] = useState(false)
+  const searchParams = useSearchParams()
+  const [showCreate, setShowCreate] = useState(searchParams.get("create") === "true")
   const [creating, setCreating] = useState(false)
   const [revoking, setRevoking] = useState<string | null>(null)
   const [deleting, setDeleting] = useState<string | null>(null)
