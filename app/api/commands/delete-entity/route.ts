@@ -25,21 +25,32 @@ export async function POST(request: Request) {
     const { data: entity } = await supabase.from(table).select(`id, ${labelCol}`).eq('id', id).single()
     const label = entity ? (entity as Record<string, string>)[labelCol] ?? id : id
 
-    // Soft delete for CRM + library; hard delete for tasks
-    const { error } = table === 'tasks'
-      ? await supabase.from(table).delete().eq('id', id).eq('tenant_id', tenantId)
-      : await supabase.from(table).update({ deleted_at: new Date().toISOString() }).eq('id', id).eq('tenant_id', tenantId)
-    if (error) return apiError(error)
+    // Hard delete for tasks; soft delete for CRM + library via RPC (bypasses RLS for agents)
+    if (table === 'tasks') {
+      const { error } = await supabase.from(table).delete().eq('id', id).eq('tenant_id', tenantId)
+      if (error) return apiError(error)
 
-    await supabase.from('activity_log').insert({
-      entity_type: table,
-      entity_id: id,
-      tenant_id: tenantId,
-      actor_id: actorId,
-      actor_type: actorType,
-      event_type: 'deleted',
-      payload: { label },
-    })
+      await supabase.from('activity_log').insert({
+        entity_type: table,
+        entity_id: id,
+        tenant_id: tenantId,
+        actor_id: actorId,
+        actor_type: actorType,
+        event_type: 'deleted',
+        payload: { label },
+      })
+    } else {
+      // RPC is SECURITY DEFINER — works even when agent has no JWT / auth.uid()
+      // It also logs field-level activity automatically
+      const { error } = await supabase.rpc('rpc_update_entity', {
+        p_table: table,
+        p_entity_id: id,
+        p_fields: { deleted_at: new Date().toISOString() },
+        p_actor_id: actorId,
+        p_tenant_id: tenantId,
+      })
+      if (error) return apiError(error)
+    }
 
     return Response.json({ success: true })
   } catch (err) {
