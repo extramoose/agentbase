@@ -660,7 +660,7 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
                 ? renderLevel1Group(item.group)
                 : renderBurst(item)
             )}
-            <div ref={sentinelRef} />
+            <div ref={sentinelRef} className="h-10 bg-red-500 text-white text-center">SENTINEL - if you see this, scroll works</div>
           </>
         )}
       </div>
