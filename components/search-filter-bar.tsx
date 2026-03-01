@@ -43,8 +43,8 @@ export function SearchFilterBar({
           {tags.map((tag) => (
             <Badge
               key={tag}
-              variant={selectedTag === tag ? 'default' : 'outline'}
-              className="cursor-pointer text-xs"
+              variant="outline"
+              className={cn("cursor-pointer text-xs", selectedTag === tag && "bg-white text-black border-black")}
               onClick={() => onTagChange(selectedTag === tag ? null : tag)}
             >
               {tag}
