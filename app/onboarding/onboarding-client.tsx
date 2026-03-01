@@ -168,7 +168,13 @@ export function OnboardingClient({ skipWorkspace }: { skipWorkspace?: boolean })
               <AvatarPicker
                 selected={avatarUrl}
                 onSelect={setAvatarUrl}
-                onUpload={() => {}}
+                onUpload={async (file) => {
+                  const body = new FormData()
+                  body.append('file', file)
+                  const res = await fetch('/api/profile/avatar', { method: 'POST', body })
+                  const json = await res.json()
+                  if (res.ok && json.avatarUrl) setAvatarUrl(json.avatarUrl)
+                }}
               />
               {error && <p className="text-sm text-destructive">{error}</p>}
               <Button

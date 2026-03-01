@@ -30,7 +30,7 @@ export function AvatarPicker({ selected, onSelect, onUpload }: AvatarPickerProps
             type="button"
             onClick={() => onSelect(url)}
             className={cn(
-              'rounded-full p-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-all',
+              'rounded-full p-1 aspect-square flex items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-all',
               selected === url && 'ring-2 ring-white ring-offset-2 ring-offset-background scale-110',
             )}
           >
