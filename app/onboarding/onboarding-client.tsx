@@ -16,7 +16,7 @@ function StepDots({ current, total }: { current: number; total: number }) {
           key={i}
           className={
             i === current
-              ? 'h-2 w-2 rounded-full bg-primary'
+              ? 'h-2 w-2 rounded-full bg-white'
               : 'h-2 w-2 rounded-full bg-muted-foreground/30'
           }
         />
