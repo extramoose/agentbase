@@ -13,11 +13,12 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from '@/hooks/use-toast'
 import { formatDistanceToNow } from 'date-fns'
-import { ChevronDown, Copy, Link, Loader2, Shield, ShieldAlert, Trash2, User } from 'lucide-react'
+import { Check, ChevronDown, Copy, Link, Loader2, Mail, Shield, ShieldAlert, Trash2, User } from 'lucide-react'
 
 type Invite = {
   id: string
   token: string
+  email: string | null
   created_at: string
   accepted_by: string | null
   accepted_at: string | null
@@ -34,9 +35,9 @@ type Member = {
 }
 
 const ROLE_CONFIG: Record<string, { label: string; color: string; icon: typeof Shield }> = {
-  owner: { label: 'Owner', color: 'bg-yellow-500/20 text-yellow-400', icon: ShieldAlert },
-  admin:      { label: 'Admin',       color: 'bg-blue-500/20 text-blue-400',   icon: Shield },
-  user:       { label: 'User',        color: 'bg-muted text-muted-foreground', icon: User },
+  owner:  { label: 'Owner',  color: 'bg-yellow-500/20 text-yellow-400', icon: ShieldAlert },
+  admin:  { label: 'Admin',  color: 'bg-blue-500/20 text-blue-400',     icon: Shield },
+  member: { label: 'Member', color: 'bg-muted text-muted-foreground',   icon: User },
 }
 
 interface UsersClientProps {
@@ -49,6 +50,10 @@ export function UsersClient({ currentUserId }: UsersClientProps) {
 
   // Invite state
   const [invites, setInvites] = useState<Invite[]>([])
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [inviteRole, setInviteRole] = useState<'member' | 'admin'>('member')
+  const [sending, setSending] = useState(false)
+  const [sent, setSent] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [newInviteUrl, setNewInviteUrl] = useState<string | null>(null)
 
@@ -69,7 +74,7 @@ export function UsersClient({ currentUserId }: UsersClientProps) {
     fetchInvites()
   }, [fetchInvites])
 
-  const changeRole = useCallback(async (userId: string, newRole: 'user' | 'admin') => {
+  const changeRole = useCallback(async (userId: string, newRole: 'member' | 'admin') => {
     // Optimistic update
     setMembers(prev => prev.map(m => m.id === userId ? { ...m, role: newRole } : m))
 
@@ -110,6 +115,30 @@ export function UsersClient({ currentUserId }: UsersClientProps) {
       setGenerating(false)
     }
   }, [fetchInvites])
+
+  const handleSendEmailInvite = useCallback(async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSending(true)
+    setSent(false)
+    try {
+      const res = await fetch('/api/invites/send-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: inviteEmail, role: inviteRole }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? 'Failed to send invite')
+      setSent(true)
+      setInviteEmail('')
+      setInviteRole('member')
+      await fetchInvites()
+      toast({ type: 'success', message: `Invite sent to ${inviteEmail}` })
+    } catch (err) {
+      toast({ type: 'error', message: err instanceof Error ? err.message : 'Failed to send invite' })
+    } finally {
+      setSending(false)
+    }
+  }, [inviteEmail, inviteRole, fetchInvites])
 
   const handleRevokeInvite = useCallback(async (inviteId: string) => {
     try {
@@ -173,7 +202,7 @@ export function UsersClient({ currentUserId }: UsersClientProps) {
           </thead>
           <tbody>
             {members.map(member => {
-              const config = ROLE_CONFIG[member.role] ?? ROLE_CONFIG.user
+              const config = ROLE_CONFIG[member.role] ?? ROLE_CONFIG.member
               const displayName = member.full_name ?? member.email.split('@')[0]
               const isSelf = member.id === currentUserId
               const isOwner = member.role === 'owner'
@@ -225,11 +254,11 @@ export function UsersClient({ currentUserId }: UsersClientProps) {
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem
-                              onClick={() => changeRole(member.id, 'user')}
-                              disabled={member.role === 'user'}
+                              onClick={() => changeRole(member.id, 'member')}
+                              disabled={member.role === 'member'}
                             >
                               <User className="mr-2 h-4 w-4" />
-                              User
+                              Member
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={() => changeRole(member.id, 'admin')}
@@ -261,13 +290,53 @@ export function UsersClient({ currentUserId }: UsersClientProps) {
         )}
       </div>
 
-      {/* Invite Links */}
-      <h2 className="text-lg font-semibold mt-8">Invite Links</h2>
+      {/* Invite */}
+      <h2 className="text-lg font-semibold mt-8">Invite</h2>
+
+      <form onSubmit={handleSendEmailInvite} className="flex flex-col sm:flex-row items-start sm:items-end gap-3">
+        <div className="flex-1 w-full sm:w-auto">
+          <label htmlFor="invite-email" className="text-xs font-medium text-muted-foreground mb-1 block">
+            Email address
+          </label>
+          <Input
+            id="invite-email"
+            type="email"
+            placeholder="colleague@company.com"
+            value={inviteEmail}
+            onChange={e => { setInviteEmail(e.target.value); setSent(false) }}
+            required
+          />
+        </div>
+        <div className="w-full sm:w-[140px]">
+          <label htmlFor="invite-role" className="text-xs font-medium text-muted-foreground mb-1 block">
+            Role
+          </label>
+          <select
+            id="invite-role"
+            value={inviteRole}
+            onChange={e => setInviteRole(e.target.value as 'member' | 'admin')}
+            className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          >
+            <option value="member">Member</option>
+            <option value="admin">Admin</option>
+          </select>
+        </div>
+        <Button type="submit" disabled={sending || !inviteEmail} size="sm" className="h-9">
+          {sending ? (
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          ) : sent ? (
+            <Check className="mr-2 h-4 w-4" />
+          ) : (
+            <Mail className="mr-2 h-4 w-4" />
+          )}
+          {sending ? 'Sending...' : sent ? 'Sent' : 'Send invite'}
+        </Button>
+      </form>
 
       <div className="flex items-center gap-3">
-        <Button onClick={handleGenerateInvite} disabled={generating} size="sm">
-          <Link className="mr-2 h-4 w-4" />
-          {generating ? 'Generating...' : 'Generate invite link'}
+        <Button variant="ghost" size="sm" className="text-xs text-muted-foreground" onClick={handleGenerateInvite} disabled={generating}>
+          <Link className="mr-2 h-3 w-3" />
+          {generating ? 'Generating...' : 'Copy invite link instead'}
         </Button>
       </div>
 
@@ -287,16 +356,20 @@ export function UsersClient({ currentUserId }: UsersClientProps) {
         </div>
       )}
 
+      {/* Pending Invites */}
       {pendingInvites.length > 0 && (
         <div>
-          <h3 className="text-sm font-medium text-muted-foreground mb-2">Pending</h3>
+          <h3 className="text-sm font-medium text-muted-foreground mb-2">Pending invites</h3>
           <div className="rounded-lg border border-border divide-y divide-border">
             {pendingInvites.map(invite => (
               <div key={invite.id} className="flex items-center justify-between px-4 py-2">
                 <div className="flex items-center gap-3">
-                  <code className="text-xs bg-muted px-2 py-1 rounded">
-                    {invite.token.slice(0, 8)}...
-                  </code>
+                  {invite.email ? (
+                    <span className="text-sm">{invite.email}</span>
+                  ) : (
+                    <span className="text-sm text-muted-foreground">Link invite</span>
+                  )}
+                  <Badge variant="secondary" className="text-xs">Pending</Badge>
                   <span suppressHydrationWarning className="text-xs text-muted-foreground">
                     {formatDistanceToNow(new Date(invite.created_at), { addSuffix: true })}
                   </span>
@@ -315,19 +388,20 @@ export function UsersClient({ currentUserId }: UsersClientProps) {
         </div>
       )}
 
+      {/* Accepted Invites */}
       {acceptedInvites.length > 0 && (
         <div>
-          <h3 className="text-sm font-medium text-muted-foreground mb-2">Accepted</h3>
+          <h3 className="text-sm font-medium text-muted-foreground mb-2">Accepted invites</h3>
           <div className="rounded-lg border border-border divide-y divide-border">
             {acceptedInvites.map(invite => (
               <div key={invite.id} className="flex items-center justify-between px-4 py-2">
                 <div className="flex items-center gap-3">
-                  <code className="text-xs bg-muted px-2 py-1 rounded">
-                    {invite.token.slice(0, 8)}...
-                  </code>
-                  <span className="text-xs text-muted-foreground">
-                    accepted by {invite.accepted_by?.slice(0, 8)}...
-                  </span>
+                  {invite.email ? (
+                    <span className="text-sm">{invite.email}</span>
+                  ) : (
+                    <span className="text-sm text-muted-foreground">Link invite</span>
+                  )}
+                  <Badge variant="secondary" className="text-xs bg-green-500/20 text-green-400">Accepted</Badge>
                   <span suppressHydrationWarning className="text-xs text-muted-foreground">
                     {invite.accepted_at && formatDistanceToNow(new Date(invite.accepted_at), { addSuffix: true })}
                   </span>
