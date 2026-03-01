@@ -263,6 +263,42 @@ const API_SCHEMA = {
       },
       {
         method: 'POST',
+        path: '/api/commands/delete-task',
+        description: 'Alias for POST /api/commands/delete-entity with table pre-set to "tasks". Humans only — agents receive 403.',
+        required_fields: {
+          id: { type: 'string', description: 'UUID of the task to delete' },
+        },
+        optional_fields: {},
+      },
+      {
+        method: 'POST',
+        path: '/api/commands/delete-company',
+        description: 'Alias for POST /api/commands/delete-entity with table pre-set to "companies". Humans only — agents receive 403.',
+        required_fields: {
+          id: { type: 'string', description: 'UUID of the company to delete' },
+        },
+        optional_fields: {},
+      },
+      {
+        method: 'POST',
+        path: '/api/commands/delete-person',
+        description: 'Alias for POST /api/commands/delete-entity with table pre-set to "people". Humans only — agents receive 403.',
+        required_fields: {
+          id: { type: 'string', description: 'UUID of the person to delete' },
+        },
+        optional_fields: {},
+      },
+      {
+        method: 'POST',
+        path: '/api/commands/delete-deal',
+        description: 'Alias for POST /api/commands/delete-entity with table pre-set to "deals". Humans only — agents receive 403.',
+        required_fields: {
+          id: { type: 'string', description: 'UUID of the deal to delete' },
+        },
+        optional_fields: {},
+      },
+      {
+        method: 'POST',
         path: '/api/commands/add-comment',
         description: 'Add a comment to an entity\'s activity log',
         required_fields: {
