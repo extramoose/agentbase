@@ -1067,6 +1067,15 @@ export function TasksClient({
           const newTask = payload.new as Task
           setTasks((prev) => {
             if (prev.some((t) => t.id === newTask.id)) return prev
+            // Replace optimistic placeholder whose title matches — avoids duplicate
+            const tempIdx = prev.findIndex(
+              (t) => t.id.startsWith('temp-') && t.title === newTask.title
+            )
+            if (tempIdx !== -1) {
+              const next = [...prev]
+              next[tempIdx] = newTask
+              return next
+            }
             return [...prev, newTask]
           })
         }
@@ -1234,11 +1243,15 @@ export function TasksClient({
         const json = await res.json()
         if (!res.ok) throw new Error(json.error ?? 'Failed to create task')
 
-        // Replace optimistic with real
+        // Replace optimistic with real (Realtime may have already delivered it)
         const created = json.data as Task
-        setTasks((prev) =>
-          prev.map((t) => (t.id === tempId ? created : t))
-        )
+        setTasks((prev) => {
+          if (prev.some((t) => t.id === created.id)) {
+            // Realtime already delivered — just remove the leftover temp placeholder
+            return prev.filter((t) => !t.id.startsWith('temp-'))
+          }
+          return prev.map((t) => (t.id === tempId ? created : t))
+        })
         toast({ type: 'success', message: 'Task created' })
       } catch (err) {
         // Remove optimistic on failure

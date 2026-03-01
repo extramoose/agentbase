@@ -58,7 +58,7 @@ export interface CrmPerson extends BaseEntity {
   last_enriched: string | null
 }
 
-type DealStatus = 'prospect' | 'active' | 'won' | 'lost'
+type DealStatus = 'prospect' | 'qualified' | 'proposal' | 'negotiation' | 'active' | 'won' | 'lost'
 
 export interface CrmDeal extends BaseEntity {
   title: string
@@ -80,13 +80,16 @@ type View = 'grid' | 'table'
 // ---------------------------------------------------------------------------
 
 const DEAL_STATUS_CONFIG: Record<DealStatus, { label: string; className: string; funnelColor: string }> = {
-  prospect: { label: 'Prospect', className: 'bg-slate-500/20 text-slate-400', funnelColor: 'bg-slate-500' },
-  active:   { label: 'Active',   className: 'bg-blue-500/20 text-blue-400',   funnelColor: 'bg-blue-500' },
-  won:      { label: 'Won',      className: 'bg-green-500/20 text-green-400', funnelColor: 'bg-green-500' },
-  lost:     { label: 'Lost',     className: 'bg-red-500/20 text-red-400',     funnelColor: 'bg-red-500' },
+  prospect:    { label: 'Prospect',    className: 'bg-slate-500/20 text-slate-400',   funnelColor: 'bg-slate-500' },
+  qualified:   { label: 'Qualified',   className: 'bg-indigo-500/20 text-indigo-400', funnelColor: 'bg-indigo-500' },
+  proposal:    { label: 'Proposal',    className: 'bg-violet-500/20 text-violet-400', funnelColor: 'bg-violet-500' },
+  negotiation: { label: 'Negotiation', className: 'bg-amber-500/20 text-amber-400',   funnelColor: 'bg-amber-500' },
+  active:      { label: 'Active',      className: 'bg-blue-500/20 text-blue-400',     funnelColor: 'bg-blue-500' },
+  won:         { label: 'Won',         className: 'bg-green-500/20 text-green-400',   funnelColor: 'bg-green-500' },
+  lost:        { label: 'Lost',        className: 'bg-red-500/20 text-red-400',       funnelColor: 'bg-red-500' },
 }
 
-const DEAL_STATUS_ORDER: DealStatus[] = ['prospect', 'active', 'won', 'lost']
+const DEAL_STATUS_ORDER: DealStatus[] = ['prospect', 'qualified', 'proposal', 'negotiation', 'active', 'won', 'lost']
 
 function formatRelativeTime(iso: string): string {
   const ms = Date.now() - new Date(iso).getTime()
@@ -152,6 +155,7 @@ export function CrmClient({
   const [sortKey, setSortKey] = useState<string | null>(null)
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
   const [dealStatusFilter, setDealStatusFilter] = useState<DealStatus | 'all'>('all')
+  const [_entityLinksMap, setEntityLinksMap] = useState<Record<string, Array<{ type: string; name: string }>>>({})
   const addInputRef = useRef<HTMLInputElement>(null)
 
   const supabase = createClient()
@@ -233,6 +237,41 @@ export function CrmClient({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // ----- Fetch entity links for CRM entities -----
+  useEffect(() => {
+    async function fetchLinks() {
+      const { data } = await supabase
+        .from('entity_links')
+        .select('source_type, source_id, target_type, target_id')
+        .in('source_type', ['companies', 'people', 'deals'])
+        .in('target_type', ['companies', 'people', 'deals'])
+      if (!data) return
+
+      // Build name lookup from in-memory entities
+      const nameMap = new Map<string, string>()
+      for (const c of companies) nameMap.set(c.id, c.name)
+      for (const p of people) nameMap.set(p.id, p.name)
+      for (const d of deals) nameMap.set(d.id, d.title)
+
+      const map: Record<string, Array<{ type: string; name: string }>> = {}
+      for (const link of data as Array<{ source_type: string; source_id: string; target_type: string; target_id: string }>) {
+        // Skip self-links and links where target is same entity type as source (bidirectional dupes)
+        if (link.source_id === link.target_id) continue
+        const name = nameMap.get(link.target_id)
+        if (!name) continue
+        const arr = map[link.source_id] ?? []
+        // Avoid duplicate chips for the same target
+        if (!arr.some((l) => l.name === name && l.type === link.target_type)) {
+          arr.push({ type: link.target_type, name })
+        }
+        map[link.source_id] = arr
+      }
+      setEntityLinksMap(map)
+    }
+    fetchLinks()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [companies.length, people.length, deals.length])
 
   // ----- CRUD operations -----
 
@@ -742,7 +781,7 @@ export function CrmClient({
       {section === 'deals' && (
         <>
           <div className="flex items-center gap-2 flex-wrap mb-3">
-            {(['all', 'prospect', 'active', 'won', 'lost'] as const).map((s) => {
+            {(['all', ...DEAL_STATUS_ORDER] as const).map((s) => {
               const count = s === 'all'
                 ? deals.length
                 : deals.filter((d) => d.status === s).length
@@ -965,15 +1004,12 @@ function SortTh({
 // ---------------------------------------------------------------------------
 
 function DealFunnel({ deals }: { deals: CrmDeal[] }) {
-  const stages: DealStatus[] = ['prospect', 'active', 'won', 'lost']
+  const stages = DEAL_STATUS_ORDER
 
   const counts = useMemo(() => {
-    const map: Record<DealStatus, { count: number; value: number }> = {
-      prospect: { count: 0, value: 0 },
-      active: { count: 0, value: 0 },
-      won: { count: 0, value: 0 },
-      lost: { count: 0, value: 0 },
-    }
+    const map = Object.fromEntries(
+      DEAL_STATUS_ORDER.map((s) => [s, { count: 0, value: 0 }])
+    ) as Record<DealStatus, { count: number; value: number }>
     for (const d of deals) {
       if (d.status in map) {
         map[d.status].count++
