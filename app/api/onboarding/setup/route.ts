@@ -2,9 +2,15 @@ import { requireAuthApi } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { apiError } from '@/lib/api/errors'
 
+const STARTER_TASKS = [
+  { title: 'Add your first agent', priority: 'medium', tags: ['onboarding'] },
+  { title: 'Invite a teammate', priority: 'medium', tags: ['onboarding'] },
+  { title: 'Create your first task', priority: 'low', tags: ['onboarding'] },
+] as const
+
 export async function POST(request: Request) {
   try {
-    await requireAuthApi()
+    const user = await requireAuthApi()
     const { name } = await request.json()
     if (!name?.trim()) {
       return Response.json({ error: 'Workspace name is required' }, { status: 400 })
@@ -14,6 +20,27 @@ export async function POST(request: Request) {
       p_workspace_name: name.trim(),
     })
     if (error) throw error
+
+    // Create starter tasks
+    const tenantId = (data as { tenant_id: string }).tenant_id ?? data
+    for (const task of STARTER_TASKS) {
+      await supabase.rpc('rpc_create_task', {
+        p_tenant_id: tenantId,
+        p_actor_id: user.id,
+        p_actor_type: 'human',
+        p_title: task.title,
+        p_priority: task.priority,
+        p_status: 'todo',
+        p_body: null,
+        p_assignee_id: null,
+        p_assignee_type: null,
+        p_type: null,
+        p_tags: [...task.tags],
+        p_due_date: null,
+        p_idempotency_key: null,
+      })
+    }
+
     return Response.json({ success: true, data })
   } catch (err) {
     return apiError(err)

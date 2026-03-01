@@ -1,28 +1,56 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { AvatarPicker } from '@/components/avatar-picker'
 
-export function OnboardingClient() {
+type Step = 'workspace' | 'profile' | 'intro-you' | 'intro-agents'
+
+function StepDots({ current, total }: { current: number; total: number }) {
+  return (
+    <div className="flex items-center justify-center gap-2 mb-8">
+      {Array.from({ length: total }, (_, i) => (
+        <div
+          key={i}
+          className={
+            i === current
+              ? 'h-2 w-2 rounded-full bg-primary'
+              : 'h-2 w-2 rounded-full bg-muted-foreground/30'
+          }
+        />
+      ))}
+    </div>
+  )
+}
+
+export function OnboardingClient({ skipWorkspace }: { skipWorkspace?: boolean }) {
   const router = useRouter()
-  const [name, setName] = useState('')
+  const searchParams = useSearchParams()
+  const joined = searchParams.get('joined') === 'true' || skipWorkspace
+
+  const [step, setStep] = useState<Step>(joined ? 'profile' : 'workspace')
+  const [workspaceName, setWorkspaceName] = useState('')
+  const [profileName, setProfileName] = useState('')
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    if (!name.trim()) return
+  const steps: Step[] = joined
+    ? ['profile', 'intro-you', 'intro-agents']
+    : ['workspace', 'profile', 'intro-you', 'intro-agents']
+  const stepIndex = steps.indexOf(step)
 
+  async function handleCreateWorkspace() {
+    if (!workspaceName.trim()) return
     setLoading(true)
     setError('')
-
     try {
       const res = await fetch('/api/onboarding/setup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim() }),
+        body: JSON.stringify({ name: workspaceName.trim() }),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -30,73 +58,186 @@ export function OnboardingClient() {
         setLoading(false)
         return
       }
-      router.push('/')
+      setStep('profile')
     } catch {
       setError('Something went wrong. Please try again.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleSaveProfile() {
+    if (!profileName.trim()) return
+    setLoading(true)
+    setError('')
+    try {
+      const res = await fetch('/api/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ full_name: profileName.trim() }),
+      })
+      if (!res.ok) {
+        setError('Failed to save profile')
+        setLoading(false)
+        return
+      }
+      if (avatarUrl) {
+        await fetch('/api/profile/avatar-preset', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: avatarUrl }),
+        })
+      }
+      setStep('intro-you')
+    } catch {
+      setError('Something went wrong. Please try again.')
+    } finally {
       setLoading(false)
     }
   }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background">
-      <div className="w-full max-w-md mx-auto p-8 rounded-xl border border-border bg-card">
-        <div className="space-y-2 text-center mb-8">
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Welcome to AgentBase
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Name your workspace to get started.
-          </p>
-        </div>
+      <div className="w-full max-w-md mx-auto p-8">
+        <StepDots current={stepIndex} total={steps.length} />
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <Input
-            type="text"
-            placeholder="Acme Inc"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            disabled={loading}
-            autoFocus
-          />
+        {step === 'workspace' && (
+          <div className="rounded-xl border border-border bg-card p-8">
+            <div className="space-y-2 text-center mb-8">
+              <h1 className="text-2xl font-semibold tracking-tight">
+                Welcome to AgentBase
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                Name your workspace to get started.
+              </p>
+            </div>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault()
+                handleCreateWorkspace()
+              }}
+              className="space-y-4"
+            >
+              <Input
+                type="text"
+                placeholder="Acme Inc"
+                value={workspaceName}
+                onChange={(e) => setWorkspaceName(e.target.value)}
+                disabled={loading}
+                autoFocus
+              />
+              {error && <p className="text-sm text-destructive">{error}</p>}
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={loading || !workspaceName.trim()}
+              >
+                {loading ? 'Creating workspace…' : 'Create workspace'}
+              </Button>
+            </form>
+          </div>
+        )}
 
-          {error && (
-            <p className="text-sm text-destructive">{error}</p>
-          )}
+        {step === 'profile' && (
+          <div className="rounded-xl border border-border bg-card p-8">
+            <div className="space-y-2 text-center mb-8">
+              <h1 className="text-2xl font-semibold tracking-tight">
+                Set up your profile
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                How should your team see you?
+              </p>
+            </div>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault()
+                handleSaveProfile()
+              }}
+              className="space-y-6"
+            >
+              <Input
+                type="text"
+                placeholder="Your name"
+                value={profileName}
+                onChange={(e) => setProfileName(e.target.value)}
+                disabled={loading}
+                autoFocus
+              />
+              <AvatarPicker
+                selected={avatarUrl}
+                onSelect={setAvatarUrl}
+                onUpload={() => {}}
+              />
+              {error && <p className="text-sm text-destructive">{error}</p>}
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={loading || !profileName.trim()}
+              >
+                {loading ? 'Saving…' : 'Continue'}
+              </Button>
+            </form>
+          </div>
+        )}
 
-          <Button
-            type="submit"
-            className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
-            disabled={loading || !name.trim()}
-          >
-            {loading ? (
-              <span className="flex items-center gap-2">
-                <svg
-                  className="h-4 w-4 animate-spin"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  />
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                  />
-                </svg>
-                Creating workspace…
+        {step === 'intro-you' && (
+          <div className="rounded-xl border border-border bg-card p-8">
+            <div className="space-y-2 text-center mb-8">
+              <h1 className="text-2xl font-semibold tracking-tight">
+                How AgentBase works for you
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                Manage tasks, collaborate with your team, and let agents handle
+                the rest.
+              </p>
+            </div>
+            <div className="flex items-center justify-center rounded-lg border border-dashed border-border bg-muted/50 h-48 mb-6">
+              <span className="text-sm text-muted-foreground">
+                Illustration TBD
               </span>
-            ) : (
-              'Create workspace'
-            )}
-          </Button>
-        </form>
+            </div>
+            <Button className="w-full" onClick={() => setStep('intro-agents')}>
+              Next
+            </Button>
+          </div>
+        )}
+
+        {step === 'intro-agents' && (
+          <div className="rounded-xl border border-border bg-card p-8">
+            <div className="space-y-2 text-center mb-8">
+              <h1 className="text-2xl font-semibold tracking-tight">
+                How it works for agents
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                Agents pick up tasks, use tools, and report back — all inside
+                AgentBase.
+              </p>
+            </div>
+            <div className="flex items-center justify-center rounded-lg border border-dashed border-border bg-muted/50 h-48 mb-6">
+              <span className="text-sm text-muted-foreground">
+                Illustration TBD
+              </span>
+            </div>
+            <div className="space-y-3">
+              <Button
+                className="w-full"
+                size="lg"
+                onClick={() => router.push('/admin/agents?create=true')}
+              >
+                Add your first agent
+              </Button>
+              <div className="text-center">
+                <button
+                  type="button"
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors underline underline-offset-4"
+                  onClick={() => router.push('/tools/tasks?create=true')}
+                >
+                  or create a task
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

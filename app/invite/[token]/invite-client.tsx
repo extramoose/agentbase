@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
+import { toast } from '@/hooks/use-toast'
 
 export function InviteClient({ token }: { token: string }) {
   const router = useRouter()
@@ -24,7 +25,20 @@ export function InviteClient({ token }: { token: string }) {
         setLoading(false)
         return
       }
-      router.push('/')
+
+      const { had_workspace, workspace_name } = data.data ?? data
+
+      if (had_workspace) {
+        // State A: existing user — go home with toast
+        toast({
+          type: 'success',
+          message: `Joined ${workspace_name ?? 'workspace'}`,
+        })
+        router.push('/')
+      } else {
+        // State B: new user — profile setup + intro (skip workspace step)
+        router.push('/onboarding?joined=true')
+      }
     } catch {
       setError('Something went wrong. Please try again.')
       setLoading(false)
