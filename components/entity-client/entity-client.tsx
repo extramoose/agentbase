@@ -17,7 +17,7 @@ import {
 // Helpers
 // ---------------------------------------------------------------------------
 
-type View = 'grid' | 'table'
+type View = 'grid' | 'table' | 'stickies'
 
 function readParam(key: string): string | null {
   if (typeof window === 'undefined') return null

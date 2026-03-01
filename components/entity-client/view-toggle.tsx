@@ -1,10 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { LayoutGrid, List } from 'lucide-react'
+import { LayoutGrid, List, StickyNote } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-type View = 'grid' | 'table'
+type View = 'grid' | 'table' | 'stickies'
 
 function readViewParam(defaultView: View): View {
   if (typeof window === 'undefined') return defaultView
@@ -12,6 +12,7 @@ function readViewParam(defaultView: View): View {
   const v = params.get('view')
   if (v === 'grid') return 'grid'
   if (v === 'table') return 'table'
+  if (v === 'stickies') return 'stickies'
   return defaultView
 }
 
@@ -63,7 +64,7 @@ export function ViewToggle({
       <button
         onClick={() => toggle('table')}
         className={cn(
-          'p-1.5 rounded-r-md transition-colors',
+          'p-1.5 transition-colors',
           view === 'table'
             ? 'bg-muted text-foreground'
             : 'text-muted-foreground hover:text-foreground',
@@ -71,6 +72,18 @@ export function ViewToggle({
         title="Table view"
       >
         <List className="h-4 w-4" />
+      </button>
+      <button
+        onClick={() => toggle('stickies')}
+        className={cn(
+          'p-1.5 rounded-r-md transition-colors',
+          view === 'stickies'
+            ? 'bg-muted text-foreground'
+            : 'text-muted-foreground hover:text-foreground',
+        )}
+        title="Stickies view"
+      >
+        <StickyNote className="h-4 w-4" />
       </button>
     </div>
   )

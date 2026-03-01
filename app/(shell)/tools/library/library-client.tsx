@@ -37,7 +37,7 @@ import { type BaseEntity } from '@/types/entities'
 
 type ItemType = 'favorite' | 'flag' | 'restaurant' | 'note' | 'idea' | 'article'
 
-type View = 'grid' | 'table'
+type View = 'grid' | 'table' | 'stickies'
 
 export interface LibraryItem extends BaseEntity {
   title: string

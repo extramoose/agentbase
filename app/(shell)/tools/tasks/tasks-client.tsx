@@ -38,6 +38,7 @@ import { TagCombobox } from '@/components/tag-combobox'
 import { RichTextEditor } from '@/components/rich-text-editor'
 import { cn } from '@/lib/utils'
 import { type BaseEntity } from '@/types/entities'
+import { StickiesView } from '@/components/stickies-view'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -48,7 +49,7 @@ type Status = 'backlog' | 'todo' | 'in_progress' | 'blocked' | 'done' | 'cancell
 
 type TaskType = 'bug' | 'improvement' | 'feature'
 
-type View = 'grid' | 'table'
+type View = 'grid' | 'table' | 'stickies'
 
 export interface Task extends BaseEntity {
   ticket_id: number
@@ -942,7 +943,7 @@ export function TasksClient({
   const [view, setView] = useState<View>(
     () => {
       const v = searchParams.get('view')
-      return v === 'grid' ? 'grid' : 'table'
+      return v === 'grid' ? 'grid' : v === 'stickies' ? 'stickies' : 'table'
     }
   )
   const [selectedTag, setSelectedTag] = useState<string | null>(
@@ -960,7 +961,7 @@ export function TasksClient({
     if (typeFilter !== 'all') params.set('type', typeFilter)
     if (assigneeFilter) params.set('assignee', assigneeFilter)
     if (selectedTag) params.set('tag', selectedTag)
-    if (view === 'grid') params.set('view', 'grid')
+    if (view !== 'table') params.set('view', view)
     const qs = params.toString()
     return qs ? `?${qs}` : ''
   }, [search, statusFilter, typeFilter, assigneeFilter, selectedTag, view])
@@ -1750,6 +1751,11 @@ export function TasksClient({
             </EntityGrid>
           )}
         </div>
+      )}
+
+      {/* Stickies view */}
+      {view === 'stickies' && (
+        <StickiesView tasks={filteredTasks} onTaskClick={handleTaskClick} />
       )}
 
       {/* Task detail shelf (EntityShelf from S1) */}

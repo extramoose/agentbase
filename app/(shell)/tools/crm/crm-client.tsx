@@ -74,7 +74,7 @@ export interface CrmDeal extends BaseEntity {
 }
 
 type Section = 'deals' | 'companies' | 'people'
-type View = 'grid' | 'table'
+type View = 'grid' | 'table' | 'stickies'
 
 // ---------------------------------------------------------------------------
 // Config
