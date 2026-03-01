@@ -16,6 +16,7 @@ export async function GET(request: Request) {
       // DB-level search for agent path requires a migration (future work)
       ;({ data, error } = await supabase.rpc('rpc_list_library_items', { p_tenant_id: tenantId }))
       if (!error && data) {
+        data = data.filter((r: Record<string, unknown>) => r.deleted_at == null)
         data = filterByFieldsInMemory(data, filters)
         if (tag) data = data.filter((r: Record<string, unknown>) => Array.isArray(r.tags) && r.tags.includes(tag))
         data = filterInMemory(data, q, ['name', 'notes', 'url'])
@@ -25,6 +26,7 @@ export async function GET(request: Request) {
       let query = supabase
         .from('library_items')
         .select('*')
+        .is('deleted_at', null)
       query = applyFilters(query, filters)
       if (tag) query = query.contains('tags', [tag])
       query = applySearch(query, q, ['name', 'notes', 'url'])

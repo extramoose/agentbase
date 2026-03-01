@@ -254,7 +254,7 @@ const API_SCHEMA = {
       {
         method: 'POST',
         path: '/api/commands/delete-entity',
-        description: 'Delete an entity. Humans only — agents receive 403 Forbidden.',
+        description: 'Delete an entity. Soft delete for companies, people, deals, library_items (sets deleted_at). Hard delete for tasks. Agents can delete CRM + library entities but receive 403 for tasks.',
         required_fields: {
           table: { type: 'string', enum: [...ENTITY_TYPES] },
           id: { type: 'string', description: 'UUID of the entity to delete' },
@@ -264,7 +264,7 @@ const API_SCHEMA = {
       {
         method: 'POST',
         path: '/api/commands/delete-task',
-        description: 'Alias for POST /api/commands/delete-entity with table pre-set to "tasks". Humans only — agents receive 403.',
+        description: 'Alias for POST /api/commands/delete-entity with table pre-set to "tasks". Hard delete. Agents receive 403.',
         required_fields: {
           id: { type: 'string', description: 'UUID of the task to delete' },
         },
@@ -273,7 +273,7 @@ const API_SCHEMA = {
       {
         method: 'POST',
         path: '/api/commands/delete-company',
-        description: 'Alias for POST /api/commands/delete-entity with table pre-set to "companies". Humans only — agents receive 403.',
+        description: 'Alias for POST /api/commands/delete-entity with table pre-set to "companies". Soft delete (sets deleted_at).',
         required_fields: {
           id: { type: 'string', description: 'UUID of the company to delete' },
         },
@@ -282,7 +282,7 @@ const API_SCHEMA = {
       {
         method: 'POST',
         path: '/api/commands/delete-person',
-        description: 'Alias for POST /api/commands/delete-entity with table pre-set to "people". Humans only — agents receive 403.',
+        description: 'Alias for POST /api/commands/delete-entity with table pre-set to "people". Soft delete (sets deleted_at).',
         required_fields: {
           id: { type: 'string', description: 'UUID of the person to delete' },
         },
@@ -291,7 +291,7 @@ const API_SCHEMA = {
       {
         method: 'POST',
         path: '/api/commands/delete-deal',
-        description: 'Alias for POST /api/commands/delete-entity with table pre-set to "deals". Humans only — agents receive 403.',
+        description: 'Alias for POST /api/commands/delete-entity with table pre-set to "deals". Soft delete (sets deleted_at).',
         required_fields: {
           id: { type: 'string', description: 'UUID of the deal to delete' },
         },

@@ -60,8 +60,11 @@ export async function GET(request: Request) {
           // DB-level search for agent path requires a migration (future work)
           const { data } = await supabase.rpc(RPC_NAMES[type], { p_tenant_id: tenantId })
           if (data) {
+            let rows = type !== 'tasks'
+              ? (data as Record<string, unknown>[]).filter(r => r.deleted_at == null)
+              : data
             // For tasks, also match ticket_id if query is numeric
-            let filtered = filterInMemory(data, q, columns)
+            let filtered = filterInMemory(rows, q, columns)
             if (type === 'tasks' && /^\d+$/.test(q)) {
               const ticketMatches = (data as { ticket_id?: number }[]).filter(
                 (r) => r.ticket_id != null && String(r.ticket_id) === q
@@ -81,11 +84,12 @@ export async function GET(request: Request) {
           if (type === 'tasks' && /^\d+$/.test(q)) {
             filter += `,ticket_id.eq.${parseInt(q, 10)}`
           }
-          const { data } = await supabase
+          let query = supabase
             .from(TABLE_NAMES[type])
             .select('*')
             .or(filter)
-            .range(0, limitParam - 1)
+          if (type !== 'tasks') query = query.is('deleted_at', null)
+          const { data } = await query.range(0, limitParam - 1)
           results[type] = data ?? []
         }
       })

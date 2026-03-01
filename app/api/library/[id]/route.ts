@@ -23,7 +23,7 @@ export async function GET(
       const { data, error } = await supabase.rpc('rpc_list_library_items', { p_tenant_id: tenantId })
       if (error) return Response.json({ error: error.message }, { status: 400 })
       row = (data as Record<string, unknown>[])?.find((r) =>
-        isUuid ? r.id === id : r.seq_id === seqId,
+        (isUuid ? r.id === id : r.seq_id === seqId) && r.deleted_at == null,
       ) ?? null
     } else {
       const col = isUuid ? 'id' : 'seq_id'
@@ -31,6 +31,7 @@ export async function GET(
         .from('library_items')
         .select('*')
         .eq(col, isUuid ? id : seqId)
+        .is('deleted_at', null)
         .maybeSingle()
       if (error) return Response.json({ error: error.message }, { status: 400 })
       row = data
