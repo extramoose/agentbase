@@ -32,7 +32,7 @@ ALTER TABLE deals ADD COLUMN IF NOT EXISTS expected_close_date date;
 -- ---------------------------------------------------------------------------
 -- 4. Rebuild rpc_create_person with new params
 -- ---------------------------------------------------------------------------
-DROP FUNCTION IF EXISTS rpc_create_person;
+DROP FUNCTION IF EXISTS rpc_create_person(uuid, uuid, text, text, text, text, text, text, text[]);
 
 CREATE FUNCTION rpc_create_person(
   p_tenant_id uuid, p_actor_id uuid, p_actor_type text,
@@ -80,7 +80,7 @@ END; $f$;
 -- ---------------------------------------------------------------------------
 -- 5. Rebuild rpc_create_company with new params
 -- ---------------------------------------------------------------------------
-DROP FUNCTION IF EXISTS rpc_create_company;
+DROP FUNCTION IF EXISTS rpc_create_company(uuid, uuid, text, text, text, text, text, text[]);
 
 CREATE FUNCTION rpc_create_company(
   p_tenant_id uuid, p_actor_id uuid, p_actor_type text,
@@ -127,7 +127,7 @@ END; $f$;
 -- ---------------------------------------------------------------------------
 -- 6. Rebuild rpc_create_deal with new params
 -- ---------------------------------------------------------------------------
-DROP FUNCTION IF EXISTS rpc_create_deal;
+DROP FUNCTION IF EXISTS rpc_create_deal(uuid, uuid, text, text, text, numeric, text, text[]);
 
 CREATE FUNCTION rpc_create_deal(
   p_tenant_id uuid, p_actor_id uuid, p_actor_type text,
