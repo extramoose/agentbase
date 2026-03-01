@@ -1540,7 +1540,7 @@ export function TasksClient({
                 <button
                   key={m.id}
                   onClick={() => setAssigneeFilter(assigneeFilter === m.id ? null : m.id)}
-                  title={m.name}
+                  title={m.name ?? "?"}
                   className="relative rounded-full transition-transform hover:z-10 hover:scale-110"
                 >
                   <Avatar className={cn(
@@ -1549,8 +1549,8 @@ export function TasksClient({
                       ? 'ring-white scale-110 z-10'
                       : 'ring-background hover:ring-muted-foreground/40'
                   )}>
-                    <AvatarImage src={m.avatarUrl ?? undefined} alt={m.name} />
-                    <AvatarFallback className="text-[9px]">{m.name.slice(0, 2).toUpperCase()}</AvatarFallback>
+                    <AvatarImage src={m.avatarUrl ?? undefined} alt={m.name ?? "?"} />
+                    <AvatarFallback className="text-[9px]">{(m.name ?? "?").slice(0, 2).toUpperCase()}</AvatarFallback>
                   </Avatar>
                 </button>
               ))}
