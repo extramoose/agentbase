@@ -285,6 +285,8 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
   const hasMoreRef = useRef<boolean>(true)
   const loadingRef = useRef<boolean>(false)
   const sentinelRef = useRef<HTMLDivElement>(null)
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const offsetRef = useRef<number>(initialEntries.length)
 
   // seq_id cache: entity UUID → seq_id (number)
   const seqIdCache = useRef<Map<string, number>>(new Map())
@@ -344,6 +346,7 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
       const results = (data ?? []) as ActivityLogEntry[]
       await resolveSeqIds(results)
       setEntries(results)
+      offsetRef.current = results.length
       hasMoreRef.current = results.length >= 50
       setLoading(false)
     }
@@ -355,12 +358,13 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
 
   // Load next page of events within the same selected day
   const loadMore = useCallback(async () => {
+    console.log('[history] loadMore called, offset:', offsetRef.current, 'hasMore:', hasMoreRef.current)
     if (!hasMoreRef.current || loadingRef.current) return
     loadingRef.current = true
     const day = localDateStr(selectedDate)
     const { data } = await supabase.rpc('get_activity_log', {
       p_limit: 50,
-      p_offset: entries.length,
+      p_offset: offsetRef.current,
       p_date_from: day,
       p_date_to: day,
       p_tz: USER_TZ,
@@ -370,21 +374,23 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
     const results = (data ?? []) as ActivityLogEntry[]
     if (results.length < 50) hasMoreRef.current = false
     if (results.length > 0) {
+      offsetRef.current += results.length
       await resolveSeqIds(results)
       setEntries(prev => [...prev, ...results])
     }
     loadingRef.current = false
-  }, [selectedDate, entries.length, entityFilter, search, supabase, resolveSeqIds])
+  }, [selectedDate, entityFilter, search, supabase, resolveSeqIds])
 
   // IntersectionObserver to trigger loadMore when sentinel is visible
   useEffect(() => {
     const sentinel = sentinelRef.current
-    if (!sentinel) return
+    const scrollContainer = scrollContainerRef.current
+    if (!sentinel || !scrollContainer) return
     const observer = new IntersectionObserver(
       (observerEntries) => {
         if (observerEntries[0]?.isIntersecting) loadMore()
       },
-      { rootMargin: '200px' },
+      { root: scrollContainer, rootMargin: '200px' },
     )
     observer.observe(sentinel)
     return () => observer.disconnect()
@@ -637,7 +643,7 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
       </div>
 
       {/* Activity list */}
-      <div className="flex-1 overflow-y-auto space-y-1">
+      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto space-y-1">
         {loading ? (
           <div className="flex justify-center py-8">
             <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
