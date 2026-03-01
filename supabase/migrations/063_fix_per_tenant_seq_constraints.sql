@@ -1,3 +1,7 @@
+-- First: drop identity on tasks.ticket_id (062 may not have run)
+ALTER TABLE tasks ALTER COLUMN ticket_id DROP IDENTITY IF EXISTS;
+ALTER TABLE tasks ALTER COLUMN ticket_id SET DEFAULT 0;
+
 -- Fix: replace global unique constraints with per-tenant unique on seq_id/ticket_id
 
 -- Drop global unique constraints
