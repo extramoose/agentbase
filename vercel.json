@@ -4,5 +4,8 @@
       "path": "/api/cron/purge-idempotency",
       "schedule": "0 * * * *"
     }
-  ]
+  ],
+  "git": {
+    "deploymentEnabled": false
+  }
 }
