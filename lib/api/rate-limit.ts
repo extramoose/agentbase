@@ -9,9 +9,10 @@ interface RateLimitEntry {
 
 const store = new Map<string, RateLimitEntry>()
 const WINDOW_MS = 60_000
-const MAX_REQUESTS = 60
+const MAX_REQUESTS_HUMAN = 60
+const MAX_REQUESTS_AGENT = 300
 
-export function checkRateLimit(actorId: string): { allowed: boolean; retryAfter: number } {
+export function checkRateLimit(actorId: string, actorType: 'human' | 'agent' = 'human'): { allowed: boolean; retryAfter: number } {
   const now = Date.now()
   const entry = store.get(actorId)
 
@@ -20,7 +21,8 @@ export function checkRateLimit(actorId: string): { allowed: boolean; retryAfter:
     return { allowed: true, retryAfter: 0 }
   }
 
-  if (entry.count >= MAX_REQUESTS) {
+  const maxRequests = actorType === 'agent' ? MAX_REQUESTS_AGENT : MAX_REQUESTS_HUMAN;
+  if (entry.count >= maxRequests) {
     const retryAfter = Math.ceil((WINDOW_MS - (now - entry.windowStart)) / 1000)
     return { allowed: false, retryAfter }
   }

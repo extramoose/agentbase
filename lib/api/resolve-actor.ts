@@ -40,7 +40,7 @@ export async function resolveActor(request: Request): Promise<ResolvedActor> {
   const { data: agent } = await supabase.rpc('resolve_agent_by_key', { p_key_hash: keyHash })
   if (!agent) throw new UnauthorizedError('Invalid or revoked API key')
 
-  const { allowed, retryAfter } = checkRateLimit(agent.id as string)
+  const { allowed, retryAfter } = checkRateLimit(agent.id as string, 'agent')
   if (!allowed) throw new RateLimitError(retryAfter)
 
   return {
