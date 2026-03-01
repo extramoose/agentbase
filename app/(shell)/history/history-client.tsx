@@ -358,7 +358,6 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
 
   // Load next page of events within the same selected day
   const loadMore = useCallback(async () => {
-    console.log('[history] loadMore called, offset:', offsetRef.current, 'hasMore:', hasMoreRef.current)
     if (!hasMoreRef.current || loadingRef.current) return
     loadingRef.current = true
     const day = localDateStr(selectedDate)
@@ -663,7 +662,7 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
                 ? renderLevel1Group(item.group)
                 : renderBurst(item)
             )}
-            <div ref={sentinelRef} className="h-10 bg-red-500 text-white text-center">SENTINEL - if you see this, scroll works</div>
+            <div ref={sentinelRef} />
           </>
         )}
       </div>
