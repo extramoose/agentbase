@@ -6,7 +6,7 @@ import { ActorChip } from '@/components/actor-chip'
 import { SearchFilterBar } from '@/components/search-filter-bar'
 import { EntityShelf } from '@/components/entity-client/entity-shelf'
 import { Badge } from '@/components/ui/badge'
-import { formatDistanceToNow, isToday, isYesterday, format, startOfDay, addDays } from 'date-fns'
+import { formatDistanceToNow, isToday, isYesterday, format, addDays } from 'date-fns'
 import { ChevronLeft, ChevronRight, Loader2, Plus, Minus } from 'lucide-react'
 import {
   formatActivityEvent,
