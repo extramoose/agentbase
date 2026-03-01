@@ -9,6 +9,7 @@ export default async function LibraryPage() {
   const { data: items } = await supabase
     .from('library_items')
     .select('*')
+    .is('deleted_at', null)
     .order('created_at', { ascending: false })
   return (
     <Suspense fallback={null}>
