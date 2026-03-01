@@ -19,9 +19,11 @@ function readViewParam(defaultView: View): View {
 export function ViewToggle({
   onChange,
   defaultView = 'table',
+  showStickies = false,
 }: {
   onChange?: (view: View) => void
   defaultView?: View
+  showStickies?: boolean
 }) {
   const [view, setView] = useState<View>(defaultView)
 
@@ -65,6 +67,7 @@ export function ViewToggle({
         onClick={() => toggle('table')}
         className={cn(
           'p-1.5 transition-colors',
+          !showStickies && 'rounded-r-md',
           view === 'table'
             ? 'bg-muted text-foreground'
             : 'text-muted-foreground hover:text-foreground',
@@ -73,18 +76,20 @@ export function ViewToggle({
       >
         <List className="h-4 w-4" />
       </button>
-      <button
-        onClick={() => toggle('stickies')}
-        className={cn(
-          'p-1.5 rounded-r-md transition-colors',
-          view === 'stickies'
-            ? 'bg-muted text-foreground'
-            : 'text-muted-foreground hover:text-foreground',
-        )}
-        title="Stickies view"
-      >
-        <StickyNote className="h-4 w-4" />
-      </button>
+      {showStickies && (
+        <button
+          onClick={() => toggle('stickies')}
+          className={cn(
+            'p-1.5 rounded-r-md transition-colors',
+            view === 'stickies'
+              ? 'bg-muted text-foreground'
+              : 'text-muted-foreground hover:text-foreground',
+          )}
+          title="Stickies view"
+        >
+          <StickyNote className="h-4 w-4" />
+        </button>
+      )}
     </div>
   )
 }
