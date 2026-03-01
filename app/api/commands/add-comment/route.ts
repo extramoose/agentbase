@@ -7,7 +7,7 @@ const schema = z.object({
   entity_type: z.string(),
   entity_id: z.string().uuid(),
   entity_label: z.string().optional(),
-  body: z.string().min(1).max(10000),
+  body: z.string().min(1).max(50000),
 })
 
 export async function POST(request: Request) {

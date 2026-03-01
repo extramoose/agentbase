@@ -36,6 +36,8 @@ export function apiResponse(data: unknown, status = 200): Response {
   return Response.json({ success: true, data }, { status })
 }
 
+import { ZodError } from 'zod'
+
 export function apiError(error: unknown): Response {
   if (error instanceof ApiError) {
     const headers: Record<string, string> = {}
@@ -46,6 +48,9 @@ export function apiError(error: unknown): Response {
       { success: false, error: error.message },
       { status: error.status, headers }
     )
+  }
+  if (error instanceof ZodError) {
+    return Response.json({ success: false, error: 'Validation failed', details: error.issues }, { status: 400 })
   }
   if (error instanceof Error) {
     console.error('Unhandled API error:', error)
