@@ -1010,7 +1010,7 @@ export function TasksClient({
   const allTags = useMemo(() => {
     // Recompute the pre-tag-filter list so tags reflect current view/filters
     let result = tasks
-    if (view === 'table') {
+    if (view === 'table' || view === 'grid') {
       if (statusFilter !== 'cancelled') result = result.filter(t => t.status !== 'cancelled')
       if (statusFilter !== 'backlog') result = result.filter(t => t.status !== 'backlog')
       if (statusFilter !== 'blocked') result = result.filter(t => t.status !== 'blocked')
@@ -1152,8 +1152,8 @@ export function TasksClient({
   const filteredTasks = useMemo(() => {
     let result = tasks
 
-    // Status filtering only in table view
-    if (view === 'table') {
+    // Status filtering in table + grid views
+    if (view === 'table' || view === 'grid') {
       // Hide overflow statuses (backlog, cancelled) unless explicitly selected
       if (statusFilter !== 'cancelled') {
         result = result.filter((t) => t.status !== 'cancelled')
@@ -1545,62 +1545,64 @@ export function TasksClient({
         ))}
       </div>
 
-      {/* Table view: tabs + priority groups + drag */}
-      {view === 'table' && (
-        <>
-          {/* Status filter tabs */}
-          <div className="flex gap-1 mb-4 border-b border-border pb-2 overflow-x-auto">
-            {STATUS_TABS.map((tab) => (
+      {/* Status filter tabs (table + grid) */}
+      {(view === 'table' || view === 'grid') && (
+        <div className="flex gap-1 mb-4 border-b border-border pb-2 overflow-x-auto">
+          {STATUS_TABS.map((tab) => (
+            <button
+              key={tab.value}
+              onClick={() => setStatusFilter(tab.value)}
+              className={cn(
+                'px-3 py-1.5 text-sm rounded-md transition-colors',
+                statusFilter === tab.value
+                  ? 'bg-muted text-foreground font-medium'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+              )}
+            >
+              {tab.label}
+              <span className="ml-1.5 text-xs text-muted-foreground">
+                {statusCounts[tab.value]}
+              </span>
+            </button>
+          ))}
+
+          {/* Overflow: Backlog + Blocked + Cancelled */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
               <button
-                key={tab.value}
-                onClick={() => setStatusFilter(tab.value)}
                 className={cn(
-                  'px-3 py-1.5 text-sm rounded-md transition-colors',
-                  statusFilter === tab.value
+                  'px-3 py-1.5 text-sm rounded-md transition-colors flex items-center gap-1',
+                  STATUS_OVERFLOW.some((o) => o.value === statusFilter)
                     ? 'bg-muted text-foreground font-medium'
                     : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
                 )}
               >
-                {tab.label}
-                <span className="ml-1.5 text-xs text-muted-foreground">
-                  {statusCounts[tab.value]}
-                </span>
+                {STATUS_OVERFLOW.find((o) => o.value === statusFilter)?.label ?? '···'}
+                <ChevronDown className="w-3 h-3" />
               </button>
-            ))}
-
-            {/* Overflow: Backlog + Blocked + Cancelled */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  className={cn(
-                    'px-3 py-1.5 text-sm rounded-md transition-colors flex items-center gap-1',
-                    STATUS_OVERFLOW.some((o) => o.value === statusFilter)
-                      ? 'bg-muted text-foreground font-medium'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
-                  )}
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              {STATUS_OVERFLOW.map((item) => (
+                <DropdownMenuItem
+                  key={item.value}
+                  onClick={() => setStatusFilter(item.value)}
+                  className={cn(statusFilter === item.value && 'font-medium')}
                 >
-                  {STATUS_OVERFLOW.find((o) => o.value === statusFilter)?.label ?? '···'}
-                  <ChevronDown className="w-3 h-3" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start">
-                {STATUS_OVERFLOW.map((item) => (
-                  <DropdownMenuItem
-                    key={item.value}
-                    onClick={() => setStatusFilter(item.value)}
-                    className={cn(statusFilter === item.value && 'font-medium')}
-                  >
-                    {item.label}
-                    <span className="ml-auto pl-4 text-xs text-muted-foreground">
-                      {statusCounts[item.value]}
-                    </span>
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
+                  {item.label}
+                  <span className="ml-auto pl-4 text-xs text-muted-foreground">
+                    {statusCounts[item.value]}
+                  </span>
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
 
-          </div>
+        </div>
+      )}
 
+      {/* Table view: priority groups + drag */}
+      {view === 'table' && (
+        <>
           {/* Select-all row */}
           {filteredTasks.length > 0 && (
             <div className="flex items-center gap-2 px-4 py-1.5 mb-1">
