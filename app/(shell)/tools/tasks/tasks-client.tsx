@@ -20,7 +20,7 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { GripVertical, Plus, ChevronDown, ChevronRight, AlertCircle, ArrowUp, Minus, ArrowDown, X, Trash2, Calendar, Loader2 } from 'lucide-react'
+import { GripVertical, Plus, ChevronDown, ChevronRight, AlertCircle, ArrowUp, Minus, ArrowDown, X, Trash2, Calendar, Loader2, BarChart3 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { SearchFilterBar } from '@/components/search-filter-bar'
 import { EntityShelf } from '@/components/entity-client/entity-shelf'
@@ -952,6 +952,7 @@ export function TasksClient({
   const [selectedTag, setSelectedTag] = useState<string | null>(
     () => searchParams.get('tag') ?? null
   )
+  const [stickiesMode, setStickiesMode] = useState<'timeframe' | 'status'>('timeframe')
   const [creatingTask, setCreatingTask] = useState(false)
 
   const supabase = createClient()
@@ -1019,15 +1020,8 @@ export function TasksClient({
       if (statusFilter !== 'all') result = result.filter(t => t.status === statusFilter)
     }
     if (view === 'stickies') {
-      // Stickies only shows tasks due within this month
-      const today = new Date()
-      const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0)
-      const endStr = `${endOfMonth.getFullYear()}-${String(endOfMonth.getMonth()+1).padStart(2,'0')}-${String(endOfMonth.getDate()).padStart(2,'0')}`
-      result = result.filter(t => {
-        if (!t.due_date) return false
-        const d = t.due_date.slice(0, 10)
-        return d <= endStr
-      })
+      // For tag computation, include all tasks matching assignee (not date-scoped)
+      // so tag pills remain visible regardless of time-based lane filtering
       result = result.filter(t => t.status !== 'done' && t.status !== 'cancelled')
     }
     if (typeFilter !== 'all') result = result.filter(t => t.type === typeFilter)
@@ -1499,6 +1493,15 @@ export function TasksClient({
     }
   }, [assigneeFilter, _currentUser])
 
+  // Auto-switch stickies mode when assignee changes
+  useEffect(() => {
+    if (!assigneeFilter) return
+    const member = workspaceMembers.find((m) => m.id === assigneeFilter)
+    if (member) {
+      setStickiesMode(member.role === 'agent' ? 'status' : 'timeframe')
+    }
+  }, [assigneeFilter, workspaceMembers])
+
   // ----- Visible priority groups -----
   // Always show all priority groups, even when empty
   const displayPriorities = PRIORITY_ORDER
@@ -1549,6 +1552,38 @@ export function TasksClient({
                   </Avatar>
                 </button>
               ))}
+            </div>
+            <div className="w-px h-5 bg-border mx-1" />
+          </>
+        )}
+
+        {view === 'stickies' && (
+          <>
+            <div className="flex rounded-md border border-border overflow-hidden">
+              <button
+                onClick={() => setStickiesMode('timeframe')}
+                title="Timeframe"
+                className={cn(
+                  'px-1.5 py-1 transition-colors',
+                  stickiesMode === 'timeframe'
+                    ? 'bg-muted text-foreground'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                )}
+              >
+                <Calendar className="h-3.5 w-3.5" />
+              </button>
+              <button
+                onClick={() => setStickiesMode('status')}
+                title="Status"
+                className={cn(
+                  'px-1.5 py-1 transition-colors',
+                  stickiesMode === 'status'
+                    ? 'bg-muted text-foreground'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                )}
+              >
+                <BarChart3 className="h-3.5 w-3.5" />
+              </button>
             </div>
             <div className="w-px h-5 bg-border mx-1" />
           </>
@@ -1824,7 +1859,7 @@ export function TasksClient({
         <StickiesView
           tasks={filteredTasks}
           onTaskClick={handleTaskClick}
-          selectedRole={assigneeFilter ? workspaceMembers.find((m) => m.id === assigneeFilter)?.role : undefined}
+          mode={stickiesMode}
         />
       )}
 

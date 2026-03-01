@@ -22,7 +22,7 @@ interface StickyTask {
 interface StickiesViewProps {
   tasks: StickyTask[]
   onTaskClick: (task: any) => void
-  selectedRole?: 'human' | 'agent'
+  mode?: 'timeframe' | 'status'
 }
 
 const PRIORITY_STYLES: Record<Priority, string> = {
@@ -133,7 +133,7 @@ function categorizeTasks(tasks: StickyTask[]): Lane[] {
     weekStart.setDate(weekStart.getDate() + 1)
     lanes.push({
       key: 'thisweek',
-      label: 'This Week',
+      label: 'Up Next',
       helperText: `${fmtShort(weekStart)} – ${fmtShort(endOfWeekSunday)}`,
       tasks: sortByPriority(thisWeekTasks),
       size: 'medium',
@@ -144,7 +144,7 @@ function categorizeTasks(tasks: StickyTask[]): Lane[] {
     monthLaneStart.setDate(monthLaneStart.getDate() + 1)
     lanes.push({
       key: 'thismonth',
-      label: 'This Month',
+      label: 'Later',
       helperText: `${fmtShort(monthLaneStart)} – ${fmtShort(endOfMonth)}`,
       tasks: sortByPriority(thisMonthTasks),
       size: 'small',
@@ -370,10 +370,10 @@ function SwimLane({
   )
 }
 
-export function StickiesView({ tasks, onTaskClick, selectedRole }: StickiesViewProps) {
+export function StickiesView({ tasks, onTaskClick, mode }: StickiesViewProps) {
   const lanes = useMemo(
-    () => selectedRole === 'agent' ? categorizeByStatus(tasks) : categorizeTasks(tasks),
-    [tasks, selectedRole],
+    () => mode === 'status' ? categorizeByStatus(tasks) : categorizeTasks(tasks),
+    [tasks, mode],
   )
 
   return (
