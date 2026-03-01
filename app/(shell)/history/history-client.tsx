@@ -591,7 +591,7 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
               onClick={() => setEntityFilter(null)}
               className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
                 entityFilter === null
-                  ? 'bg-primary text-primary-foreground'
+                  ? 'bg-white text-black border border-black'
                   : 'bg-muted text-muted-foreground hover:text-foreground'
               }`}
             >
@@ -603,7 +603,7 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
                 onClick={() => setEntityFilter(entityFilter === type ? null : type)}
                 className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
                   entityFilter === type
-                    ? ENTITY_COLORS[type] ?? 'bg-primary text-primary-foreground'
+                    ? 'bg-white text-black border border-black'
                     : 'bg-muted text-muted-foreground hover:text-foreground'
                 }`}
               >

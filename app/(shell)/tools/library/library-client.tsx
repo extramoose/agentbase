@@ -467,7 +467,7 @@ export function LibraryClient({ initialItems, initialItemId }: { initialItems: L
           className={cn(
             'px-3 py-1.5 rounded-full text-sm font-medium transition-colors',
             typeFilter === 'all'
-              ? 'bg-primary text-primary-foreground'
+              ? 'bg-white text-black border border-black'
               : 'bg-muted text-muted-foreground hover:text-foreground',
           )}
         >
@@ -483,7 +483,7 @@ export function LibraryClient({ initialItems, initialItemId }: { initialItems: L
               className={cn(
                 'px-3 py-1.5 rounded-full text-sm font-medium transition-colors flex items-center gap-1.5',
                 typeFilter === t
-                  ? 'bg-primary text-primary-foreground'
+                  ? 'bg-white text-black border border-black'
                   : 'bg-muted text-muted-foreground hover:text-foreground',
               )}
             >
