@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils'
 
 export const AVATAR_PRESETS = [
   '/avatars/avatar_anonymous.jpg',
-  ...Array.from({ length: 12 }, (_, i) => `/avatars/avatar${i + 1}.jpg`),
+  ...Array.from({ length: 11 }, (_, i) => `/avatars/avatar${i + 1}.jpg`),
 ]
 
 interface AvatarPickerProps {
