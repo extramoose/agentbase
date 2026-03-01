@@ -50,6 +50,7 @@ BEGIN
       key,
       CASE
         WHEN key IN ('due_date') THEN 'date'
+        WHEN key IN ('last_enriched') THEN 'timestamptz'
         WHEN key IN ('checked', 'is_public') THEN 'boolean'
         WHEN key IN ('sort_order', 'value') THEN 'numeric'
         WHEN key IN ('tags', 'proposed_tasks') THEN

@@ -40,6 +40,7 @@ export interface CrmCompany extends BaseEntity {
   instagram: string | null
   location: string | null
   source: string | null
+  last_enriched: string | null
 }
 
 export interface CrmPerson extends BaseEntity {
@@ -54,6 +55,7 @@ export interface CrmPerson extends BaseEntity {
   twitter: string | null
   instagram: string | null
   source: string | null
+  last_enriched: string | null
 }
 
 type DealStatus = 'prospect' | 'active' | 'won' | 'lost'
@@ -67,6 +69,7 @@ export interface CrmDeal extends BaseEntity {
   source: string | null
   primary_contact_id: string | null
   expected_close_date: string | null
+  last_enriched: string | null
 }
 
 type Section = 'deals' | 'companies' | 'people'
@@ -84,6 +87,22 @@ const DEAL_STATUS_CONFIG: Record<DealStatus, { label: string; className: string;
 }
 
 const DEAL_STATUS_ORDER: DealStatus[] = ['prospect', 'active', 'won', 'lost']
+
+function formatRelativeTime(iso: string): string {
+  const ms = Date.now() - new Date(iso).getTime()
+  const seconds = Math.floor(ms / 1000)
+  if (seconds < 60) return 'just now'
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) return `${minutes}m ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours}h ago`
+  const days = Math.floor(hours / 24)
+  if (days < 30) return `${days}d ago`
+  const months = Math.floor(days / 30)
+  if (months < 12) return `${months}mo ago`
+  const years = Math.floor(months / 12)
+  return `${years}y ago`
+}
 
 const SECTIONS: Array<{ value: Section; label: string }> = [
   { value: 'deals', label: 'Deals' },
@@ -257,7 +276,7 @@ export function CrmClient({
     const optimistic: CrmCompany = {
       id: tempId, seq_id: null, tenant_id: '', name, domain: null, industry: null, notes: null,
       website: null, linkedin: null, twitter: null, instagram: null, location: null, source: null,
-      tags: [], assignee_id: null, assignee_type: null,
+      last_enriched: null, tags: [], assignee_id: null, assignee_type: null,
       created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
     }
     setCompanies((prev) => [optimistic, ...prev])
@@ -284,7 +303,7 @@ export function CrmClient({
     const optimistic: CrmPerson = {
       id: tempId, seq_id: null, tenant_id: '', name, email: null, phone: null, title: null, notes: null,
       emails: [], phones: [], linkedin: null, twitter: null, instagram: null, source: null,
-      tags: [], assignee_id: null, assignee_type: null,
+      last_enriched: null, tags: [], assignee_id: null, assignee_type: null,
       created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
     }
     setPeople((prev) => [optimistic, ...prev])
@@ -311,7 +330,7 @@ export function CrmClient({
     const optimistic: CrmDeal = {
       id: tempId, seq_id: null, tenant_id: '', title: dealTitle, status: 'prospect', value: null, notes: null,
       follow_up_date: null, source: null, primary_contact_id: null, expected_close_date: null,
-      tags: [], assignee_id: null, assignee_type: null,
+      last_enriched: null, tags: [], assignee_id: null, assignee_type: null,
       created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
     }
     setDeals((prev) => [optimistic, ...prev])
@@ -1457,6 +1476,10 @@ export function DealShelfContent({
         />
       </div>
 
+      <p className="text-xs text-muted-foreground">
+        Last enriched: {deal.last_enriched ? formatRelativeTime(deal.last_enriched) : 'Never'}
+      </p>
+
     </div>
   )
 }
@@ -1641,6 +1664,10 @@ export function CompanyShelfContent({
           }
         />
       </div>
+
+      <p className="text-xs text-muted-foreground">
+        Last enriched: {company.last_enriched ? formatRelativeTime(company.last_enriched) : 'Never'}
+      </p>
 
     </div>
   )
@@ -1840,6 +1867,10 @@ export function PersonShelfContent({
           }
         />
       </div>
+
+      <p className="text-xs text-muted-foreground">
+        Last enriched: {person.last_enriched ? formatRelativeTime(person.last_enriched) : 'Never'}
+      </p>
 
     </div>
   )

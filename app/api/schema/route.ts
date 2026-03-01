@@ -39,6 +39,7 @@ const UPDATABLE_FIELDS = {
     location: { type: 'string' },
     source: { type: 'string' },
     tags: { type: 'text[]' },
+    last_enriched: { type: 'timestamptz', description: 'ISO-8601 timestamp of last agent enrichment' },
   },
   people: {
     name: { type: 'string' },
@@ -53,6 +54,7 @@ const UPDATABLE_FIELDS = {
     instagram: { type: 'string' },
     source: { type: 'string' },
     tags: { type: 'text[]' },
+    last_enriched: { type: 'timestamptz', description: 'ISO-8601 timestamp of last agent enrichment' },
   },
   deals: {
     title: { type: 'string' },
@@ -64,6 +66,7 @@ const UPDATABLE_FIELDS = {
     primary_contact_id: { type: 'string | null', description: 'UUID of primary contact (person)' },
     expected_close_date: { type: 'date | null', description: 'ISO date string (YYYY-MM-DD)' },
     tags: { type: 'text[]' },
+    last_enriched: { type: 'timestamptz', description: 'ISO-8601 timestamp of last agent enrichment' },
   },
 }
 
