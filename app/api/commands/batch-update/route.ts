@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { resolveActorUnified } from '@/lib/api/resolve-actor'
 import { apiError } from '@/lib/api/errors'
+import { broadcastMutation } from '@/lib/api/broadcast'
 
 const ALLOWED_TABLES = [
   'tasks', 'library_items',
@@ -38,6 +39,9 @@ export async function POST(request: Request) {
     }))
     await supabase.from('activity_log').insert(logEntries)
 
+    if (actorType === 'agent') {
+      broadcastMutation(supabase, table, 'UPDATE', ids)
+    }
     return Response.json({ success: true, updated: ids.length })
   } catch (err) {
     return apiError(err)

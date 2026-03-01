@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { resolveActorUnified } from '@/lib/api/resolve-actor'
 import { apiError } from '@/lib/api/errors'
+import { broadcastMutation } from '@/lib/api/broadcast'
 
 const schema = z.object({
   entity_type: z.string(),
@@ -12,7 +13,7 @@ const schema = z.object({
 
 export async function POST(request: Request) {
   try {
-    const { supabase, actorId, tenantId } = await resolveActorUnified(request)
+    const { supabase, actorId, actorType, tenantId } = await resolveActorUnified(request)
     const body = await request.json()
     const input = schema.parse(body)
 
@@ -26,6 +27,9 @@ export async function POST(request: Request) {
     })
 
     if (error) throw error
+    if (actorType === 'agent') {
+      broadcastMutation(supabase, 'activity_log', 'INSERT', input.entity_id)
+    }
 
     return NextResponse.json({ success: true, data })
   } catch (err) {

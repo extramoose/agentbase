@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { resolveActorUnified } from '@/lib/api/resolve-actor'
 import { apiError } from '@/lib/api/errors'
 import { validateAssignee } from '@/lib/api/validate-assignee'
+import { broadcastMutation } from '@/lib/api/broadcast'
 
 const ALLOWED_TABLES = [
   'tasks', 'library_items', 'companies', 'people', 'deals',
@@ -16,7 +17,7 @@ const schema = z.object({
 
 export async function PATCH(request: Request) {
   try {
-    const { supabase, actorId, tenantId } = await resolveActorUnified(request)
+    const { supabase, actorId, actorType, tenantId } = await resolveActorUnified(request)
     const body = await request.json()
     const input = schema.parse(body)
 
@@ -59,6 +60,9 @@ export async function PATCH(request: Request) {
     })
 
     if (error) throw error
+    if (actorType === 'agent') {
+      broadcastMutation(supabase, input.table, 'UPDATE', input.id)
+    }
 
     return NextResponse.json({ success: true, data })
   } catch (err) {

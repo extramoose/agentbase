@@ -1,6 +1,7 @@
 import { resolveActorUnified } from '@/lib/api/resolve-actor'
 import { apiError } from '@/lib/api/errors'
 import { validateAssignee } from '@/lib/api/validate-assignee'
+import { broadcastMutation } from '@/lib/api/broadcast'
 import { z } from 'zod'
 
 const schema = z.object({
@@ -71,6 +72,9 @@ export async function POST(request: Request) {
       p_idempotency_key: input.idempotency_key ?? null,
     })
     if (error) throw error
+    if (actorType === 'agent') {
+      broadcastMutation(supabase, 'tasks', 'INSERT', (data as { id: string }).id)
+    }
     return Response.json({ data }, { status: 201 })
   } catch (err) {
     return apiError(err)

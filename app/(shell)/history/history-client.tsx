@@ -354,7 +354,40 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
     return () => { cancelled = true; clearTimeout(timeout) }
   }, [entityFilter, search, selectedDate]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  
+  // ----- Agent broadcast sidecar -----
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('agent:mutations')
+      .on('broadcast', { event: 'mutation' }, (msg) => {
+        const { table } = msg.payload as { table: string }
+        if (table !== 'activity_log') return
+        const day = localDateStr(selectedDate)
+        supabase
+          .rpc('get_activity_log', {
+            p_limit: 50,
+            p_offset: 0,
+            p_date_from: day,
+            p_date_to: day,
+            p_tz: USER_TZ,
+            ...(entityFilter ? { p_entity_type: entityFilter } : {}),
+            ...(search.trim() ? { p_search: search.trim() } : {}),
+          })
+          .then(async ({ data }) => {
+            const results = (data ?? []) as ActivityLogEntry[]
+            await resolveSeqIds(results)
+            setEntries(results)
+            offsetRef.current = results.length
+            hasMoreRef.current = results.length >= 50
+          })
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDate, entityFilter, search])
 
   // Load next page of events within the same selected day
   const loadMore = useCallback(async () => {

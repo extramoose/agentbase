@@ -1,5 +1,6 @@
 import { resolveActorUnified } from '@/lib/api/resolve-actor'
 import { apiError } from '@/lib/api/errors'
+import { broadcastMutation } from '@/lib/api/broadcast'
 import { z } from 'zod'
 
 const ALLOWED_TABLES = ['tasks', 'library_items', 'companies', 'people', 'deals'] as const
@@ -52,6 +53,9 @@ export async function POST(request: Request) {
       if (error) return apiError(error)
     }
 
+    if (actorType === 'agent') {
+      broadcastMutation(supabase, table, 'DELETE', id)
+    }
     return Response.json({ success: true })
   } catch (err) {
     return apiError(err)

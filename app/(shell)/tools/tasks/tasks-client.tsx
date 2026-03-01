@@ -1147,6 +1147,31 @@ export function TasksClient({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // ----- Agent broadcast sidecar -----
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('agent:mutations')
+      .on('broadcast', { event: 'mutation' }, (msg) => {
+        const { table } = msg.payload as { table: string }
+        if (table !== 'tasks') return
+        supabase
+          .from('tasks')
+          .select('*')
+          .order('sort_order', { ascending: true })
+          .order('created_at', { ascending: false })
+          .then(({ data }) => {
+            if (data) setTasks(data as Task[])
+          })
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   // ----- Filtered & grouped tasks -----
 
   const filteredTasks = useMemo(() => {
