@@ -126,8 +126,8 @@ function StickyCard({
   onClick: () => void
 }) {
   const config = SIZE_CONFIG[size]
-  const visibleTags = task.tags.slice(0, size === 'small' ? 1 : 3)
-  const extraTagCount = task.tags.length - visibleTags.length
+  const visibleTags = (task.tags ?? []).slice(0, size === 'small' ? 1 : 3)
+  const extraTagCount = (task.tags ?? []).length - visibleTags.length
 
   return (
     <button
