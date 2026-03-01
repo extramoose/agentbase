@@ -1015,6 +1015,18 @@ export function TasksClient({
       if (statusFilter !== 'blocked') result = result.filter(t => t.status !== 'blocked')
       if (statusFilter !== 'all') result = result.filter(t => t.status === statusFilter)
     }
+    if (view === 'stickies') {
+      // Stickies only shows tasks due within this month
+      const today = new Date()
+      const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0)
+      const endStr = `${endOfMonth.getFullYear()}-${String(endOfMonth.getMonth()+1).padStart(2,'0')}-${String(endOfMonth.getDate()).padStart(2,'0')}`
+      result = result.filter(t => {
+        if (!t.due_date) return false
+        const d = t.due_date.slice(0, 10)
+        return d <= endStr
+      })
+      result = result.filter(t => t.status !== 'done' && t.status !== 'cancelled')
+    }
     if (typeFilter !== 'all') result = result.filter(t => t.type === typeFilter)
     if (assigneeFilter) result = result.filter(t => t.assignee_id === assigneeFilter)
     if (search.trim()) {
