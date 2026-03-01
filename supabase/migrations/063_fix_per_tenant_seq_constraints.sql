@@ -61,3 +61,17 @@ WITH numbered AS (
 UPDATE tasks SET ticket_id = numbered.rn FROM numbered WHERE tasks.id = numbered.id;
 
 NOTIFY pgrst, 'reload schema';
+
+-- Fix rpc_create_invite: let column default handle token generation
+CREATE OR REPLACE FUNCTION rpc_create_invite()
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE
+  v_user_id uuid := auth.uid();
+  v_tenant_id uuid := get_my_tenant_id();
+  v_invite workspace_invites;
+BEGIN
+  INSERT INTO workspace_invites (tenant_id, created_by)
+  VALUES (v_tenant_id, v_user_id)
+  RETURNING * INTO v_invite;
+  RETURN to_jsonb(v_invite);
+END; $$;
