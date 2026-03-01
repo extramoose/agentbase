@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Building2, Plus, Trash2, User, Handshake, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { EntityShelf } from '@/components/entity-client/entity-shelf'
@@ -82,6 +82,8 @@ const DEAL_STATUS_CONFIG: Record<DealStatus, { label: string; className: string;
   won:      { label: 'Won',      className: 'bg-green-500/20 text-green-400', funnelColor: 'bg-green-500' },
   lost:     { label: 'Lost',     className: 'bg-red-500/20 text-red-400',     funnelColor: 'bg-red-500' },
 }
+
+const DEAL_STATUS_ORDER: DealStatus[] = ['prospect', 'active', 'won', 'lost']
 
 const SECTIONS: Array<{ value: Section; label: string }> = [
   { value: 'deals', label: 'Deals' },
@@ -431,7 +433,7 @@ export function CrmClient({
 
   const hasResults =
     section === 'deals'
-      ? filteredDeals.length > 0
+      ? true // always show status sections for deals
       : section === 'companies'
         ? filteredCompanies.length > 0
         : filteredPeople.length > 0
@@ -753,20 +755,42 @@ export function CrmClient({
             <p className="text-sm">No {entityLabelPlural} found</p>
           </div>
         ) : view === 'grid' ? (
-          <EntityGrid>
-            {section === 'deals' &&
-              filteredDeals.map((d) => (
-                <DealGridCard key={d.id} deal={d} onClick={() => openShelf(d)} />
-              ))}
-            {section === 'companies' &&
-              filteredCompanies.map((c) => (
-                <CompanyGridCard key={c.id} company={c} onClick={() => openShelf(c)} />
-              ))}
-            {section === 'people' &&
-              filteredPeople.map((p) => (
-                <PersonGridCard key={p.id} person={p} onClick={() => openShelf(p)} />
-              ))}
-          </EntityGrid>
+          section === 'deals' ? (
+            <div className="space-y-4">
+              {(dealStatusFilter === 'all' ? DEAL_STATUS_ORDER : [dealStatusFilter]).map((status) => {
+                const cfg = DEAL_STATUS_CONFIG[status]
+                const groupDeals = filteredDeals.filter((d) => d.status === status)
+                return (
+                  <div key={status}>
+                    <div className="flex items-center gap-2 mb-2">
+                      <Badge variant="secondary" className={cn('text-xs', cfg.className)}>{cfg.label}</Badge>
+                      <span className="text-xs text-muted-foreground">({groupDeals.length})</span>
+                    </div>
+                    {groupDeals.length > 0 ? (
+                      <EntityGrid>
+                        {groupDeals.map((d) => (
+                          <DealGridCard key={d.id} deal={d} onClick={() => openShelf(d)} />
+                        ))}
+                      </EntityGrid>
+                    ) : (
+                      <p className="text-xs text-muted-foreground/60 py-2">No items</p>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
+            <EntityGrid>
+              {section === 'companies' &&
+                filteredCompanies.map((c) => (
+                  <CompanyGridCard key={c.id} company={c} onClick={() => openShelf(c)} />
+                ))}
+              {section === 'people' &&
+                filteredPeople.map((p) => (
+                  <PersonGridCard key={p.id} person={p} onClick={() => openShelf(p)} />
+                ))}
+            </EntityGrid>
+          )
         ) : (
           <div className="overflow-x-auto rounded-md border border-border">
             <table className="w-full text-sm">
@@ -802,9 +826,29 @@ export function CrmClient({
               </thead>
               <tbody>
                 {section === 'deals' &&
-                  filteredDeals.map((d) => (
-                    <DealTableRow key={d.id} deal={d} onClick={() => openShelf(d)} />
-                  ))}
+                  (dealStatusFilter === 'all' ? DEAL_STATUS_ORDER : [dealStatusFilter]).map((status) => {
+                    const cfg = DEAL_STATUS_CONFIG[status]
+                    const groupDeals = filteredDeals.filter((d) => d.status === status)
+                    return (
+                      <Fragment key={status}>
+                        <tr className="bg-muted/20">
+                          <td colSpan={5} className="px-4 py-1.5">
+                            <span className="text-xs font-medium">{cfg.label}</span>
+                            <span className="text-xs text-muted-foreground ml-2">({groupDeals.length})</span>
+                          </td>
+                        </tr>
+                        {groupDeals.length > 0 ? (
+                          groupDeals.map((d) => (
+                            <DealTableRow key={d.id} deal={d} onClick={() => openShelf(d)} />
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan={5} className="px-4 py-1.5 text-xs text-muted-foreground/60">No items</td>
+                          </tr>
+                        )}
+                      </Fragment>
+                    )
+                  })}
                 {section === 'companies' &&
                   filteredCompanies.map((c) => (
                     <CompanyTableRow key={c.id} company={c} onClick={() => openShelf(c)} />

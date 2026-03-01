@@ -1270,18 +1270,8 @@ export function TasksClient({
   }, [])
 
   // ----- Visible priority groups -----
-
-  const visiblePriorities = PRIORITY_ORDER.filter(
-    (p) => grouped[p].length > 0 || addingToPriority === p
-  )
-
-  // If no groups visible, show all when on 'todo' filter
-  const displayPriorities =
-    visiblePriorities.length === 0 && statusFilter === 'todo'
-      ? PRIORITY_ORDER
-      : visiblePriorities.length === 0
-        ? ['medium' as Priority]
-        : visiblePriorities
+  // Always show all priority groups, even when empty
+  const displayPriorities = PRIORITY_ORDER
 
   return (
     <div className="flex flex-col h-full">
@@ -1480,6 +1470,9 @@ export function TasksClient({
                       <span className="text-xs text-muted-foreground">({groupTasks.length})</span>
                     </div>
                     <div className="ml-1">
+                      {groupTasks.length === 0 && (
+                        <p className="px-3 py-1.5 text-xs text-muted-foreground/60">No items</p>
+                      )}
                       {groupTasks.map((task) => {
                         const statusCfg = STATUS_CONFIG[task.status]
                         const visibleTags = (task.tags ?? []).slice(0, 2)
@@ -1489,7 +1482,7 @@ export function TasksClient({
                             key={task.id}
                             className="group flex items-center gap-2 px-3 py-1.5 rounded-md hover:bg-accent/40 cursor-pointer border border-transparent hover:border-border transition-colors"
                             onClick={() => handleTaskClick(task)}
-                          >
+>
                             <input
                               type="checkbox"
                               checked={selectedIds.has(task.id)}

@@ -136,7 +136,7 @@ export function ActivityAndComments({ entityType, entityId, currentUserId, noCol
         <ActorChip actorId={entry.actor_id} actorType={entry.actor_type} />
         <div className="flex-1 min-w-0">
           {entry.event_type === 'commented' ? (
-            <div className="rounded-lg bg-muted/40 px-3 py-2 text-sm">
+            <div className="rounded-lg bg-muted/40 px-3 py-2 text-sm overflow-hidden break-words">
               <MarkdownRenderer content={entry.body ?? ''} />
             </div>
           ) : (
