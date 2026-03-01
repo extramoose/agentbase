@@ -48,9 +48,9 @@ function entityRoute(entity: EntitySearchResult): string {
       return `/tools/tasks/${ticketId ?? entity.id}`
     }
     case 'library_items': return `/tools/library/${entity.id}`
-    case 'companies': return `/tools/crm/companies/${entity.id}`
-    case 'people': return `/tools/crm/people/${entity.id}`
-    case 'deals': return `/tools/crm/deals/${entity.id}`
+    case 'companies': return `/tools/crm/companies?id=${entity.seq_id ?? entity.id}`
+    case 'people': return `/tools/crm/people?id=${entity.seq_id ?? entity.id}`
+    case 'deals': return `/tools/crm/deals?id=${entity.seq_id ?? entity.id}`
   }
 }
 

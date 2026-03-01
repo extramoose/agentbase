@@ -7,6 +7,7 @@ export type EntitySearchResult = {
   type: 'tasks' | 'people' | 'companies' | 'deals' | 'library_items'
   name: string
   subtitle?: string
+  seq_id?: number
 }
 
 const SEARCH_TYPE_TO_TABLE: Record<string, string> = {
@@ -89,6 +90,9 @@ export function useEntitySearch(query: string) {
                 type: tableName as EntitySearchResult['type'],
                 name: extractName(searchType, row),
                 subtitle: extractSubtitle(searchType, row),
+                seq_id: typeof row.seq_id === 'number' ? row.seq_id
+                  : typeof row.ticket_id === 'number' ? row.ticket_id
+                  : undefined,
               })
             }
           }
