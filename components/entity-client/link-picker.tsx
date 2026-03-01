@@ -3,7 +3,7 @@
 // Inline chip link picker — matches TagCombobox pattern
 // - Selected links show as small removable chips INSIDE the input field
 // - On focus with empty input: show recent entities
-// - Type to search: fetch from /api/search?q=...&limit=8 (debounced 300ms)
+// - Type to search: debounced via useEntitySearch hook
 // - Click suggestion or press Enter to link
 // - Press Backspace on empty input to remove last chip
 // - Click X on chip to unlink
@@ -12,6 +12,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { X, Loader2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
+import { useEntitySearch, type EntitySearchResult } from '@/hooks/use-entity-search'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -33,32 +34,11 @@ const TABLE_LABELS: Record<string, string> = {
   deals:         'Deal',
 }
 
-/** Maps search API type keys to table names used by entity-link API */
-const SEARCH_TYPE_TO_TABLE: Record<string, string> = {
-  tasks:     'tasks',
-  people:    'people',
-  companies: 'companies',
-  deals:     'deals',
-  library:   'library_items',
-}
-
-interface SearchResult {
-  id: string
-  type: string // table name: tasks, library_items, companies, people, deals
-  name: string
-}
-
 interface ResolvedLink {
   link_id: string
   target_type: string
   target_id: string
   name: string
-}
-
-function extractName(type: string, row: Record<string, unknown>): string {
-  if (type === 'tasks') return `Task #${row.ticket_id}: ${row.title}`
-  if (type === 'library' || type === 'library_items') return (row.title as string) ?? 'Untitled'
-  return (row.name as string) ?? (row.title as string) ?? 'Untitled'
 }
 
 // ---------------------------------------------------------------------------
@@ -150,14 +130,13 @@ export function LinkPicker({ sourceType, sourceId, className }: LinkPickerProps)
 
   // Combobox state
   const [inputValue, setInputValue] = useState('')
-  const [suggestions, setSuggestions] = useState<SearchResult[]>([])
-  const [recentItems, setRecentItems] = useState<SearchResult[]>([])
   const [open, setOpen] = useState(false)
   const [activeIndex, setActiveIndex] = useState(-1)
-  const [searching, setSearching] = useState(false)
 
   const inputRef = useRef<HTMLInputElement>(null)
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>(null)
+
+  // Entity search via shared hook
+  const { results, recentResults, loading: searching } = useEntitySearch(inputValue)
 
   // Stable set of linked entity keys for filtering
   const linkedKeys = useMemo(
@@ -196,88 +175,20 @@ export function LinkPicker({ sourceType, sourceId, className }: LinkPickerProps)
     fetchLinks()
   }, [fetchLinks])
 
-  // ------- Fetch recent entities (for empty-state suggestions) -------
-
-  useEffect(() => {
-    let cancelled = false
-    ;(async () => {
-      try {
-        const res = await fetch('/api/entities/recent')
-        if (!res.ok) return
-        const json = await res.json()
-        const rows = json.data as { id: string; label: string; entity_type: string }[]
-        if (cancelled || !Array.isArray(rows)) return
-        setRecentItems(
-          rows
-            .filter(r => !(r.entity_type === sourceType && r.id === sourceId))
-            .map(r => ({ id: r.id, type: r.entity_type, name: r.label })),
-        )
-      } catch { /* ignore */ }
-    })()
-    return () => { cancelled = true }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  // ------- Debounced search -------
-
-  useEffect(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current)
-
-    const trimmed = inputValue.trim()
-    if (trimmed.length < 2) {
-      setSuggestions([])
-      setSearching(false)
-      return
-    }
-
-    setSearching(true)
-
-    debounceRef.current = setTimeout(async () => {
-      try {
-        const res = await fetch(`/api/search?q=${encodeURIComponent(trimmed)}&limit=8`)
-        if (!res.ok) { setSearching(false); return }
-        const json = await res.json()
-        const data = json.data as Record<string, Record<string, unknown>[]> | undefined
-
-        const flat: SearchResult[] = []
-        if (data && typeof data === 'object') {
-          for (const [searchType, rows] of Object.entries(data)) {
-            if (!Array.isArray(rows)) continue
-            const tableName = SEARCH_TYPE_TO_TABLE[searchType] ?? searchType
-            for (const row of rows) {
-              const id = row.id as string
-              if (!id) continue
-              // Skip self
-              if (tableName === sourceType && id === sourceId) continue
-              flat.push({ id, type: tableName, name: extractName(searchType, row) })
-            }
-          }
-        }
-
-        setSuggestions(flat)
-        setActiveIndex(-1)
-      } catch {
-        setSuggestions([])
-      } finally {
-        setSearching(false)
-      }
-    }, 300)
-
-    return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inputValue, sourceType, sourceId])
-
-  // ------- Compute display items (filter out already-linked) -------
+  // ------- Compute display items (filter out already-linked and self) -------
 
   const isSearching = inputValue.trim().length >= 2
   const displayItems = useMemo(() => {
-    const items = isSearching ? suggestions : recentItems
-    return items.filter(item => !linkedKeys.has(`${item.type}:${item.id}`))
-  }, [isSearching, suggestions, recentItems, linkedKeys])
+    const items = isSearching ? results : recentResults
+    return items.filter(item =>
+      !linkedKeys.has(`${item.type}:${item.id}`) &&
+      !(item.type === sourceType && item.id === sourceId)
+    )
+  }, [isSearching, results, recentResults, linkedKeys, sourceType, sourceId])
 
   // ------- Create link -------
 
-  const addLink = useCallback(async (result: SearchResult) => {
+  const addLink = useCallback(async (result: EntitySearchResult) => {
     try {
       const res = await fetch('/api/commands/create-entity-link', {
         method: 'POST',
@@ -341,11 +252,7 @@ export function LinkPicker({ sourceType, sourceId, className }: LinkPickerProps)
   // ------- Focus / blur handlers -------
 
   function handleFocus() {
-    if (!inputValue.trim()) {
-      setOpen(true)
-    } else {
-      setOpen(true)
-    }
+    setOpen(true)
   }
 
   function handleClick() {

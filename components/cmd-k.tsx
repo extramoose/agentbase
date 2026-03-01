@@ -4,10 +4,11 @@ import { useEffect, useState, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   CheckSquare, BookOpen, Users, Clock,
-  ArrowRight, Building2, User, Loader2, Hash
+  ArrowRight, Building2, User, Loader2, Hash, Handshake
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
+import { useEntitySearch, type EntitySearchResult } from '@/hooks/use-entity-search'
 
 type SearchResult = {
   id: string
@@ -27,15 +28,64 @@ const NAV_ITEMS = [
 
 const TASK_NUM_RE = /^#?(\d+)$/
 
+const ENTITY_ICON: Record<string, React.ElementType> = {
+  tasks: CheckSquare,
+  library_items: BookOpen,
+  companies: Building2,
+  people: User,
+  deals: Handshake,
+}
+
+const ENTITY_SECTION: Record<string, SearchResult['section']> = {
+  tasks: 'tasks',
+  library_items: 'library',
+  companies: 'crm',
+  people: 'crm',
+  deals: 'crm',
+}
+
+function entityRoute(entity: EntitySearchResult): string {
+  switch (entity.type) {
+    case 'tasks': {
+      const ticketId = entity.subtitle?.match(/^Task #(\d+)$/)?.[1]
+      return `/tools/tasks/${ticketId ?? entity.id}`
+    }
+    case 'library_items': return `/tools/library/${entity.id}`
+    case 'companies': return `/tools/crm/companies/${entity.id}`
+    case 'people': return `/tools/crm/people/${entity.id}`
+    case 'deals': return `/tools/crm/deals/${entity.id}`
+  }
+}
+
 export function CmdK() {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [selected, setSelected] = useState(0)
-  const [searchResults, setSearchResults] = useState<SearchResult[]>([])
-  const [loading, setLoading] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>(null)
   const router = useRouter()
+
+  const close = useCallback(() => {
+    setOpen(false)
+    setQuery('')
+    setSelected(0)
+  }, [])
+
+  // Detect task number pattern
+  const taskNumMatch = query.match(TASK_NUM_RE)
+  const taskNum = taskNumMatch ? parseInt(taskNumMatch[1], 10) : null
+
+  // Entity search via shared hook (skip for task-number queries)
+  const { results: entityResults, loading } = useEntitySearch(taskNumMatch ? '' : query)
+
+  // Map entity results to cmd-k SearchResult format
+  const searchResults: SearchResult[] = entityResults.map(entity => ({
+    id: `${entity.type}-${entity.id}`,
+    label: entity.name,
+    subtitle: entity.subtitle,
+    icon: ENTITY_ICON[entity.type] ?? Hash,
+    section: ENTITY_SECTION[entity.type] ?? 'crm',
+    action: () => { router.push(entityRoute(entity)); close() },
+  }))
 
   // Toggle on Cmd+K
   useEffect(() => {
@@ -45,8 +95,6 @@ export function CmdK() {
         setOpen(prev => !prev)
         setQuery('')
         setSelected(0)
-        setSearchResults([])
-        setLoading(false)
       }
     }
     document.addEventListener('keydown', handler)
@@ -57,105 +105,6 @@ export function CmdK() {
   useEffect(() => {
     if (open) setTimeout(() => inputRef.current?.focus(), 50)
   }, [open])
-
-  const close = useCallback(() => {
-    setOpen(false)
-    setQuery('')
-    setSelected(0)
-    setSearchResults([])
-    setLoading(false)
-  }, [])
-
-  // Detect task number pattern
-  const taskNumMatch = query.match(TASK_NUM_RE)
-  const taskNum = taskNumMatch ? parseInt(taskNumMatch[1], 10) : null
-
-  // Entity search (debounced, 3+ chars, non-number queries)
-  useEffect(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current)
-
-    const trimmed = query.trim()
-    if (trimmed.length < 3 || TASK_NUM_RE.test(trimmed)) {
-      setSearchResults([])
-      setLoading(false)
-      return
-    }
-
-    setLoading(true)
-
-    debounceRef.current = setTimeout(async () => {
-      const supabase = createClient()
-      const pattern = `%${trimmed}%`
-
-      const [tasksRes, libraryRes, companiesRes, peopleRes] = await Promise.all([
-        supabase.from('tasks').select('id,title,ticket_id').ilike('title', pattern).limit(5),
-        supabase.from('library_items').select('id,title').ilike('title', pattern).limit(3),
-        supabase.from('companies').select('id,name').ilike('name', pattern).limit(3),
-        supabase.from('people').select('id,name').ilike('name', pattern).limit(3),
-      ])
-
-      const results: SearchResult[] = []
-
-      if (tasksRes.data) {
-        for (const t of tasksRes.data) {
-          results.push({
-            id: `task-${t.id}`,
-            label: t.title,
-            subtitle: `Task #${t.ticket_id}`,
-            icon: CheckSquare,
-            section: 'tasks',
-            action: () => { router.push(`/tools/tasks/${t.ticket_id}`); close() },
-          })
-        }
-      }
-
-      if (libraryRes.data) {
-        for (const l of libraryRes.data) {
-          results.push({
-            id: `lib-${l.id}`,
-            label: l.title,
-            subtitle: 'Library',
-            icon: BookOpen,
-            section: 'library',
-            action: () => { router.push(`/tools/library/${l.id}`); close() },
-          })
-        }
-      }
-
-      if (companiesRes.data) {
-        for (const c of companiesRes.data) {
-          results.push({
-            id: `company-${c.id}`,
-            label: c.name,
-            subtitle: 'Company',
-            icon: Building2,
-            section: 'crm',
-            action: () => { router.push(`/tools/crm/companies/${c.id}`); close() },
-          })
-        }
-      }
-
-      if (peopleRes.data) {
-        for (const p of peopleRes.data) {
-          results.push({
-            id: `person-${p.id}`,
-            label: p.name,
-            subtitle: 'Person',
-            icon: User,
-            section: 'crm',
-            action: () => { router.push(`/tools/crm/people/${p.id}`); close() },
-          })
-        }
-      }
-
-      setSearchResults(results)
-      setLoading(false)
-    }, 300)
-
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current)
-    }
-  }, [query, router, close])
 
   // Build items list
   const navItems: SearchResult[] = NAV_ITEMS
@@ -214,7 +163,7 @@ export function CmdK() {
   if (libResults.length > 0) sections.push({ key: 'library', title: 'Library', items: libResults })
 
   const crmResults = searchResults.filter(i => i.section === 'crm')
-  if (crmResults.length > 0) sections.push({ key: 'crm', title: 'People & Companies', items: crmResults })
+  if (crmResults.length > 0) sections.push({ key: 'crm', title: 'CRM', items: crmResults })
 
   // Flat list for keyboard navigation
   const flatItems = sections.flatMap(s => s.items)
