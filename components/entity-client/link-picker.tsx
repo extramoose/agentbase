@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { X, Loader2, Search } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -69,15 +69,42 @@ const TYPE_ORDER = ['tasks', 'library_items', 'companies', 'people', 'deals']
 export function LinkPicker({ sourceType, sourceId, linkedIds, onLinkCreated, onClose }: LinkPickerProps) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<SearchResult[]>([])
+  const [recentItems, setRecentItems] = useState<SearchResult[]>([])
   const [loading, setLoading] = useState(false)
   const [creating, setCreating] = useState(false)
   const [activeIndex, setActiveIndex] = useState(-1)
   const inputRef = useRef<HTMLInputElement>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(null)
 
+  // Stabilise linkedIds so it doesn't re-trigger effects on every render
+  const linkedKey = useMemo(() => [...linkedIds].sort().join(','), [linkedIds])
+
   // Focus input on mount
   useEffect(() => {
     inputRef.current?.focus()
+  }, [])
+
+  // Fetch recent entities on mount
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetch('/api/entities/recent')
+        if (!res.ok) return
+        const json = await res.json()
+        const rows = json.data as { id: string; label: string; entity_type: string }[]
+        if (cancelled || !Array.isArray(rows)) return
+        const items: SearchResult[] = rows
+          .filter(r => {
+            const key = `${r.entity_type}:${r.id}`
+            return !(r.entity_type === sourceType && r.id === sourceId) && !linkedIds.has(key)
+          })
+          .map(r => ({ id: r.id, type: r.entity_type, name: r.label }))
+        setRecentItems(items)
+      } catch { /* ignore */ }
+    })()
+    return () => { cancelled = true }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Close on Escape
@@ -106,18 +133,23 @@ export function LinkPicker({ sourceType, sourceId, linkedIds, onLinkCreated, onC
       try {
         const res = await fetch(`/api/search?q=${encodeURIComponent(trimmed)}&limit=8`)
         if (!res.ok) { setLoading(false); return }
-        const { data } = await res.json()
+        const json = await res.json()
+        const data = json.data as Record<string, Record<string, unknown>[]> | undefined
 
         const flat: SearchResult[] = []
-        for (const [searchType, rows] of Object.entries(data as Record<string, Record<string, unknown>[]>)) {
-          const tableName = SEARCH_TYPE_TO_TABLE[searchType] ?? searchType
-          for (const row of rows) {
-            const id = row.id as string
-            const key = `${tableName}:${id}`
-            // Skip self and already-linked
-            if (tableName === sourceType && id === sourceId) continue
-            if (linkedIds.has(key)) continue
-            flat.push({ id, type: tableName, name: extractName(searchType, row) })
+        if (data && typeof data === 'object') {
+          for (const [searchType, rows] of Object.entries(data)) {
+            if (!Array.isArray(rows)) continue
+            const tableName = SEARCH_TYPE_TO_TABLE[searchType] ?? searchType
+            for (const row of rows) {
+              const id = row.id as string
+              if (!id) continue
+              const key = `${tableName}:${id}`
+              // Skip self and already-linked
+              if (tableName === sourceType && id === sourceId) continue
+              if (linkedIds.has(key)) continue
+              flat.push({ id, type: tableName, name: extractName(searchType, row) })
+            }
           }
         }
 
@@ -131,7 +163,8 @@ export function LinkPicker({ sourceType, sourceId, linkedIds, onLinkCreated, onC
     }, 300)
 
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
-  }, [query, sourceType, sourceId, linkedIds])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query, sourceType, sourceId, linkedKey])
 
   // Create link
   const createLink = useCallback(async (result: SearchResult) => {
@@ -175,11 +208,15 @@ export function LinkPicker({ sourceType, sourceId, linkedIds, onLinkCreated, onC
     }
   }
 
+  // Decide which items to display: search results or recent entities
+  const isSearching = query.trim().length >= 2
+  const displayItems = isSearching ? results : recentItems
+
   // Group results by type in display order
   const grouped = TYPE_ORDER
     .map(type => ({
       type,
-      items: results.filter(r => r.type === type),
+      items: displayItems.filter(r => r.type === type),
     }))
     .filter(g => g.items.length > 0)
 
@@ -219,21 +256,28 @@ export function LinkPicker({ sourceType, sourceId, linkedIds, onLinkCreated, onC
 
           {/* Results */}
           <div className="max-h-72 overflow-y-auto">
-            {query.trim().length < 2 ? (
-              <div className="px-3 py-6 text-sm text-muted-foreground text-center">
-                Type at least 2 characters to search...
-              </div>
-            ) : !loading && results.length === 0 ? (
+            {isSearching && !loading && results.length === 0 ? (
               <div className="px-3 py-6 text-sm text-muted-foreground text-center">
                 No results found
               </div>
+            ) : grouped.length === 0 && !isSearching ? (
+              <div className="px-3 py-6 text-sm text-muted-foreground text-center">
+                Type to search entities...
+              </div>
             ) : (
               <ul className="py-1">
+                {!isSearching && grouped.length > 0 && (
+                  <li className="px-3 py-1 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    Recent
+                  </li>
+                )}
                 {grouped.map(({ type, items }) => (
                   <li key={type}>
-                    <div className="px-3 py-1 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                      {TABLE_LABELS[type] ?? type}
-                    </div>
+                    {isSearching && (
+                      <div className="px-3 py-1 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        {TABLE_LABELS[type] ?? type}
+                      </div>
+                    )}
                     {items.map(item => {
                       flatIdx++
                       const idx = flatIdx
