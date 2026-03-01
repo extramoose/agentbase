@@ -477,10 +477,10 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
               <MarkdownRenderer content={entry.body} />
             </div>
           )}
-          <p suppressHydrationWarning className="text-xs text-muted-foreground mt-0.5">
-            {formatDistanceToNow(new Date(entry.created_at), { addSuffix: true })}
-          </p>
         </div>
+        <span suppressHydrationWarning className="text-xs text-muted-foreground/50 shrink-0 ml-2 mt-0.5">
+          {formatDistanceToNow(new Date(entry.created_at), { addSuffix: true })}
+        </span>
       </div>
     )
   }
@@ -511,10 +511,10 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
               <span className="font-medium">{group.entries.length}</span>{' '}
               {entityLabel}
             </p>
-            <p suppressHydrationWarning className="text-xs text-muted-foreground mt-0.5">
-              {formatDistanceToNow(new Date(group.entries[0].created_at), { addSuffix: true })}
-            </p>
           </div>
+          <span suppressHydrationWarning className="text-xs text-muted-foreground/50 shrink-0 ml-auto">
+            {formatDistanceToNow(new Date(group.entries[0].created_at), { addSuffix: true })}
+          </span>
         </div>
         {isExpanded && (
           <div className="space-y-1 ml-4 border-l border-border pl-2">
@@ -547,7 +547,7 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
               <span className="text-sm text-muted-foreground">
                 made <span className="font-medium">{burst.totalEntries}</span> changes
               </span>
-              <span suppressHydrationWarning className="text-xs text-muted-foreground">
+              <span suppressHydrationWarning className="text-xs text-muted-foreground/50 ml-auto shrink-0">
                 {formatDistanceToNow(new Date(burst.groups[0].entries[0].created_at), { addSuffix: true })}
               </span>
             </div>
