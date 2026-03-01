@@ -20,7 +20,7 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { GripVertical, Plus, ChevronDown, ChevronRight, AlertCircle, ArrowUp, Minus, ArrowDown, X, Trash2, Calendar } from 'lucide-react'
+import { GripVertical, Plus, ChevronDown, ChevronRight, AlertCircle, ArrowUp, Minus, ArrowDown, X, Trash2, Calendar, Loader2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { SearchFilterBar } from '@/components/search-filter-bar'
 import { EntityShelf } from '@/components/entity-client/entity-shelf'
@@ -695,6 +695,201 @@ export function TaskShelfContent({
 }
 
 // ---------------------------------------------------------------------------
+// New Task creation shelf
+// ---------------------------------------------------------------------------
+
+function NewTaskShelf({
+  onCreated,
+  onClose,
+  defaultStatus,
+}: {
+  onCreated: (task: Task) => void
+  onClose: () => void
+  defaultStatus: Status
+}) {
+  const [title, setTitle] = useState('')
+  const [body, setBody] = useState('')
+  const [priority, setPriority] = useState<Priority>('medium')
+  const [status, setStatus] = useState<Status>(defaultStatus)
+  const [assigneeId, setAssigneeId] = useState<string | null>(null)
+  const [assigneeType, setAssigneeType] = useState<string | null>(null)
+  const [tags, setTags] = useState<string[]>([])
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [onClose])
+
+  async function handleSave() {
+    const trimmed = title.trim()
+    if (!trimmed) return
+    setSaving(true)
+    try {
+      const res = await fetch('/api/commands/create-task', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: trimmed,
+          body: body || undefined,
+          priority,
+          status,
+          assignee_id: assigneeId ?? 'unassigned',
+          tags,
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? 'Failed to create task')
+      const created = json.data as Task
+      toast({ type: 'success', message: 'Task created' })
+      onCreated(created)
+    } catch (err) {
+      toast({
+        type: 'error',
+        message: err instanceof Error ? err.message : 'Failed to create task',
+      })
+      setSaving(false)
+    }
+  }
+
+  return (
+    <>
+      <div className="fixed inset-0 bg-black/50 z-40" onClick={onClose} />
+      <div
+        className={cn(
+          'fixed right-0 top-0 h-full z-50 flex flex-col',
+          'bg-card border-l border-border shadow-2xl',
+          'w-full sm:w-[480px] sm:max-w-full',
+          'animate-in slide-in-from-right duration-200',
+        )}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-border shrink-0">
+          <h2 className="text-base font-semibold">New Task</h2>
+          <Button variant="ghost" size="icon" onClick={onClose} className="shrink-0">
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+
+        {/* Scrollable form */}
+        <div className="flex-1 overflow-y-auto">
+          <div className="p-4 sm:p-6 space-y-5">
+            {/* Title */}
+            <div>
+              <label className="text-xs text-muted-foreground font-medium mb-1 block">
+                Title
+              </label>
+              <Input
+                autoFocus
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault()
+                    handleSave()
+                  }
+                }}
+                placeholder="Task title"
+                className="text-base font-medium"
+              />
+            </div>
+
+            {/* Status + Priority row */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs text-muted-foreground font-medium mb-1 block">
+                  Status
+                </label>
+                <select
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value as Status)}
+                  className="w-full h-9 rounded-md border border-input bg-transparent px-3 text-sm focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] outline-none"
+                >
+                  {STATUS_ORDER.map((s) => (
+                    <option key={s} value={s}>
+                      {STATUS_CONFIG[s].label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground font-medium mb-1 block">
+                  Priority
+                </label>
+                <select
+                  value={priority}
+                  onChange={(e) => setPriority(e.target.value as Priority)}
+                  className="w-full h-9 rounded-md border border-input bg-transparent px-3 text-sm focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] outline-none"
+                >
+                  {PRIORITY_ORDER.map((p) => (
+                    <option key={p} value={p}>
+                      {PRIORITY_CONFIG[p].label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Assignee */}
+            <div>
+              <label className="text-xs text-muted-foreground font-medium mb-1 block">
+                Assignee
+              </label>
+              <AssigneePicker
+                value={assigneeId ? { id: assigneeId, type: assigneeType as 'human' | 'agent' } : null}
+                onChange={(actor) => {
+                  setAssigneeId(actor?.id ?? null)
+                  setAssigneeType(actor?.type ?? null)
+                }}
+              />
+            </div>
+
+            {/* Description */}
+            <div>
+              <label className="text-xs text-muted-foreground font-medium mb-1 block">
+                Description
+              </label>
+              <RichTextEditor
+                value={body}
+                onBlur={(md) => setBody(md)}
+                placeholder="Add details..."
+                minHeight="120px"
+              />
+            </div>
+
+            {/* Tags */}
+            <div>
+              <label className="text-xs text-muted-foreground font-medium mb-1 block">
+                Tags
+              </label>
+              <TagCombobox
+                selected={tags}
+                onChange={setTags}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Footer with Save button */}
+        <div className="px-4 sm:px-6 py-4 border-t border-border shrink-0">
+          <Button
+            onClick={handleSave}
+            disabled={!title.trim() || saving}
+            className="w-full"
+          >
+            {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+            {saving ? 'Creating...' : 'Save'}
+          </Button>
+        </div>
+      </div>
+    </>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Main client component
 // ---------------------------------------------------------------------------
 
@@ -753,6 +948,7 @@ export function TasksClient({
   const [selectedTag, setSelectedTag] = useState<string | null>(
     () => searchParams.get('tag') ?? null
   )
+  const [creatingTask, setCreatingTask] = useState(false)
 
   const supabase = createClient()
 
@@ -1147,7 +1343,7 @@ export function TasksClient({
   // ----- New task button -----
 
   function handleNewTask() {
-    setAddingToPriority('medium')
+    setCreatingTask(true)
   }
 
   // ----- Selection helpers -----
@@ -1582,6 +1778,26 @@ export function TasksClient({
         >
           <TaskShelfContent task={selectedTask} />
         </EntityShelf>
+      )}
+
+      {/* New task creation shelf */}
+      {creatingTask && (
+        <NewTaskShelf
+          defaultStatus={statusFilter !== 'all' ? statusFilter : 'todo'}
+          onClose={() => setCreatingTask(false)}
+          onCreated={(created) => {
+            setTasks((prev) =>
+              prev.some((t) => t.id === created.id) ? prev : [created, ...prev]
+            )
+            setCreatingTask(false)
+            // Open the real task shelf so the user can add links
+            setSelectedTask(created)
+            const params = new URLSearchParams(window.location.search)
+            params.set('id', String(created.seq_id ?? created.ticket_id))
+            const qs = params.toString()
+            window.history.pushState(null, '', `${window.location.pathname}${qs ? `?${qs}` : ''}`)
+          }}
+        />
       )}
 
       {/* Floating batch action bar */}
