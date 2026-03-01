@@ -439,31 +439,29 @@ export function LibraryClient({ initialItems, initialItemId }: { initialItems: L
 
   // ----- Render -----
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between gap-2">
-        <h1 className="text-xl sm:text-2xl font-bold">Library</h1>
-        <Button onClick={() => setIsCreating(true)} size="sm">
-          <Plus className="h-4 w-4 mr-1" />
-          Add Item
-        </Button>
-      </div>
-
-      {/* Search + View toggle */}
-      <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-        <SearchFilterBar
-          search={search}
-          onSearchChange={setSearch}
-          placeholder="Search library..."
-          tags={allTags}
-          selectedTag={selectedTag}
-          onTagChange={handleTagChange}
-        />
-        <ViewToggle onChange={setView} defaultView="grid" />
+    <div className="flex flex-col h-full">
+      {/* Title row */}
+      <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-4 mb-4">
+        <h1 className="text-xl sm:text-2xl font-bold shrink-0">Library</h1>
+        <div className="flex items-center gap-2">
+          <SearchFilterBar
+            search={search}
+            onSearchChange={setSearch}
+            placeholder="Search library..."
+            tags={allTags}
+            selectedTag={selectedTag}
+            onTagChange={handleTagChange}
+          />
+          <ViewToggle onChange={setView} defaultView="grid" />
+          <Button onClick={() => setIsCreating(true)} size="sm">
+            <Plus className="h-4 w-4 mr-1" />
+            Add Item
+          </Button>
+        </div>
       </div>
 
       {/* Type filter chips */}
-      <div className="flex items-center gap-2 flex-wrap">
+      <div className="flex items-center gap-1 mb-4 flex-wrap">
         <button
           onClick={() => setTypeFilter('all')}
           className={cn(

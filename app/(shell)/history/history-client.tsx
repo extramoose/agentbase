@@ -573,41 +573,45 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
   }
 
   return (
-    <div className="space-y-4 sm:space-y-6">
-      <h1 className="text-xl sm:text-2xl font-bold">History</h1>
-
-      <SearchFilterBar
-        search={search}
-        onSearchChange={setSearch}
-        placeholder="Search activity..."
-      >
-        <button
-          onClick={() => setEntityFilter(null)}
-          className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-            entityFilter === null
-              ? 'bg-primary text-primary-foreground'
-              : 'bg-muted text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          All
-        </button>
-        {ENTITY_TYPES.map(type => (
-          <button
-            key={type}
-            onClick={() => setEntityFilter(entityFilter === type ? null : type)}
-            className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-              entityFilter === type
-                ? ENTITY_COLORS[type] ?? 'bg-primary text-primary-foreground'
-                : 'bg-muted text-muted-foreground hover:text-foreground'
-            }`}
+    <div className="flex flex-col h-full">
+      {/* Title row */}
+      <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-4 mb-4">
+        <h1 className="text-xl sm:text-2xl font-bold shrink-0">History</h1>
+        <div className="flex items-center gap-2">
+          <SearchFilterBar
+            search={search}
+            onSearchChange={setSearch}
+            placeholder="Search activity..."
           >
-            {formatEntityType(type)}
-          </button>
-        ))}
-      </SearchFilterBar>
+            <button
+              onClick={() => setEntityFilter(null)}
+              className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                entityFilter === null
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              All
+            </button>
+            {ENTITY_TYPES.map(type => (
+              <button
+                key={type}
+                onClick={() => setEntityFilter(entityFilter === type ? null : type)}
+                className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                  entityFilter === type
+                    ? ENTITY_COLORS[type] ?? 'bg-primary text-primary-foreground'
+                    : 'bg-muted text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {formatEntityType(type)}
+              </button>
+            ))}
+          </SearchFilterBar>
+        </div>
+      </div>
 
       {/* Day navigation */}
-      <div className="flex items-center justify-between px-2">
+      <div className="flex items-center justify-between px-2 mb-4">
         <button
           onClick={() => setSelectedDate(d => addDays(d, -1))}
           className="p-1 rounded hover:bg-muted transition-colors"

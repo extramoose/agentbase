@@ -719,8 +719,29 @@ export function CrmClient({
 
   return (
     <div className="flex flex-col h-full">
+      {/* Title row */}
+      <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-4 mb-4">
+        <h1 className="text-xl sm:text-2xl font-bold shrink-0">CRM</h1>
+        <div className="flex items-center gap-2">
+          <SearchFilterBar
+            search={search}
+            onSearchChange={setSearch}
+            placeholder={`Search ${entityLabelPlural}...`}
+            tags={allTags}
+            selectedTag={selectedTag}
+            onTagChange={handleTagChange}
+          />
+          <ViewToggle onChange={setView} />
+          <Button size="sm" onClick={() => setAdding(true)}>
+            <Plus className="h-4 w-4 mr-1" />
+            <span className="hidden sm:inline">Add {entityLabel}</span>
+            <span className="sm:hidden">Add</span>
+          </Button>
+        </div>
+      </div>
+
       {/* Tab navigation: Deals | Companies | People */}
-      <div className="flex gap-1 mb-4 border-b border-border pb-2 overflow-x-auto">
+      <div className="flex items-center gap-1 mb-4 flex-wrap border-b border-border pb-2">
         {SECTIONS.map((s) => {
           const count =
             s.value === 'deals'
@@ -744,24 +765,6 @@ export function CrmClient({
             </button>
           )
         })}
-      </div>
-
-      {/* Search + filters + view toggle + add button */}
-      <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-4">
-        <SearchFilterBar
-          search={search}
-          onSearchChange={setSearch}
-          placeholder={`Search ${entityLabelPlural}...`}
-          tags={allTags}
-          selectedTag={selectedTag}
-          onTagChange={handleTagChange}
-        />
-        <ViewToggle onChange={setView} />
-        <Button size="sm" onClick={() => setAdding(true)}>
-          <Plus className="h-4 w-4 mr-1" />
-          <span className="hidden sm:inline">Add {entityLabel}</span>
-          <span className="sm:hidden">Add</span>
-        </Button>
       </div>
 
       {/* Quick-add input */}
