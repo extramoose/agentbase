@@ -34,11 +34,6 @@ CREATE POLICY "Owners update members" ON tenant_members FOR UPDATE
     WHERE tm.tenant_id = tenant_members.tenant_id AND tm.user_id = auth.uid() AND tm.role = 'owner'
   ));
 
-DROP POLICY IF EXISTS "Superadmins manage agents" ON agent_owners;
-DROP POLICY IF EXISTS "Owners manage agents" ON agent_owners;
-CREATE POLICY "Owners manage agents" ON agent_owners FOR ALL
-  USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'owner'));
-
 NOTIFY pgrst, 'reload schema';
 
 COMMIT;
