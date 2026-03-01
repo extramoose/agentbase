@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { X, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { DateInput } from '@/components/ui/date-input'
 import { ActivityAndComments } from '@/components/activity-and-comments'
 import { AssigneePicker } from '@/components/assignee-picker'
 import { TagCombobox } from '@/components/tag-combobox'
@@ -301,8 +302,7 @@ export function TaskModal({ task, onClose }: { task: TaskData; onClose: () => vo
               <label className="text-xs text-muted-foreground font-medium mb-1 block">
                 Due date
               </label>
-              <Input
-                type="date"
+              <DateInput
                 value={dueDate}
                 onChange={(e) => {
                   setDueDate(e.target.value)

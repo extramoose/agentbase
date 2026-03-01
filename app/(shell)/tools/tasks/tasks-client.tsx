@@ -30,6 +30,7 @@ import { toast } from '@/hooks/use-toast'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
+import { DateInput } from '@/components/ui/date-input'
 import { Badge } from '@/components/ui/badge'
 import { ActorChip } from '@/components/actor-chip'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
@@ -666,8 +667,7 @@ export function TaskShelfContent({
         <label className="text-xs text-muted-foreground font-medium mb-1 block">
           Due date
         </label>
-        <Input
-          type="date"
+        <DateInput
           value={dueDate}
           onChange={(e) => {
             setDueDate(e.target.value)

@@ -14,6 +14,7 @@ import { AssigneePicker } from '@/components/assignee-picker'
 import { toast } from '@/hooks/use-toast'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { DateInput } from '@/components/ui/date-input'
 import { Badge } from '@/components/ui/badge'
 import { RichTextEditor } from '@/components/rich-text-editor'
 import { UnfurlInput } from '@/components/unfurl-input'
@@ -81,14 +82,14 @@ type View = 'grid' | 'table' | 'stickies'
 // ---------------------------------------------------------------------------
 
 const DEAL_STATUS_CONFIG: Record<DealStatus, { label: string; className: string; funnelColor: string }> = {
-  cold:     { label: 'Cold',     className: 'bg-gray-500/20 text-gray-400',    funnelColor: 'bg-gray-500' },
-  prospect: { label: 'Prospect', className: 'bg-slate-500/20 text-slate-400',  funnelColor: 'bg-slate-500' },
-  warm:     { label: 'Warm',     className: 'bg-amber-500/20 text-amber-400',  funnelColor: 'bg-amber-500' },
-  active:   { label: 'Active',   className: 'bg-blue-500/20 text-blue-400',    funnelColor: 'bg-blue-500' },
-  won:      { label: 'Won',      className: 'bg-green-500/20 text-green-400',  funnelColor: 'bg-green-500' },
-  lost:     { label: 'Lost',     className: 'bg-red-500/20 text-red-400',      funnelColor: 'bg-red-500' },
-  paused:   { label: 'Paused',   className: 'bg-yellow-500/20 text-yellow-400', funnelColor: 'bg-yellow-500' },
-  archived: { label: 'Archived', className: 'bg-neutral-500/20 text-neutral-400', funnelColor: 'bg-neutral-500' },
+  cold:     { label: 'Cold',     className: 'bg-gray-500/20 text-gray-400',    funnelColor: 'bg-gray-500/50' },
+  prospect: { label: 'Prospect', className: 'bg-slate-500/20 text-slate-400',  funnelColor: 'bg-slate-500/50' },
+  warm:     { label: 'Warm',     className: 'bg-amber-500/20 text-amber-400',  funnelColor: 'bg-amber-400/40' },
+  active:   { label: 'Active',   className: 'bg-blue-500/20 text-blue-400',    funnelColor: 'bg-blue-400/40' },
+  won:      { label: 'Won',      className: 'bg-green-500/20 text-green-400',  funnelColor: 'bg-green-400/40' },
+  lost:     { label: 'Lost',     className: 'bg-red-500/20 text-red-400',      funnelColor: 'bg-red-400/40' },
+  paused:   { label: 'Paused',   className: 'bg-yellow-500/20 text-yellow-400', funnelColor: 'bg-yellow-400/40' },
+  archived: { label: 'Archived', className: 'bg-neutral-500/20 text-neutral-400', funnelColor: 'bg-neutral-500/50' },
 }
 
 const DEAL_STATUS_ORDER: DealStatus[] = ['cold', 'prospect', 'warm', 'active', 'won', 'lost', 'paused', 'archived']
@@ -1056,7 +1057,7 @@ function DealFunnel({ deals }: { deals: CrmDeal[] }) {
 
   return (
     <div className="mb-4">
-      <div className="flex h-10 rounded-md overflow-hidden">
+      <div className="flex h-7 rounded-md overflow-hidden">
         {stages.map((stage) => {
           const { count, value } = counts[stage]
           if (count === 0) return null
@@ -1066,16 +1067,13 @@ function DealFunnel({ deals }: { deals: CrmDeal[] }) {
             <div
               key={stage}
               className={cn(
-                'flex flex-col items-center justify-center text-white',
+                'flex items-center justify-center text-white/80',
                 cfg.funnelColor,
               )}
-              style={{ width: `${pct}%`, minWidth: count > 0 ? '64px' : undefined }}
+              style={{ width: `${pct}%`, minWidth: count > 0 ? '56px' : undefined }}
               title={`${cfg.label}: ${count} deal${count !== 1 ? 's' : ''} — $${value.toLocaleString()}`}
             >
-              <span className="text-xs font-semibold leading-tight">{cfg.label} {count}</span>
-              {value > 0 && (
-                <span className="text-[10px] leading-tight opacity-80">${value.toLocaleString()}</span>
-              )}
+              <span className="text-[11px] font-medium leading-none">{cfg.label} {count}</span>
             </div>
           )
         })}
@@ -1531,8 +1529,7 @@ export function DealShelfContent({
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="text-xs text-muted-foreground font-medium mb-1 block">Follow-up Date</label>
-          <Input
-            type="date"
+          <DateInput
             value={followUpDate}
             onChange={(e) => {
               setFollowUpDate(e.target.value)
@@ -1543,8 +1540,7 @@ export function DealShelfContent({
         </div>
         <div>
           <label className="text-xs text-muted-foreground font-medium mb-1 block">Expected Close</label>
-          <Input
-            type="date"
+          <DateInput
             value={expectedCloseDate}
             onChange={(e) => {
               setExpectedCloseDate(e.target.value)
