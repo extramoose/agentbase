@@ -257,7 +257,7 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
 
   // Refs to decouple loadMore identity from rapidly-changing state.
   const loadingRef = useRef(false)
-  const hasMoreRef = useRef(initialEntries.length >= 50)
+  const hasMoreRef = useRef(initialEntries.length >= 200)
   const entriesRef = useRef(entries)
   entriesRef.current = entries
 
@@ -301,17 +301,17 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
     loadingRef.current = true
     setLoading(true)
     const { data } = await supabase.rpc('get_activity_log', {
-      p_limit: 50,
+      p_limit: 200,
       p_offset: entriesRef.current.length,
       ...(entityFilter ? { p_entity_type: entityFilter } : {}),
       ...(search.trim() ? { p_search: search.trim() } : {}),
     })
     const newEntries = (data ?? []) as ActivityLogEntry[]
+    await resolveSeqIds(newEntries)
     setEntries(prev => [...prev, ...newEntries])
-    hasMoreRef.current = newEntries.length >= 50
+    hasMoreRef.current = newEntries.length >= 200
     loadingRef.current = false
     setLoading(false)
-    resolveSeqIds(newEntries)
   }, [entityFilter, search, supabase, resolveSeqIds])
 
   // Infinite scroll observer
@@ -333,18 +333,18 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
       loadingRef.current = true
       setLoading(true)
       const { data } = await supabase.rpc('get_activity_log', {
-        p_limit: 50,
+        p_limit: 200,
         p_offset: 0,
         ...(entityFilter ? { p_entity_type: entityFilter } : {}),
         ...(search.trim() ? { p_search: search.trim() } : {}),
       })
       if (cancelled) return
       const results = (data ?? []) as ActivityLogEntry[]
+      await resolveSeqIds(results)
       setEntries(results)
-      hasMoreRef.current = results.length >= 50
+      hasMoreRef.current = results.length >= 200
       loadingRef.current = false
       setLoading(false)
-      resolveSeqIds(results)
     }
     const timeout = setTimeout(reload, search.trim() ? 300 : 0)
     return () => { cancelled = true; clearTimeout(timeout) }
@@ -357,13 +357,13 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'activity_log' },
-        (payload) => {
+        async (payload) => {
           const newEntry = payload.new as ActivityLogEntry
+          await resolveSeqIds([newEntry])
           setEntries(prev => {
             if (prev.some(e => e.id === newEntry.id)) return prev
             return [newEntry, ...prev]
           })
-          resolveSeqIds([newEntry])
         }
       )
       .subscribe()
