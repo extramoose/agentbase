@@ -98,6 +98,9 @@ export function OnboardingClient({ skipWorkspace }: { skipWorkspace?: boolean })
     }
   }
 
+  const showBack = step === 'intro-you' || step === 'intro-agents'
+  const backStep = step === 'intro-you' ? 'profile' : step === 'intro-agents' ? 'intro-you' : null
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-background">
       <div className="w-full max-w-md mx-auto p-8">
@@ -177,24 +180,13 @@ export function OnboardingClient({ skipWorkspace }: { skipWorkspace?: boolean })
                 }}
               />
               {error && <p className="text-sm text-destructive">{error}</p>}
-              <div className="flex gap-2">
-                {!skipWs && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    onClick={() => setStep('workspace')}
-                  >
-                    Back
-                  </Button>
-                )}
-                <Button
-                  type="submit"
-                  className="flex-1"
-                  disabled={loading || !profileName.trim()}
-                >
-                  {loading ? 'Saving…' : 'Continue'}
-                </Button>
-              </div>
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={loading || !profileName.trim()}
+              >
+                {loading ? 'Saving…' : 'Continue'}
+              </Button>
             </form>
           </div>
         )}
@@ -215,14 +207,9 @@ export function OnboardingClient({ skipWorkspace }: { skipWorkspace?: boolean })
                 Illustration TBD
               </span>
             </div>
-            <div className="flex gap-2">
-              <Button variant="ghost" className="flex-1" onClick={() => setStep('profile')}>
-                Back
-              </Button>
-              <Button className="flex-1" onClick={() => setStep('intro-agents')}>
-                Next
-              </Button>
-            </div>
+            <Button className="w-full" onClick={() => setStep('intro-agents')}>
+              Next
+            </Button>
           </div>
         )}
 
@@ -243,14 +230,13 @@ export function OnboardingClient({ skipWorkspace }: { skipWorkspace?: boolean })
               </span>
             </div>
             <div className="space-y-3">
-              <div className="flex gap-2">
-                <Button variant="ghost" className="flex-1" onClick={() => setStep('intro-you')}>
-                  Back
-                </Button>
-                <Button className="flex-1" onClick={() => router.push('/admin/agents?create=true')}>
-                  Add your first agent
-                </Button>
-              </div>
+              <Button
+                className="w-full"
+                size="lg"
+                onClick={() => router.push('/admin/agents?create=true')}
+              >
+                Add your first agent
+              </Button>
               <div className="text-center">
                 <button
                   type="button"
@@ -261,6 +247,18 @@ export function OnboardingClient({ skipWorkspace }: { skipWorkspace?: boolean })
                 </button>
               </div>
             </div>
+          </div>
+        )}
+
+        {showBack && (
+          <div className="text-center mt-4">
+            <button
+              type="button"
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              onClick={() => backStep && setStep(backStep as Step)}
+            >
+              ← Back
+            </button>
           </div>
         )}
       </div>
