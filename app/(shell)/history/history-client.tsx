@@ -381,20 +381,23 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
     loadingRef.current = false
   }, [selectedDate, entityFilter, search, supabase, resolveSeqIds])
 
-  // Scroll listener to trigger loadMore near bottom of page
+  // Scroll listener on the shell's <main> scroll container
   useEffect(() => {
+    const sentinel = sentinelRef.current
+    if (!sentinel) return
+    // Find the nearest scrollable ancestor (the shell <main>)
+    const scrollParent = sentinel.closest('main') ?? document.querySelector('main')
+    if (!scrollParent) return
     const handleScroll = () => {
-      const sentinel = sentinelRef.current
-      if (!sentinel) return
       const rect = sentinel.getBoundingClientRect()
-      if (rect.top < window.innerHeight + 200) {
+      const containerRect = scrollParent.getBoundingClientRect()
+      if (rect.top < containerRect.bottom + 200) {
         loadMore()
       }
     }
-    window.addEventListener('scroll', handleScroll, { passive: true })
-    // Check immediately in case content is short
+    scrollParent.addEventListener('scroll', handleScroll, { passive: true })
     handleScroll()
-    return () => window.removeEventListener('scroll', handleScroll)
+    return () => scrollParent.removeEventListener('scroll', handleScroll)
   }, [loadMore])
 
   // Filter to selected day, then two-pass grouping
