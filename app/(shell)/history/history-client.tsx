@@ -140,6 +140,77 @@ function groupConsecutiveEvents(entries: ActivityLogEntry[]): ConsecutiveEventGr
   return result
 }
 
+// ---------------------------------------------------------------------------
+// Level 2 "session burst" grouping — same actor, 6+ actions within 20 min
+// ---------------------------------------------------------------------------
+
+interface SessionBurst {
+  type: 'burst'
+  id: string
+  actorId: string
+  actorType: 'human' | 'agent'
+  groups: ConsecutiveEventGroup[]
+  totalEntries: number
+}
+
+interface FlatGroup {
+  type: 'flat'
+  group: ConsecutiveEventGroup
+}
+
+type DisplayItem = SessionBurst | FlatGroup
+
+function groupSessionBursts(groups: ConsecutiveEventGroup[]): DisplayItem[] {
+  const result: DisplayItem[] = []
+  let run: ConsecutiveEventGroup[] = []
+  let runEntryCount = 0
+
+  function flushRun() {
+    if (run.length === 0) return
+    if (runEntryCount >= 6) {
+      result.push({
+        type: 'burst',
+        id: `burst-${run[0].id}`,
+        actorId: run[0].actorId,
+        actorType: run[0].actorType,
+        groups: run,
+        totalEntries: runEntryCount,
+      })
+    } else {
+      for (const g of run) {
+        result.push({ type: 'flat', group: g })
+      }
+    }
+    run = []
+    runEntryCount = 0
+  }
+
+  for (const group of groups) {
+    if (run.length === 0) {
+      run.push(group)
+      runEntryCount = group.entries.length
+      continue
+    }
+
+    const sameActor = group.actorId === run[0].actorId
+    const runStart = new Date(run[0].entries[0].created_at).getTime()
+    const groupEnd = new Date(group.entries[group.entries.length - 1].created_at).getTime()
+    const withinWindow = Math.abs(runStart - groupEnd) <= 20 * 60 * 1000
+
+    if (sameActor && withinWindow) {
+      run.push(group)
+      runEntryCount += group.entries.length
+    } else {
+      flushRun()
+      run.push(group)
+      runEntryCount = group.entries.length
+    }
+  }
+
+  flushRun()
+  return result
+}
+
 function formatEventVerb(eventType: string): string {
   switch (eventType) {
     case 'created':          return 'created'
@@ -300,9 +371,9 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
     return () => { supabase.removeChannel(channel) }
   }, [supabase, resolveSeqIds])
 
-  // Group consecutive same-actor/event/entity-type entries (within 5 min)
-  const eventGroups = useMemo(
-    () => groupConsecutiveEvents(filterActivityItems(entries)),
+  // Two-pass grouping: Level 1 (consecutive events) → Level 2 (session bursts)
+  const displayItems = useMemo(
+    () => groupSessionBursts(groupConsecutiveEvents(filterActivityItems(entries))),
     [entries]
   )
 
@@ -399,6 +470,43 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
     )
   }
 
+  function renderLevel1Group(group: ConsecutiveEventGroup) {
+    if (group.entries.length === 1) {
+      return renderSingleEntry(group.entries[0])
+    }
+    const isExpanded = expandedGroups.has(group.id)
+    const entityLabel = group.entityType.replace(/_/g, ' ')
+    return (
+      <div key={group.id}>
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => toggleGroup(group.id)}
+          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleGroup(group.id) } }}
+          className="flex items-center gap-3 rounded-lg px-3 py-3 hover:bg-muted/40 transition-colors cursor-pointer select-none"
+        >
+          <ActorChip actorId={group.actorId} actorType={group.actorType} />
+          <span className="text-sm flex-1 min-w-0">
+            {formatEventVerb(group.eventType)}{' '}
+            <span className="font-medium">{group.entries.length}</span>{' '}
+            {entityLabel}
+          </span>
+          <span className="text-xs text-muted-foreground" aria-label={isExpanded ? 'Collapse' : 'Expand'}>
+            {isExpanded ? '▾' : '▸'}
+          </span>
+          <span suppressHydrationWarning className="text-xs text-muted-foreground whitespace-nowrap shrink-0">
+            {formatDistanceToNow(new Date(group.entries[0].created_at), { addSuffix: true })}
+          </span>
+        </div>
+        {isExpanded && (
+          <div className="space-y-1 ml-4 border-l border-border pl-2">
+            {group.entries.map(entry => renderSingleEntry(entry))}
+          </div>
+        )}
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-4 sm:space-y-6">
       <h1 className="text-xl sm:text-2xl font-bold">History</h1>
@@ -435,42 +543,41 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
 
       {/* Activity list */}
       <div className="space-y-1">
-        {eventGroups.length === 0 && !loading ? (
+        {displayItems.length === 0 && !loading ? (
           <p className="text-sm text-muted-foreground py-8 text-center">
             No activity found.
           </p>
         ) : (
-          eventGroups.map(group => {
-            if (group.entries.length === 1) {
-              return renderSingleEntry(group.entries[0])
+          displayItems.map(item => {
+            if (item.type === 'flat') {
+              return renderLevel1Group(item.group)
             }
-            const isExpanded = expandedGroups.has(group.id)
-            const entityLabel = group.entityType.replace(/_/g, ' ')
+            // Session burst (Level 2)
+            const burst = item
+            const isBurstExpanded = expandedGroups.has(burst.id)
             return (
-              <div key={group.id}>
+              <div key={burst.id}>
                 <div
                   role="button"
                   tabIndex={0}
-                  onClick={() => toggleGroup(group.id)}
-                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleGroup(group.id) } }}
+                  onClick={() => toggleGroup(burst.id)}
+                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleGroup(burst.id) } }}
                   className="flex items-center gap-3 rounded-lg px-3 py-3 hover:bg-muted/40 transition-colors cursor-pointer select-none"
                 >
-                  <ActorChip actorId={group.actorId} actorType={group.actorType} />
+                  <ActorChip actorId={burst.actorId} actorType={burst.actorType} />
                   <span className="text-sm flex-1 min-w-0">
-                    {formatEventVerb(group.eventType)}{' '}
-                    <span className="font-medium">{group.entries.length}</span>{' '}
-                    {entityLabel}
+                    made <span className="font-medium">{burst.totalEntries}</span> changes
                   </span>
-                  <span className="text-xs text-muted-foreground" aria-label={isExpanded ? 'Collapse' : 'Expand'}>
-                    {isExpanded ? '▾' : '▸'}
+                  <span className="text-xs text-muted-foreground" aria-label={isBurstExpanded ? 'Collapse' : 'Expand'}>
+                    {isBurstExpanded ? '▾' : '▸'}
                   </span>
                   <span suppressHydrationWarning className="text-xs text-muted-foreground whitespace-nowrap shrink-0">
-                    {formatDistanceToNow(new Date(group.entries[0].created_at), { addSuffix: true })}
+                    {formatDistanceToNow(new Date(burst.groups[0].entries[0].created_at), { addSuffix: true })}
                   </span>
                 </div>
-                {isExpanded && (
+                {isBurstExpanded && (
                   <div className="space-y-1 ml-4 border-l border-border pl-2">
-                    {group.entries.map(entry => renderSingleEntry(entry))}
+                    {burst.groups.map(group => renderLevel1Group(group))}
                   </div>
                 )}
               </div>

@@ -3,8 +3,86 @@ import { apiError } from '@/lib/api/errors'
 
 const ENTITY_TYPES = ['tasks', 'library_items', 'companies', 'people', 'deals'] as const
 
+const UPDATABLE_FIELDS = {
+  tasks: {
+    title: { type: 'string' },
+    body: { type: 'string' },
+    status: { type: 'string', enum: ['backlog', 'todo', 'in_progress', 'blocked', 'done', 'cancelled'] },
+    priority: { type: 'string', enum: ['urgent', 'high', 'medium', 'low', 'none'] },
+    assignee_id: { type: 'string', description: 'UUID of assignee, or the literal string "unassigned" to clear. See /api/workspace/members for valid IDs.' },
+    type: { type: 'string | null', enum: ['bug', 'improvement', 'feature'] },
+    due_date: { type: 'date | null', description: 'ISO date string (YYYY-MM-DD)' },
+    tags: { type: 'text[]' },
+  },
+  library_items: {
+    title: { type: 'string' },
+    body: { type: 'string' },
+    type: { type: 'string', enum: ['favorite', 'flag', 'restaurant', 'note', 'idea', 'article'] },
+    url: { type: 'string' },
+    source: { type: 'string' },
+    excerpt: { type: 'string' },
+    location_name: { type: 'string' },
+    latitude: { type: 'number' },
+    longitude: { type: 'number' },
+    is_public: { type: 'boolean' },
+    tags: { type: 'text[]' },
+  },
+  companies: {
+    name: { type: 'string' },
+    domain: { type: 'string' },
+    industry: { type: 'string' },
+    notes: { type: 'string' },
+    website: { type: 'string' },
+    linkedin: { type: 'string' },
+    twitter: { type: 'string' },
+    instagram: { type: 'string' },
+    location: { type: 'string' },
+    source: { type: 'string' },
+    tags: { type: 'text[]' },
+  },
+  people: {
+    name: { type: 'string' },
+    email: { type: 'string' },
+    phone: { type: 'string' },
+    title: { type: 'string' },
+    notes: { type: 'string' },
+    emails: { type: 'jsonb', description: 'Array of {label, value} objects' },
+    phones: { type: 'jsonb', description: 'Array of {label, value} objects' },
+    linkedin: { type: 'string' },
+    twitter: { type: 'string' },
+    instagram: { type: 'string' },
+    source: { type: 'string' },
+    tags: { type: 'text[]' },
+  },
+  deals: {
+    title: { type: 'string' },
+    status: { type: 'string', enum: ['prospect', 'active', 'won', 'lost'] },
+    value: { type: 'number' },
+    notes: { type: 'string' },
+    follow_up_date: { type: 'date | null', description: 'ISO date string (YYYY-MM-DD)' },
+    source: { type: 'string' },
+    primary_contact_id: { type: 'string | null', description: 'UUID of primary contact (person)' },
+    expected_close_date: { type: 'date | null', description: 'ISO date string (YYYY-MM-DD)' },
+    tags: { type: 'text[]' },
+  },
+}
+
 const API_SCHEMA = {
   schema_version: '1.0.0',
+  rate_limit: {
+    max_requests: 60,
+    window_seconds: 60,
+    description: '60 requests per 60-second sliding window per actor. Returns 429 with Retry-After header when exceeded.',
+  },
+  errors: {
+    format: '{ "success": false, "error": "message" }',
+    description: 'All error responses return a JSON object with "success": false and an "error" string. HTTP status codes: 400 (bad request), 401 (unauthorized), 403 (forbidden), 404 (not found), 429 (rate limited), 500 (server error).',
+  },
+  id_conventions: {
+    seq_id: 'Canonical sequential integer ID for display (e.g. Task #42). All entity types have a seq_id. Accepted by single-entity GET endpoints.',
+    ticket_id: 'Alias for seq_id on tasks only (same value). Exists for backward compatibility.',
+  },
+  updatable_fields: UPDATABLE_FIELDS,
   endpoints: {
     commands: [
       {
@@ -111,11 +189,11 @@ const API_SCHEMA = {
       {
         method: 'PATCH',
         path: '/api/commands/update',
-        description: 'Update fields on any entity',
+        description: 'Update fields on any entity. See updatable_fields for allowed fields per entity type.',
         required_fields: {
           table: { type: 'string', enum: [...ENTITY_TYPES] },
           id: { type: 'string', description: 'UUID of the entity to update' },
-          fields: { type: 'object', description: 'Key-value map of fields to update' },
+          fields: { type: 'object', description: 'Key-value map of fields to update. See updatable_fields for valid keys per table.' },
         },
         optional_fields: {},
       },
@@ -126,7 +204,17 @@ const API_SCHEMA = {
         required_fields: {
           table: { type: 'string', enum: [...ENTITY_TYPES] },
           ids: { type: 'string[]', description: 'Array of UUIDs (1-100)' },
-          fields: { type: 'object', description: 'Key-value map of fields to update' },
+          fields: { type: 'object', description: 'Key-value map of fields to update. See updatable_fields for valid keys per table.' },
+        },
+        optional_fields: {},
+      },
+      {
+        method: 'POST',
+        path: '/api/commands/delete-entity',
+        description: 'Delete an entity. Humans only — agents receive 403 Forbidden.',
+        required_fields: {
+          table: { type: 'string', enum: [...ENTITY_TYPES] },
+          id: { type: 'string', description: 'UUID of the entity to delete' },
         },
         optional_fields: {},
       },
@@ -187,6 +275,15 @@ const API_SCHEMA = {
       },
       {
         method: 'GET',
+        path: '/api/tasks/:id',
+        description: 'Get a single task by UUID or seq_id',
+        required_fields: {
+          id: { type: 'string', description: 'UUID or sequential ID (path param)' },
+        },
+        optional_fields: {},
+      },
+      {
+        method: 'GET',
         path: '/api/library',
         description: 'List library items with optional filtering, search, and pagination',
         required_fields: {},
@@ -197,6 +294,15 @@ const API_SCHEMA = {
           type: { type: 'string', description: 'Filter by type', enum: ['favorite', 'flag', 'restaurant', 'note', 'idea', 'article'] },
           tag: { type: 'string', description: 'Filter by tag (exact match)' },
         },
+      },
+      {
+        method: 'GET',
+        path: '/api/library/:id',
+        description: 'Get a single library item by UUID or seq_id',
+        required_fields: {
+          id: { type: 'string', description: 'UUID or sequential ID (path param)' },
+        },
+        optional_fields: {},
       },
       {
         method: 'GET',
@@ -212,6 +318,15 @@ const API_SCHEMA = {
       },
       {
         method: 'GET',
+        path: '/api/crm/companies/:id',
+        description: 'Get a single company by UUID or seq_id',
+        required_fields: {
+          id: { type: 'string', description: 'UUID or sequential ID (path param)' },
+        },
+        optional_fields: {},
+      },
+      {
+        method: 'GET',
         path: '/api/crm/people',
         description: 'List people with optional search and pagination',
         required_fields: {},
@@ -224,6 +339,15 @@ const API_SCHEMA = {
       },
       {
         method: 'GET',
+        path: '/api/crm/people/:id',
+        description: 'Get a single person by UUID or seq_id',
+        required_fields: {
+          id: { type: 'string', description: 'UUID or sequential ID (path param)' },
+        },
+        optional_fields: {},
+      },
+      {
+        method: 'GET',
         path: '/api/crm/deals',
         description: 'List deals with optional search and pagination',
         required_fields: {},
@@ -233,6 +357,15 @@ const API_SCHEMA = {
           q: { type: 'string', description: 'Search query (searches name, notes)' },
           tag: { type: 'string', description: 'Filter by tag (exact match)' },
         },
+      },
+      {
+        method: 'GET',
+        path: '/api/crm/deals/:id',
+        description: 'Get a single deal by UUID or seq_id',
+        required_fields: {
+          id: { type: 'string', description: 'UUID or sequential ID (path param)' },
+        },
+        optional_fields: {},
       },
       {
         method: 'GET',
