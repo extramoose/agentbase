@@ -216,7 +216,7 @@ export function OnboardingClient({ skipWorkspace }: { skipWorkspace?: boolean })
               </span>
             </div>
             <div className="flex gap-2">
-              <Button variant="ghost" onClick={() => setStep('profile')}>
+              <Button variant="ghost" className="flex-1" onClick={() => setStep('profile')}>
                 Back
               </Button>
               <Button className="flex-1" onClick={() => setStep('intro-agents')}>
@@ -228,13 +228,6 @@ export function OnboardingClient({ skipWorkspace }: { skipWorkspace?: boolean })
 
         {step === 'intro-agents' && (
           <div className="rounded-xl border border-border bg-card p-8">
-            <button
-              type="button"
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors mb-4"
-              onClick={() => setStep('intro-you')}
-            >
-              ← Back
-            </button>
             <div className="space-y-2 text-center mb-8">
               <h1 className="text-2xl font-semibold tracking-tight">
                 How it works for agents
@@ -250,13 +243,14 @@ export function OnboardingClient({ skipWorkspace }: { skipWorkspace?: boolean })
               </span>
             </div>
             <div className="space-y-3">
-              <Button
-                className="w-full"
-                size="lg"
-                onClick={() => router.push('/admin/agents?create=true')}
-              >
-                Add your first agent
-              </Button>
+              <div className="flex gap-2">
+                <Button variant="ghost" className="flex-1" onClick={() => setStep('intro-you')}>
+                  Back
+                </Button>
+                <Button className="flex-1" onClick={() => router.push('/admin/agents?create=true')}>
+                  Add your first agent
+                </Button>
+              </div>
               <div className="text-center">
                 <button
                   type="button"
