@@ -23,5 +23,6 @@ export async function broadcastMutation(
     event: 'mutation',
     payload: { table, event, id },
   })
+  console.log("[broadcast] sent mutation event:", table, event, id)
   supabase.removeChannel(channel)
 }

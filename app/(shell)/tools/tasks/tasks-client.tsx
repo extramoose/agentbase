@@ -1153,6 +1153,7 @@ export function TasksClient({
     const channel = supabase
       .channel('agent:mutations')
       .on('broadcast', { event: 'mutation' }, (msg) => {
+        console.log('[tasks] broadcast received:', msg)
         const { table } = msg.payload as { table: string }
         if (table !== 'tasks') return
         supabase
