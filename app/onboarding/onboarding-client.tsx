@@ -35,7 +35,7 @@ export function OnboardingClient({ skipWorkspace }: { skipWorkspace?: boolean })
   const [step, setStep] = useState<Step>(skipWs ? 'profile' : 'workspace')
   const [workspaceName, setWorkspaceName] = useState('')
   const [profileName, setProfileName] = useState('')
-  const [avatarUrl, setAvatarUrl] = useState<string | null>('/avatars/avatar_anonymous.jpg')
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 

@@ -6,10 +6,10 @@ import { Button } from '@/components/ui/button'
 import { Upload, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-export const AVATAR_PRESETS = Array.from(
-  { length: 12 },
-  (_, i) => `/avatars/avatar${i + 1}.jpg`,
-)
+export const AVATAR_PRESETS = [
+  '/avatars/avatar_anonymous.jpg',
+  ...Array.from({ length: 12 }, (_, i) => `/avatars/avatar${i + 1}.jpg`),
+]
 
 interface AvatarPickerProps {
   selected: string | null
@@ -30,7 +30,7 @@ export function AvatarPicker({ selected, onSelect, onUpload }: AvatarPickerProps
           </Avatar>
           <button
             type="button"
-            onClick={() => onSelect('/avatars/avatar_anonymous.jpg')}
+            onClick={() => onSelect(AVATAR_PRESETS[0])}
             className="absolute -top-1 -right-1 h-6 w-6 rounded-full bg-muted border border-border flex items-center justify-center hover:bg-destructive hover:border-destructive hover:text-white transition-colors"
           >
             <X className="h-3 w-3" />
@@ -39,7 +39,7 @@ export function AvatarPicker({ selected, onSelect, onUpload }: AvatarPickerProps
         <button
           type="button"
           className="text-xs text-muted-foreground hover:text-foreground transition-colors underline underline-offset-4"
-          onClick={() => onSelect('/avatars/avatar_anonymous.jpg')}
+          onClick={() => onSelect(AVATAR_PRESETS[0])}
         >
           Choose from presets instead
         </button>
