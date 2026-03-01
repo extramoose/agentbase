@@ -339,7 +339,7 @@ export function CrmClient({
     const optimistic: CrmCompany = {
       id: tempId, seq_id: null, tenant_id: '', name, domain: null, industry: null, notes: null,
       website: null, linkedin: null, twitter: null, instagram: null, location: null, source: null,
-      last_enriched: null, tags: [], assignee_id: null, assignee_type: null,
+      last_enriched: null, tags: [],
       created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
     }
     setCompanies((prev) => [optimistic, ...prev])
@@ -366,7 +366,7 @@ export function CrmClient({
     const optimistic: CrmPerson = {
       id: tempId, seq_id: null, tenant_id: '', name, email: null, phone: null, title: null, notes: null,
       emails: [], phones: [], linkedin: null, twitter: null, instagram: null, source: null,
-      last_enriched: null, tags: [], assignee_id: null, assignee_type: null,
+      last_enriched: null, tags: [],
       created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
     }
     setPeople((prev) => [optimistic, ...prev])
@@ -393,7 +393,7 @@ export function CrmClient({
     const optimistic: CrmDeal = {
       id: tempId, seq_id: null, tenant_id: '', title: dealTitle, status: 'prospect', value: null, notes: null,
       follow_up_date: null, source: null, primary_contact_id: null, expected_close_date: null,
-      last_enriched: null, tags: [], assignee_id: null, assignee_type: null,
+      last_enriched: null, tags: [],
       created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
     }
     setDeals((prev) => [optimistic, ...prev])

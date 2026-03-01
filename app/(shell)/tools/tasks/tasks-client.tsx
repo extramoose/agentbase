@@ -53,6 +53,8 @@ type TaskType = 'bug' | 'improvement' | 'feature'
 type View = 'grid' | 'table' | 'stickies'
 
 export interface Task extends BaseEntity {
+  assignee_id: string | null
+  assignee_type: string | null
   ticket_id: number
   title: string
   body: string | null

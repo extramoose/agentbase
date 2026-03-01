@@ -5,8 +5,8 @@ export interface BaseEntity {
   seq_id: number | null
   tenant_id: string
   tags: string[]
-  assignee_id: string | null
-  assignee_type: string | null
+  assignee_id?: string | null
+  assignee_type?: string | null
   created_at: string
   updated_at: string
   deleted_at?: string | null

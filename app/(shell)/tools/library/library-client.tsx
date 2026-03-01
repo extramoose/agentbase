@@ -40,6 +40,8 @@ type ItemType = 'favorite' | 'flag' | 'restaurant' | 'note' | 'idea' | 'article'
 type View = 'grid' | 'table' | 'stickies'
 
 export interface LibraryItem extends BaseEntity {
+  assignee_id: string | null
+  assignee_type: string | null
   title: string
   url: string | null
   source: string | null
