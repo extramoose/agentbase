@@ -27,7 +27,7 @@ export async function POST(request: Request) {
     const host = h.get('x-forwarded-host') ?? h.get('host') ?? 'localhost:3000'
     const proto = h.get('x-forwarded-proto') ?? 'http'
     const origin = `${proto}://${host}`
-    const inviteUrl = `${origin}/invite/${invite.token}`
+    const inviteUrl = `${origin}/invite/${invite.token}?email=${encodeURIComponent(email)}`
 
     // 3. Send email via Resend API (no service_role needed)
     const resendKey = process.env.RESEND_API_KEY
