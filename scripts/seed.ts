@@ -2,7 +2,7 @@
  * scripts/seed.ts
  *
  * Creates the initial HunterTenant workspace and sets Hunter's profile
- * role to 'superadmin'. Run this once after Hunter signs in for the first time.
+ * role to 'owner'. Run this once after Hunter signs in for the first time.
  *
  * Uses SUPABASE_SECRET_KEY — scripts only, never runtime.
  *
@@ -36,21 +36,21 @@ async function main() {
   if (tenantError) throw new Error(`Tenant creation failed: ${tenantError.message}`)
   console.log(`  ✓ Tenant created: ${tenant.id}`)
 
-  // 2. Add Hunter as superadmin member
-  console.log('Adding Hunter as superadmin...')
+  // 2. Add Hunter as owner member
+  console.log('Adding Hunter as owner...')
   const { error: memberError } = await supabase
     .from('tenant_members')
-    .insert({ tenant_id: tenant.id, user_id: HUNTER_USER_ID, role: 'superadmin' })
+    .insert({ tenant_id: tenant.id, user_id: HUNTER_USER_ID, role: 'owner' })
   if (memberError) throw new Error(`tenant_members insert failed: ${memberError.message}`)
-  console.log('  ✓ Hunter added as superadmin')
+  console.log('  ✓ Hunter added as owner')
 
   // 3. Upgrade Hunter's profile role
   const { error: profileError } = await supabase
     .from('profiles')
-    .update({ role: 'superadmin' })
+    .update({ role: 'owner' })
     .eq('id', HUNTER_USER_ID)
   if (profileError) throw new Error(`Profile update failed: ${profileError.message}`)
-  console.log('  ✓ Profile role set to superadmin')
+  console.log('  ✓ Profile role set to owner')
 
   console.log('\n✅ Seed complete!')
   console.log(`   TENANT_ID=${tenant.id}`)

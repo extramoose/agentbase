@@ -7,11 +7,11 @@ export type UserProfile = {
   email: string
   full_name: string | null
   avatar_url: string | null
-  role: 'superadmin' | 'admin' | 'user'
+  role: 'owner' | 'admin' | 'user'
   active_tenant_id: string | null
   created_at: string
   updated_at: string
-  tenant_role?: 'superadmin' | 'admin' | 'member' | 'agent' | null
+  tenant_role?: 'owner' | 'admin' | 'member' | 'agent' | null
 }
 
 export async function getSession() {
@@ -50,9 +50,9 @@ export async function requireAuth() {
 
 export async function requireAdmin(): Promise<UserProfile> {
   const profile = await getUserProfile()
-  const isTenantAdmin = profile?.tenant_role === 'superadmin' || profile?.tenant_role === 'admin'
-  const isGlobalSuperadmin = profile?.role === 'superadmin'
-  if (!profile || (!isTenantAdmin && !isGlobalSuperadmin)) {
+  const isTenantAdmin = profile?.tenant_role === 'owner' || profile?.tenant_role === 'admin'
+  const isGlobalOwner = profile?.role === 'owner'
+  if (!profile || (!isTenantAdmin && !isGlobalOwner)) {
     redirect('/')
   }
   return profile
@@ -74,9 +74,9 @@ export async function requireAuthApi() {
 /** For API routes — throws ForbiddenError (caught by apiError) */
 export async function requireAdminApi(): Promise<UserProfile> {
   const profile = await getUserProfile()
-  const isTenantAdmin = profile?.tenant_role === 'superadmin' || profile?.tenant_role === 'admin'
-  const isGlobalSuperadmin = profile?.role === 'superadmin'
-  if (!profile || (!isTenantAdmin && !isGlobalSuperadmin)) {
+  const isTenantAdmin = profile?.tenant_role === 'owner' || profile?.tenant_role === 'admin'
+  const isGlobalOwner = profile?.role === 'owner'
+  if (!profile || (!isTenantAdmin && !isGlobalOwner)) {
     throw new ForbiddenError()
   }
   return profile

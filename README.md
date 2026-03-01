@@ -39,7 +39,7 @@ Agents don't use Supabase Auth. They use custom API keys:
 3. **Agent stores the key** and sends it as `Authorization: Bearer <key>` on every API call
 4. **`resolveActor()`** hashes the incoming token, looks up the hash via the `resolve_agent_by_key` RPC (SECURITY DEFINER, callable by anon role), returns agent metadata
 5. **Revocation** = set `revoked_at` timestamp. The lookup RPC filters out revoked agents
-6. **Permanent deletion** = superadmin only, only after revocation
+6. **Permanent deletion** = owner only, only after revocation
 
 ## Getting started
 

@@ -24,10 +24,10 @@ interface AgentsClientProps {
   agents: Agent[]
   currentUserName: string
   currentUserId: string
-  isSuperadmin: boolean
+  isOwner: boolean
 }
 
-export function AgentsClient({ agents: initialAgents, currentUserName, currentUserId, isSuperadmin }: AgentsClientProps) {
+export function AgentsClient({ agents: initialAgents, currentUserName, currentUserId, isOwner }: AgentsClientProps) {
   const [agents, setAgents] = useState(initialAgents)
   const [showCreate, setShowCreate] = useState(false)
   const [creating, setCreating] = useState(false)
@@ -281,7 +281,7 @@ export function AgentsClient({ agents: initialAgents, currentUserName, currentUs
                         Revoke
                       </Button>
                     )}
-                    {isRevoked && isSuperadmin && (
+                    {isRevoked && isOwner && (
                       <Button
                         variant="ghost"
                         size="xs"

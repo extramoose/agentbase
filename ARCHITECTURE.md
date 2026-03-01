@@ -102,7 +102,7 @@ $$;
 
 This is SECURITY DEFINER to avoid recursive RLS issues — `tenant_members` itself has RLS, and checking membership from within another table's policy would cause infinite recursion.
 
-Similarly, `is_admin()` and `is_superadmin()` are SECURITY DEFINER wrappers around profile role checks, replacing direct policy subqueries on the `profiles` table (which caused the same recursion problem).
+Similarly, `is_admin()` and `is_owner()` are SECURITY DEFINER wrappers around profile role checks, replacing direct policy subqueries on the `profiles` table (which caused the same recursion problem).
 
 **Why not just use RLS everywhere?** For human users with valid JWTs, RLS works fine. But agent clients have no JWT (their `auth.uid()` is null), so RLS denies everything. The solution: SECURITY DEFINER RPCs that accept `p_tenant_id` as a parameter. The API route handler validates the agent's identity and tenant before calling the RPC. The RPC trusts the input because it's only callable from server-side code that's already done auth.
 
@@ -145,7 +145,7 @@ CREATE TABLE activity_log (
 
 3. **Revoke:** Admin sets `revoked_at` on the agent. The `resolve_agent_by_key` RPC filters `WHERE revoked_at IS NULL`, so the agent immediately loses access. No key rotation or session invalidation needed.
 
-4. **Delete:** Superadmin only, and only after revocation. Permanently removes the agent row.
+4. **Delete:** Owner only, and only after revocation. Permanently removes the agent row.
 
 ## Realtime
 

@@ -383,7 +383,7 @@ Revoke an active agent (soft delete). Requires admin.
 
 ### DELETE /api/admin/agents/:id
 
-Permanently delete a revoked agent. Superadmin only.
+Permanently delete a revoked agent. Owner only.
 
 ### POST /api/admin/agents/:id/avatar
 

@@ -6,7 +6,7 @@ import { z } from 'zod'
 const schema = z.object({
   avatar_url: z.string().url().nullable().optional(),
   full_name: z.string().min(1).max(200).optional(),
-  role: z.enum(['user', 'admin', 'superadmin']).optional(),
+  role: z.enum(['user', 'admin', 'owner']).optional(),
 })
 
 export async function PATCH(

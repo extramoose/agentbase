@@ -34,7 +34,7 @@ type Member = {
 }
 
 const ROLE_CONFIG: Record<string, { label: string; color: string; icon: typeof Shield }> = {
-  superadmin: { label: 'Super Admin', color: 'bg-yellow-500/20 text-yellow-400', icon: ShieldAlert },
+  owner: { label: 'Owner', color: 'bg-yellow-500/20 text-yellow-400', icon: ShieldAlert },
   admin:      { label: 'Admin',       color: 'bg-blue-500/20 text-blue-400',   icon: Shield },
   user:       { label: 'User',        color: 'bg-muted text-muted-foreground', icon: User },
 }
@@ -176,7 +176,7 @@ export function UsersClient({ currentUserId }: UsersClientProps) {
               const config = ROLE_CONFIG[member.role] ?? ROLE_CONFIG.user
               const displayName = member.full_name ?? member.email.split('@')[0]
               const isSelf = member.id === currentUserId
-              const isSuperadmin = member.role === 'superadmin'
+              const isOwner = member.role === 'owner'
 
               return (
                 <tr key={member.id} className="border-b border-border last:border-0 hover:bg-muted/40">
@@ -210,7 +210,7 @@ export function UsersClient({ currentUserId }: UsersClientProps) {
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    {isSelf || isSuperadmin ? (
+                    {isSelf || isOwner ? (
                       <span className="text-xs text-muted-foreground">
                         {isSelf ? 'You' : '—'}
                       </span>

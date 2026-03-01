@@ -21,7 +21,7 @@ Find your user UUID from the Supabase dashboard → Auth → Users.
 
 ### Step 2: Seed the workspace
 
-Creates HunterTenant and grants you superadmin role.
+Creates HunterTenant and grants you owner role.
 
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=https://<project>.supabase.co \

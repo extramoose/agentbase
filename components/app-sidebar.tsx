@@ -88,7 +88,7 @@ export function AppSidebar({ profile, workspaces, onNavigate }: { profile: UserP
 
   const tenantRole = activeWorkspace?.role
   const isAdmin =
-    tenantRole === 'admin' || tenantRole === 'superadmin' || profile?.role === 'superadmin'
+    tenantRole === 'admin' || tenantRole === 'owner' || profile?.role === 'owner'
 
   return (
     <aside className="flex h-full w-60 flex-col border-r border-border bg-card">

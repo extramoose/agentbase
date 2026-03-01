@@ -31,5 +31,5 @@ export default async function AdminAgentsPage() {
   const { data: { user } } = await supabase.auth.getUser()
   const { data: profile } = await supabase.from('profiles').select('full_name, role').eq('id', user!.id).single()
 
-  return <AgentsClient agents={agentsWithOwners} currentUserName={profile?.full_name ?? user?.email ?? 'You'} currentUserId={user!.id} isSuperadmin={profile?.role === 'superadmin'} />
+  return <AgentsClient agents={agentsWithOwners} currentUserName={profile?.full_name ?? user?.email ?? 'You'} currentUserId={user!.id} isOwner={profile?.role === 'owner'} />
 }

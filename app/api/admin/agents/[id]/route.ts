@@ -24,7 +24,7 @@ export async function PATCH(
   }
 }
 
-/** DELETE — permanently delete a revoked agent (superadmin only) */
+/** DELETE — permanently delete a revoked agent (owner only) */
 export async function DELETE(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -32,8 +32,8 @@ export async function DELETE(
   try {
     const profile = await requireAdminApi()
 
-    if (profile.role !== 'superadmin') {
-      throw new ForbiddenError('Only superadmins can delete agents')
+    if (profile.role !== 'owner') {
+      throw new ForbiddenError('Only owners can delete agents')
     }
 
     const { id } = await params
