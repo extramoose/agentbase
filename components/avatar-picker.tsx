@@ -22,15 +22,15 @@ export function AvatarPicker({ selected, onSelect, onUpload }: AvatarPickerProps
 
   return (
     <div className="space-y-3">
-      <div className="grid grid-cols-4 gap-2">
+      <div className="grid grid-cols-4 gap-3">
         {AVATAR_PRESETS.map((url) => (
           <button
             key={url}
             type="button"
             onClick={() => onSelect(url)}
             className={cn(
-              'rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-              selected === url && 'ring-2 ring-primary',
+              'rounded-full p-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-all',
+              selected === url && 'ring-2 ring-primary ring-offset-2 ring-offset-background scale-110',
             )}
           >
             <Avatar className="h-12 w-12">
