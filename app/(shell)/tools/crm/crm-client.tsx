@@ -10,7 +10,6 @@ import { ViewToggle } from '@/components/entity-client/view-toggle'
 import { SearchFilterBar } from '@/components/search-filter-bar'
 import { TagCombobox } from '@/components/tag-combobox'
 import { batchCreateLinks } from '@/components/entity-client/link-picker'
-import { AssigneePicker } from '@/components/assignee-picker'
 import { toast } from '@/hooks/use-toast'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -1586,23 +1585,6 @@ export function DealShelfContent({
         />
       </div>
 
-      <div>
-        <label className="text-xs text-muted-foreground font-medium mb-1 block">Assignee</label>
-        <AssigneePicker
-          value={
-            deal.assignee_id
-              ? { id: deal.assignee_id, type: (deal.assignee_type as 'human' | 'agent') ?? 'human' }
-              : null
-          }
-          onChange={(actor) =>
-            saveField({
-              assignee_id: actor?.id ?? null,
-              assignee_type: actor?.type ?? null,
-            })
-          }
-        />
-      </div>
-
       <p className="text-xs text-muted-foreground">
         Last enriched: {deal.last_enriched ? formatRelativeTime(deal.last_enriched) : 'Never'}
       </p>
@@ -1772,23 +1754,6 @@ export function CompanyShelfContent({
             setTags(newTags)
             saveField({ tags: newTags })
           }}
-        />
-      </div>
-
-      <div>
-        <label className="text-xs text-muted-foreground font-medium mb-1 block">Assignee</label>
-        <AssigneePicker
-          value={
-            company.assignee_id
-              ? { id: company.assignee_id, type: (company.assignee_type as 'human' | 'agent') ?? 'human' }
-              : null
-          }
-          onChange={(actor) =>
-            saveField({
-              assignee_id: actor?.id ?? null,
-              assignee_type: actor?.type ?? null,
-            })
-          }
         />
       </div>
 
@@ -1975,23 +1940,6 @@ export function PersonShelfContent({
             setTags(newTags)
             saveField({ tags: newTags })
           }}
-        />
-      </div>
-
-      <div>
-        <label className="text-xs text-muted-foreground font-medium mb-1 block">Assignee</label>
-        <AssigneePicker
-          value={
-            person.assignee_id
-              ? { id: person.assignee_id, type: (person.assignee_type as 'human' | 'agent') ?? 'human' }
-              : null
-          }
-          onChange={(actor) =>
-            saveField({
-              assignee_id: actor?.id ?? null,
-              assignee_type: actor?.type ?? null,
-            })
-          }
         />
       </div>
 
