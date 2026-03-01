@@ -10,7 +10,7 @@ export async function GET() {
     // Fetch top 3 from each entity type, then sort and return top 8
     const [tasks, library, companies, people, deals] = await Promise.all([
       supabase.from('tasks').select('id,title,updated_at').order('updated_at', { ascending: false }).limit(3),
-      supabase.from('library_items').select('id,name,updated_at').order('updated_at', { ascending: false }).limit(3),
+      supabase.from('library_items').select('id,title,updated_at').order('updated_at', { ascending: false }).limit(3),
       supabase.from('companies').select('id,name,updated_at').order('updated_at', { ascending: false }).limit(3),
       supabase.from('people').select('id,name,updated_at').order('updated_at', { ascending: false }).limit(3),
       supabase.from('deals').select('id,name,updated_at').order('updated_at', { ascending: false }).limit(3),
@@ -19,7 +19,7 @@ export async function GET() {
     type RecentEntity = { id: string; label: string; entity_type: string; updated_at: string }
     const all: RecentEntity[] = [
       ...(tasks.data ?? []).map(r => ({ id: r.id, label: r.title, entity_type: 'tasks', updated_at: r.updated_at })),
-      ...(library.data ?? []).map(r => ({ id: r.id, label: r.name, entity_type: 'library_items', updated_at: r.updated_at })),
+      ...(library.data ?? []).map(r => ({ id: r.id, label: r.title, entity_type: 'library_items', updated_at: r.updated_at })),
       ...(companies.data ?? []).map(r => ({ id: r.id, label: r.name, entity_type: 'companies', updated_at: r.updated_at })),
       ...(people.data ?? []).map(r => ({ id: r.id, label: r.name, entity_type: 'people', updated_at: r.updated_at })),
       ...(deals.data ?? []).map(r => ({ id: r.id, label: r.name, entity_type: 'deals', updated_at: r.updated_at })),

@@ -60,13 +60,27 @@ export async function GET(request: Request) {
           // DB-level search for agent path requires a migration (future work)
           const { data } = await supabase.rpc(RPC_NAMES[type], { p_tenant_id: tenantId })
           if (data) {
-            const filtered = filterInMemory(data, q, columns)
+            // For tasks, also match ticket_id if query is numeric
+            let filtered = filterInMemory(data, q, columns)
+            if (type === 'tasks' && /^\d+$/.test(q)) {
+              const ticketMatches = (data as { ticket_id?: number }[]).filter(
+                (r) => r.ticket_id != null && String(r.ticket_id) === q
+              )
+              const existingIds = new Set(filtered.map((r: Record<string, unknown>) => r.id as string))
+              for (const m of ticketMatches) {
+                if (!existingIds.has((m as { id: string }).id)) filtered.unshift(m)
+              }
+            }
             results[type] = paginateInMemory(filtered, 1, limitParam)
           } else {
             results[type] = []
           }
         } else {
-          const filter = columns.map(col => `${col}.ilike.%${q}%`).join(',')
+          let filter = columns.map(col => `${col}.ilike.%${q}%`).join(',')
+          // For tasks, also match ticket_id if query is numeric
+          if (type === 'tasks' && /^\d+$/.test(q)) {
+            filter += `,ticket_id.eq.${parseInt(q, 10)}`
+          }
           const { data } = await supabase
             .from(TABLE_NAMES[type])
             .select('*')
