@@ -63,11 +63,13 @@ export function ActivityAndComments({ entityType, entityId, currentUserId, noCol
   // Initial load
   useEffect(() => {
     const load = async () => {
-      const { data } = await supabase.rpc('get_activity_log', {
+      const { data, error } = await supabase.rpc('get_activity_log', {
         p_entity_type: entityType,
         p_entity_id: entityId,
         p_limit: 50,
       })
+      if (error) console.error("[activity-shelf] RPC error:", error)
+      console.log("[activity-shelf] RPC returned", data?.length ?? 0, "entries for", entityType, entityId)
       setEntries((data ?? []) as ActivityLogEntry[])
       setLoading(false)
     }
