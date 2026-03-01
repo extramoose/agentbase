@@ -371,7 +371,6 @@ function SwimLane({
 }
 
 export function StickiesView({ tasks, onTaskClick, selectedRole }: StickiesViewProps) {
-  console.log("[StickiesView] render, tasks count:", tasks.length, "role:", selectedRole)
   const lanes = useMemo(
     () => selectedRole === 'agent' ? categorizeByStatus(tasks) : categorizeTasks(tasks),
     [tasks, selectedRole],
