@@ -90,7 +90,7 @@ export function AppSidebar({ profile, workspaces, onNavigate }: { profile: UserP
         body: JSON.stringify({ tenant_id: tenantId }),
       })
       if (!res.ok) throw new Error('Failed to switch workspace')
-      router.refresh()
+      window.location.href = '/tools/tasks'
     } finally {
       setSwitching(false)
     }
