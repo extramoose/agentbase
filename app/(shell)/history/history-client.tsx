@@ -257,7 +257,8 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
 
   // Refs to decouple loadMore identity from rapidly-changing state.
   const loadingRef = useRef(false)
-  const hasMoreRef = useRef(initialEntries.length >= 200)
+  const countUniqueEntities = (items: ActivityLogEntry[]) => new Set(items.map(e => e.entity_id)).size
+  const hasMoreRef = useRef(countUniqueEntities(initialEntries) >= 200)
   const entriesRef = useRef(entries)
   entriesRef.current = entries
 
@@ -300,16 +301,17 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
     if (loadingRef.current || !hasMoreRef.current) return
     loadingRef.current = true
     setLoading(true)
+    const entityOffset = countUniqueEntities(entriesRef.current)
     const { data } = await supabase.rpc('get_activity_log', {
       p_limit: 200,
-      p_offset: entriesRef.current.length,
+      p_offset: entityOffset,
       ...(entityFilter ? { p_entity_type: entityFilter } : {}),
       ...(search.trim() ? { p_search: search.trim() } : {}),
     })
     const newEntries = (data ?? []) as ActivityLogEntry[]
     await resolveSeqIds(newEntries)
     setEntries(prev => [...prev, ...newEntries])
-    hasMoreRef.current = newEntries.length >= 200
+    hasMoreRef.current = countUniqueEntities(newEntries) >= 200
     loadingRef.current = false
     setLoading(false)
   }, [entityFilter, search, supabase, resolveSeqIds])
@@ -342,7 +344,7 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
       const results = (data ?? []) as ActivityLogEntry[]
       await resolveSeqIds(results)
       setEntries(results)
-      hasMoreRef.current = results.length >= 200
+      hasMoreRef.current = countUniqueEntities(results) >= 200
       loadingRef.current = false
       setLoading(false)
     }
