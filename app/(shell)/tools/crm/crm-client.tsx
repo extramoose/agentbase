@@ -29,7 +29,7 @@ interface LabelValue {
   value: string
 }
 
-interface CrmCompany extends BaseEntity {
+export interface CrmCompany extends BaseEntity {
   name: string
   domain: string | null
   industry: string | null
@@ -42,7 +42,7 @@ interface CrmCompany extends BaseEntity {
   source: string | null
 }
 
-interface CrmPerson extends BaseEntity {
+export interface CrmPerson extends BaseEntity {
   name: string
   email: string | null
   phone: string | null
@@ -58,7 +58,7 @@ interface CrmPerson extends BaseEntity {
 
 type DealStatus = 'prospect' | 'active' | 'won' | 'lost'
 
-interface CrmDeal extends BaseEntity {
+export interface CrmDeal extends BaseEntity {
   title: string
   status: DealStatus
   value: number | null
@@ -1135,7 +1135,7 @@ function LabelValueListField({
 // Shelf Content — Deal
 // ---------------------------------------------------------------------------
 
-function DealShelfContent({
+export function DealShelfContent({
   deal,
   onUpdate,
 }: {
@@ -1309,7 +1309,7 @@ function DealShelfContent({
 // Shelf Content — Company
 // ---------------------------------------------------------------------------
 
-function CompanyShelfContent({
+export function CompanyShelfContent({
   company,
   onUpdate,
 }: {
@@ -1494,7 +1494,7 @@ function CompanyShelfContent({
 // Shelf Content — Person
 // ---------------------------------------------------------------------------
 
-function PersonShelfContent({
+export function PersonShelfContent({
   person,
   onUpdate,
 }: {

@@ -52,7 +52,7 @@ type TaskType = 'bug' | 'improvement' | 'feature'
 
 type View = 'grid' | 'table'
 
-interface Task extends BaseEntity {
+export interface Task extends BaseEntity {
   ticket_id: number
   title: string
   body: string | null
@@ -496,7 +496,7 @@ function PriorityGroup({
 // Shelf content (editable fields for a task — rendered inside EntityShelf)
 // ---------------------------------------------------------------------------
 
-function TaskShelfContent({
+export function TaskShelfContent({
   task,
   onClose,
 }: {

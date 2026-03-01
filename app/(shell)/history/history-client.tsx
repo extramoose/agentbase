@@ -14,7 +14,18 @@ import {
   type ActivityLogEntry,
 } from '@/lib/format-activity'
 import { MarkdownRenderer } from '@/components/markdown-renderer'
-import { type BaseEntity, type EntityType } from '@/types/entities'
+import { type BaseEntity, type EntityType, ENTITY_TABLE } from '@/types/entities'
+import { toast } from '@/hooks/use-toast'
+import { TaskShelfContent, type Task } from '@/app/(shell)/tools/tasks/tasks-client'
+import {
+  DealShelfContent,
+  CompanyShelfContent,
+  PersonShelfContent,
+  type CrmDeal,
+  type CrmCompany,
+  type CrmPerson,
+} from '@/app/(shell)/tools/crm/crm-client'
+import { LibraryShelfContent, type LibraryItem } from '@/app/(shell)/tools/library/library-client'
 
 /** Maps entity_type (table name) to the front-end path prefix */
 function getEntityPath(entityType: string): string {
@@ -317,6 +328,26 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
     setShelfData({ entity, entityType: mappedType, label })
   }, [supabase])
 
+  const handleEntityUpdate = useCallback(
+    async (id: string, table: string, fields: Record<string, unknown>) => {
+      try {
+        const res = await fetch('/api/commands/update', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ table, id, fields }),
+        })
+        const json = await res.json()
+        if (!res.ok) throw new Error(json.error ?? 'Update failed')
+      } catch (err) {
+        toast({
+          type: 'error',
+          message: err instanceof Error ? err.message : 'Update failed',
+        })
+      }
+    },
+    [],
+  )
+
   function handleEntityClick(entry: ActivityLogEntry) {
     const normalized = normalizeEntityType(entry.entity_type)
     if (!getEntityPath(normalized)) return
@@ -461,69 +492,45 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
           onClose={() => setShelfData(null)}
           title={shelfData.label}
         >
-          <HistoryShelfContent entity={shelfData.entity} entityType={shelfData.entityType} />
+          {shelfData.entityType === 'task' && (
+            <TaskShelfContent
+              task={shelfData.entity as Task}
+              onClose={() => setShelfData(null)}
+            />
+          )}
+          {shelfData.entityType === 'deal' && (
+            <DealShelfContent
+              deal={shelfData.entity as CrmDeal}
+              onUpdate={(fields) =>
+                handleEntityUpdate(shelfData.entity.id, ENTITY_TABLE[shelfData.entityType], fields)
+              }
+            />
+          )}
+          {shelfData.entityType === 'company' && (
+            <CompanyShelfContent
+              company={shelfData.entity as CrmCompany}
+              onUpdate={(fields) =>
+                handleEntityUpdate(shelfData.entity.id, ENTITY_TABLE[shelfData.entityType], fields)
+              }
+            />
+          )}
+          {shelfData.entityType === 'person' && (
+            <PersonShelfContent
+              person={shelfData.entity as CrmPerson}
+              onUpdate={(fields) =>
+                handleEntityUpdate(shelfData.entity.id, ENTITY_TABLE[shelfData.entityType], fields)
+              }
+            />
+          )}
+          {shelfData.entityType === 'library_item' && (
+            <LibraryShelfContent
+              item={shelfData.entity as LibraryItem}
+              onUpdate={(id, fields) =>
+                handleEntityUpdate(id, ENTITY_TABLE[shelfData.entityType], fields)
+              }
+            />
+          )}
         </EntityShelf>
-      )}
-    </div>
-  )
-}
-
-// ---------------------------------------------------------------------------
-// Minimal read-only shelf content for entities opened from history
-// ---------------------------------------------------------------------------
-
-function HistoryShelfContent({
-  entity,
-  entityType,
-}: {
-  entity: BaseEntity
-  entityType: EntityType
-}) {
-  const data = entity as unknown as Record<string, unknown>
-
-  const fields: { label: string; value: string }[] = []
-  if (data.title) fields.push({ label: 'Title', value: String(data.title) })
-  if (data.name) fields.push({ label: 'Name', value: String(data.name) })
-  if (data.status) fields.push({ label: 'Status', value: String(data.status).replace(/_/g, ' ') })
-  if (data.priority && data.priority !== 'none') fields.push({ label: 'Priority', value: String(data.priority) })
-  if (data.email) fields.push({ label: 'Email', value: String(data.email) })
-  if (data.phone) fields.push({ label: 'Phone', value: String(data.phone) })
-  if (data.domain) fields.push({ label: 'Domain', value: String(data.domain) })
-  if (data.industry) fields.push({ label: 'Industry', value: String(data.industry) })
-  if (data.value != null && entityType === 'deal') fields.push({ label: 'Value', value: `$${Number(data.value).toLocaleString()}` })
-  if (data.url) fields.push({ label: 'URL', value: String(data.url) })
-
-  const bodyText = (data.body ?? data.notes ?? '') as string
-
-  return (
-    <div className="space-y-4">
-      {fields.map(({ label, value }) => (
-        <div key={label}>
-          <span className="text-xs text-muted-foreground font-medium">{label}</span>
-          <p className="text-sm mt-0.5">{value}</p>
-        </div>
-      ))}
-      {bodyText && (
-        <div>
-          <span className="text-xs text-muted-foreground font-medium">
-            {data.notes ? 'Notes' : 'Description'}
-          </span>
-          <div className="mt-1 text-sm text-muted-foreground">
-            <MarkdownRenderer content={bodyText} />
-          </div>
-        </div>
-      )}
-      {(entity.tags ?? []).length > 0 && (
-        <div>
-          <span className="text-xs text-muted-foreground font-medium">Tags</span>
-          <div className="flex gap-1 flex-wrap mt-1">
-            {entity.tags.map((tag) => (
-              <Badge key={tag} variant="secondary" className="text-xs">
-                {tag}
-              </Badge>
-            ))}
-          </div>
-        </div>
       )}
     </div>
   )

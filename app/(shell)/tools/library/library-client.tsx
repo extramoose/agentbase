@@ -39,7 +39,7 @@ type ItemType = 'favorite' | 'flag' | 'restaurant' | 'note' | 'idea' | 'article'
 
 type View = 'grid' | 'table'
 
-interface LibraryItem extends BaseEntity {
+export interface LibraryItem extends BaseEntity {
   title: string
   url: string | null
   source: string | null
@@ -601,7 +601,7 @@ function ItemCard({ item, onClick }: { item: LibraryItem; onClick: () => void })
 // Shelf content (all subtypes)
 // ---------------------------------------------------------------------------
 
-function LibraryShelfContent({
+export function LibraryShelfContent({
   item,
   onUpdate,
 }: {
