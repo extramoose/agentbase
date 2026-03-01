@@ -1094,6 +1094,7 @@ export function TasksClient({
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'tasks' },
         (payload) => {
+          console.log('[tasks] postgres_changes INSERT received:', payload.new)
           const newTask = payload.new as Task
           setTasks((prev) => {
             if (prev.some((t) => t.id === newTask.id)) return prev
@@ -1114,6 +1115,7 @@ export function TasksClient({
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'tasks' },
         (payload) => {
+          console.log('[tasks] postgres_changes UPDATE received:', payload.new)
           const updated = payload.new as Task
           setTasks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)))
           // Also update selectedTask if it's the one being updated
