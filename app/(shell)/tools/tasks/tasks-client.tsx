@@ -1005,16 +1005,30 @@ export function TasksClient({
     fetchMembers()
   }, [])
 
-  // ----- Collect all tags from tasks -----
+  // ----- Collect tags from visible tasks (pre-tag-filter) -----
   const allTags = useMemo(() => {
+    // Recompute the pre-tag-filter list so tags reflect current view/filters
+    let result = tasks
+    if (view === 'table') {
+      if (statusFilter !== 'cancelled') result = result.filter(t => t.status !== 'cancelled')
+      if (statusFilter !== 'backlog') result = result.filter(t => t.status !== 'backlog')
+      if (statusFilter !== 'blocked') result = result.filter(t => t.status !== 'blocked')
+      if (statusFilter !== 'all') result = result.filter(t => t.status === statusFilter)
+    }
+    if (typeFilter !== 'all') result = result.filter(t => t.type === typeFilter)
+    if (assigneeFilter) result = result.filter(t => t.assignee_id === assigneeFilter)
+    if (search.trim()) {
+      const q = search.toLowerCase()
+      result = result.filter(t => t.title.toLowerCase().includes(q) || (t.tags ?? []).some(tag => tag.toLowerCase().includes(q)))
+    }
     const tagCount = new Map<string, number>()
-    for (const t of tasks) {
+    for (const t of result) {
       for (const tag of t.tags ?? []) tagCount.set(tag, (tagCount.get(tag) ?? 0) + 1)
     }
     return Array.from(tagCount.entries())
       .sort((a, b) => b[1] - a[1])
       .map(([tag]) => tag)
-  }, [tasks])
+  }, [tasks, view, statusFilter, typeFilter, assigneeFilter, search])
 
   // ----- Shelf open/close with URL sync (?id=seq_id via pushState) -----
 
