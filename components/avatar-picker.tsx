@@ -1,9 +1,9 @@
 'use client'
 
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import { Avatar, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
-import { Upload, X } from 'lucide-react'
+import { Upload, X, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 export const AVATAR_PRESETS = [
@@ -14,11 +14,12 @@ export const AVATAR_PRESETS = [
 interface AvatarPickerProps {
   selected: string | null
   onSelect: (url: string) => void
-  onUpload: (file: File) => void
+  onUpload: (file: File) => void | Promise<void>
 }
 
 export function AvatarPicker({ selected, onSelect, onUpload }: AvatarPickerProps) {
   const inputRef = useRef<HTMLInputElement>(null)
+  const [uploading, setUploading] = useState(false)
   const isCustom = selected && !AVATAR_PRESETS.includes(selected)
 
   if (isCustom) {
@@ -36,13 +37,6 @@ export function AvatarPicker({ selected, onSelect, onUpload }: AvatarPickerProps
             <X className="h-3 w-3" />
           </button>
         </div>
-        <button
-          type="button"
-          className="text-xs text-muted-foreground hover:text-foreground transition-colors underline underline-offset-4"
-          onClick={() => onSelect(AVATAR_PRESETS[0])}
-        >
-          Choose from presets instead
-        </button>
       </div>
     )
   }
@@ -72,10 +66,15 @@ export function AvatarPicker({ selected, onSelect, onUpload }: AvatarPickerProps
         variant="outline"
         size="sm"
         className="w-full"
+        disabled={uploading}
         onClick={() => inputRef.current?.click()}
       >
-        <Upload className="h-4 w-4" />
-        Upload custom
+        {uploading ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : (
+          <Upload className="h-4 w-4" />
+        )}
+        {uploading ? 'Uploading…' : 'Upload custom'}
       </Button>
       <input
         ref={inputRef}
@@ -84,7 +83,10 @@ export function AvatarPicker({ selected, onSelect, onUpload }: AvatarPickerProps
         className="hidden"
         onChange={(e) => {
           const file = e.target.files?.[0]
-          if (file) onUpload(file)
+          if (file) {
+            setUploading(true)
+            Promise.resolve(onUpload(file)).finally(() => setUploading(false))
+          }
           e.target.value = ''
         }}
       />
