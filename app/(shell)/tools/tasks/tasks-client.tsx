@@ -75,6 +75,7 @@ type WorkspaceMember = {
   id: string
   name: string
   avatarUrl: string | null
+  role: 'human' | 'agent'
 }
 
 // ---------------------------------------------------------------------------
@@ -994,8 +995,8 @@ export function TasksClient({
         }
         if (!json.success) return
         const members: WorkspaceMember[] = [
-          ...json.data.humans.map((h) => ({ id: h.id, name: h.name, avatarUrl: h.avatar_url })),
-          ...json.data.agents.map((a) => ({ id: a.id, name: a.name, avatarUrl: a.avatar_url })),
+          ...json.data.humans.map((h) => ({ id: h.id, name: h.name, avatarUrl: h.avatar_url, role: 'human' as const })),
+          ...json.data.agents.map((a) => ({ id: a.id, name: a.name, avatarUrl: a.avatar_url, role: 'agent' as const })),
         ]
         setWorkspaceMembers(members)
       } catch {
@@ -1464,6 +1465,13 @@ export function TasksClient({
     setSelectedTag(tag)
   }, [])
 
+  const handleViewChange = useCallback((newView: View) => {
+    setView(newView)
+    if (newView === 'stickies' && !assigneeFilter && _currentUser?.id) {
+      setAssigneeFilter(_currentUser.id)
+    }
+  }, [assigneeFilter, _currentUser])
+
   // ----- Visible priority groups -----
   // Always show all priority groups, even when empty
   const displayPriorities = PRIORITY_ORDER
@@ -1482,7 +1490,7 @@ export function TasksClient({
             selectedTag={selectedTag}
             onTagChange={handleTagChange}
           />
-          <ViewToggle onChange={setView} showStickies />
+          <ViewToggle onChange={handleViewChange} showStickies />
           <Button size="sm" onClick={handleNewTask}>
             <Plus className="h-4 w-4 mr-1" />
             <span className="hidden sm:inline">New Task</span>
@@ -1504,9 +1512,9 @@ export function TasksClient({
                   className="relative rounded-full transition-transform hover:z-10 hover:scale-110"
                 >
                   <Avatar className={cn(
-                    'h-6 w-6 ring-2 transition-colors',
+                    'h-6 w-6 ring-2 transition-all',
                     assigneeFilter === m.id
-                      ? 'ring-primary'
+                      ? 'ring-white scale-110 z-10'
                       : 'ring-background hover:ring-muted-foreground/40'
                   )}>
                     <AvatarImage src={m.avatarUrl ?? undefined} alt={m.name} />
@@ -1784,7 +1792,11 @@ export function TasksClient({
 
       {/* Stickies view */}
       {view === 'stickies' && (
-        <StickiesView tasks={filteredTasks} onTaskClick={handleTaskClick} />
+        <StickiesView
+          tasks={filteredTasks}
+          onTaskClick={handleTaskClick}
+          selectedRole={assigneeFilter ? workspaceMembers.find((m) => m.id === assigneeFilter)?.role : undefined}
+        />
       )}
 
       {/* Task detail shelf (EntityShelf from S1) */}

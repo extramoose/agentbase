@@ -21,6 +21,7 @@ interface StickyTask {
 interface StickiesViewProps {
   tasks: StickyTask[]
   onTaskClick: (task: any) => void
+  selectedRole?: 'human' | 'agent'
 }
 
 const PRIORITY_STYLES: Record<Priority, string> = {
@@ -148,6 +149,24 @@ function categorizeTasks(tasks: StickyTask[]): Lane[] {
     })
   }
 
+  return lanes
+}
+
+function categorizeByStatus(tasks: StickyTask[]): Lane[] {
+  const buckets: { key: string; label: string; status: Status; size: Lane['size'] }[] = [
+    { key: 'backlog', label: 'Backlog', status: 'backlog', size: 'large' },
+    { key: 'todo', label: 'To Do', status: 'todo', size: 'medium' },
+    { key: 'in_progress', label: 'In Progress', status: 'in_progress', size: 'medium' },
+    { key: 'done', label: 'Done', status: 'done', size: 'small' },
+  ]
+
+  const lanes: Lane[] = []
+  for (const bucket of buckets) {
+    const matching = sortByPriority(tasks.filter((t) => t.status === bucket.status))
+    if (matching.length > 0) {
+      lanes.push({ key: bucket.key, label: bucket.label, tasks: matching, size: bucket.size })
+    }
+  }
   return lanes
 }
 
@@ -320,8 +339,11 @@ function SwimLane({
   )
 }
 
-export function StickiesView({ tasks, onTaskClick }: StickiesViewProps) {
-  const lanes = useMemo(() => categorizeTasks(tasks), [tasks])
+export function StickiesView({ tasks, onTaskClick, selectedRole }: StickiesViewProps) {
+  const lanes = useMemo(
+    () => selectedRole === 'agent' ? categorizeByStatus(tasks) : categorizeTasks(tasks),
+    [tasks, selectedRole],
+  )
 
   return (
     <div className="flex-1 overflow-y-auto">
