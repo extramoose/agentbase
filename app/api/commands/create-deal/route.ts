@@ -5,9 +5,9 @@ import { z } from 'zod'
 const schema = z.object({
   title: z.string().min(1).max(500),
   status: z
-    .enum(['prospect', 'active', 'won', 'lost'])
+    .enum(['cold', 'prospect', 'warm', 'active', 'won', 'lost', 'paused', 'archived'])
     .optional()
-    .default('prospect'),
+    .default('cold'),
   value: z.number().nullable().optional(),
   notes: z.string().optional(),
   tags: z.array(z.string()).optional().default([]),
