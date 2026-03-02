@@ -47,14 +47,15 @@ export function AvatarPicker({ selected, onSelect, onUpload, mode = 'agent' }: A
 
   return (
     <div className="space-y-2">
-      <div className="grid grid-cols-3 gap-3">
+      <div className={cn('grid gap-2', mode === 'agent' ? 'grid-cols-4' : 'grid-cols-3')}>
         {presets.map((url) => (
           <button
             key={url}
             type="button"
             onClick={() => onSelect(url)}
             className={cn(
-              'rounded-full h-12 w-12 overflow-hidden focus:outline-none transition-all',
+              'rounded-full overflow-hidden focus:outline-none transition-all',
+              mode === 'agent' ? 'h-14 w-14' : 'h-12 w-12',
               selected === url
                 ? 'ring-2 ring-white'
                 : 'hover:opacity-80',
@@ -70,7 +71,10 @@ export function AvatarPicker({ selected, onSelect, onUpload, mode = 'agent' }: A
           type="button"
           onClick={() => inputRef.current?.click()}
           disabled={uploading}
-          className="h-12 w-12 rounded-full border-2 border-dashed border-border flex items-center justify-center hover:border-foreground/40 transition-colors"
+          className={cn(
+            'rounded-full border-2 border-dashed border-border flex items-center justify-center hover:border-foreground/40 transition-colors',
+            mode === 'agent' ? 'h-14 w-14' : 'h-12 w-12',
+          )}
           title="Upload custom"
         >
           {uploading ? (

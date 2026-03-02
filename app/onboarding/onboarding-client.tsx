@@ -168,6 +168,7 @@ export function OnboardingClient({ skipWorkspace, skipProfile }: { skipWorkspace
                 disabled={loading}
                 autoFocus
               />
+              <div className="flex justify-center">
               <AvatarPicker
                 selected={avatarUrl}
                 onSelect={setAvatarUrl}
@@ -180,6 +181,7 @@ export function OnboardingClient({ skipWorkspace, skipProfile }: { skipWorkspace
                   if (res.ok && json.avatarUrl) setAvatarUrl(json.avatarUrl)
                 }}
               />
+              </div>
               {error && <p className="text-sm text-destructive">{error}</p>}
               <Button
                 type="submit"

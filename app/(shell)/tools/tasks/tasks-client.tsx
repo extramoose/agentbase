@@ -20,7 +20,7 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { GripVertical, Plus, ChevronDown, ChevronRight, AlertCircle, ArrowUp, Minus, ArrowDown, X, Trash2, Calendar, Loader2, BarChart3, Circle, CheckCircle2 } from 'lucide-react'
+import { GripVertical, Plus, ChevronDown, ChevronRight, AlertCircle, ArrowUp, Minus, ArrowDown, X, Trash2, Calendar, Loader2, BarChart3, Square, CheckSquare } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { SearchFilterBar } from '@/components/search-filter-bar'
 import { EntityShelf } from '@/components/entity-client/entity-shelf'
@@ -184,9 +184,9 @@ function TaskGridCard({ task, onClick, onMarkDone }: { task: Task; onClick: () =
           title={task.status === 'done' ? 'Reopen' : 'Mark done'}
         >
           {task.status === 'done' ? (
-            <CheckCircle2 className="h-4 w-4 text-green-500" />
+            <CheckSquare className="h-4 w-4 text-foreground" />
           ) : (
-            <Circle className="h-4 w-4 text-muted-foreground hover:text-green-500 transition-colors" />
+            <Square className="h-4 w-4 text-muted-foreground hover:text-foreground transition-colors" />
           )}
         </button>
         <h3 className={cn(
@@ -347,9 +347,9 @@ function SortableTaskRow({
         title={task.status === 'done' ? 'Reopen' : 'Mark done'}
       >
         {task.status === 'done' ? (
-          <CheckCircle2 className="h-4 w-4 text-green-500" />
+          <CheckSquare className="h-4 w-4 text-foreground" />
         ) : (
-          <Circle className="h-4 w-4 text-muted-foreground hover:text-green-500" />
+          <Square className="h-4 w-4 text-muted-foreground hover:text-foreground" />
         )}
       </button>
 
@@ -594,9 +594,9 @@ export function TaskShelfContent({
             title={status === 'done' ? 'Reopen' : 'Mark done'}
           >
             {status === 'done' ? (
-              <CheckCircle2 className="h-6 w-6 text-green-500" />
+              <CheckSquare className="h-6 w-6 text-foreground" />
             ) : (
-              <Circle className="h-6 w-6 text-muted-foreground hover:text-green-500 transition-colors" />
+              <Square className="h-6 w-6 text-muted-foreground hover:text-foreground transition-colors" />
             )}
           </button>
           <Input
@@ -915,11 +915,9 @@ function NewTaskShelf({
                 <label className="text-xs text-muted-foreground font-medium mb-1 block">
                   Due Date
                 </label>
-                <input
-                  type="date"
+                <DateInput
                   value={dueDate}
                   onChange={(e) => setDueDate(e.target.value)}
-                  className="w-full h-9 rounded-md border border-input bg-transparent px-3 text-sm focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] outline-none"
                 />
               </div>
               <div>
@@ -1020,7 +1018,7 @@ export function TasksClient({
   const [mounted, setMounted] = useState(false)
   const [activeDragId, setActiveDragId] = useState<string | null>(null)
   const [assigneeFilter, setAssigneeFilter] = useState<string | null>(
-    () => searchParams.get('assignee') ?? null
+    () => searchParams.get('assignee') ?? _currentUser?.id ?? null
   )
   const [workspaceMembers, setWorkspaceMembers] = useState<WorkspaceMember[]>([])
   const [selectedTask, setSelectedTask] = useState<Task | null>(() => {
@@ -1642,13 +1640,13 @@ export function TasksClient({
                   className="relative rounded-full transition-transform hover:z-10 hover:scale-110"
                 >
                   <Avatar className={cn(
-                    'h-6 w-6 ring-2 transition-all',
+                    'h-7 w-7 ring-2 transition-all',
                     assigneeFilter === m.id
                       ? 'ring-white scale-110 z-10'
                       : 'ring-background hover:ring-muted-foreground/40'
                   )}>
                     <AvatarImage src={m.avatarUrl ?? undefined} alt={m.name ?? "?"} />
-                    <AvatarFallback className="text-[9px]">{(m.name ?? "?").slice(0, 2).toUpperCase()}</AvatarFallback>
+                    <AvatarFallback className="text-[10px]">{(m.name ?? "?").slice(0, 2).toUpperCase()}</AvatarFallback>
                   </Avatar>
                 </button>
               ))}
@@ -1670,7 +1668,7 @@ export function TasksClient({
                     : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
                 )}
               >
-                <Calendar className="h-3.5 w-3.5" />
+                <Calendar className="h-4 w-4" />
               </button>
               <button
                 onClick={() => setStickiesMode('status')}
@@ -1682,7 +1680,7 @@ export function TasksClient({
                     : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
                 )}
               >
-                <BarChart3 className="h-3.5 w-3.5" />
+                <BarChart3 className="h-4 w-4" />
               </button>
             </div>
             <div className="w-px h-5 bg-border mx-1" />

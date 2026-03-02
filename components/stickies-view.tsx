@@ -216,7 +216,7 @@ function formatDueDate(dateStr: string): string {
 const SIZE_CONFIG = {
   large: {
     card: 'w-[380px] min-h-[350px]',
-    title: 'text-lg',
+    title: 'text-xl',
   },
   medium: {
     card: 'w-[250px] min-h-[230px]',
@@ -253,6 +253,7 @@ function StickyCard({
           ? 'bg-gray-50 border-gray-200 opacity-80 dark:bg-gray-900/40 dark:border-gray-700'
           : PRIORITY_STYLES[task.priority],
         highlight && 'animate-sticky-pulse',
+        task.status === 'in_progress' && 'animate-in-progress-pulse',
       )}
     >
       <div className="flex-1 min-h-0">

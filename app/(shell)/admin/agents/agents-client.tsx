@@ -4,7 +4,8 @@ import { useState, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Avatar, AvatarImage } from '@/components/ui/avatar'
 import { AvatarUpload } from '@/components/avatar-upload'
-import { Dialog, DialogContent } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
+import * as VisuallyHidden from '@radix-ui/react-visually-hidden'
 import { AvatarPicker, AGENT_AVATAR_PRESETS } from '@/components/avatar-picker'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -138,6 +139,7 @@ export function AgentsClient({ agents: initialAgents, currentUserName, currentUs
       {/* Create agent modal */}
       <Dialog open={showCreate && !createResult} onOpenChange={(open) => { if (!open) { setShowCreate(false); setName(''); setCreateAvatarUrl(AGENT_AVATAR_PRESETS[Math.floor(Math.random() * AGENT_AVATAR_PRESETS.length)]) } }}>
         <DialogContent className="sm:max-w-md">
+          <VisuallyHidden.Root><DialogTitle>New Agent</DialogTitle></VisuallyHidden.Root>
           <div className="space-y-4">
             <h2 className="text-base font-semibold">New Agent</h2>
             <div className="space-y-1">
@@ -151,18 +153,13 @@ export function AgentsClient({ agents: initialAgents, currentUserName, currentUs
                 disabled={creating}
               />
             </div>
-            <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">Avatar</label>
+            <div className="flex justify-center">
               <AvatarPicker
                 selected={createAvatarUrl}
                 onSelect={setCreateAvatarUrl}
                 onUpload={() => {}}
                 mode="agent"
               />
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">Owner</label>
-              <p className="text-sm">{currentUserName}</p>
             </div>
             <div className="flex justify-end gap-2">
               <Button variant="outline" size="sm" onClick={() => { setShowCreate(false); setName('') }} disabled={creating}>
@@ -180,6 +177,7 @@ export function AgentsClient({ agents: initialAgents, currentUserName, currentUs
       {/* Agent welcome modal */}
       <Dialog open={!!modalAgent} onOpenChange={(open) => { if (!open) { setModalAgent(null); setCreateResult(null); setShowCreate(false) } }}>
         <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+          <VisuallyHidden.Root><DialogTitle>Agent Details</DialogTitle></VisuallyHidden.Root>
           {modalAgent && (
             <div className="space-y-6 pt-2">
               {/* Avatar + welcome */}
