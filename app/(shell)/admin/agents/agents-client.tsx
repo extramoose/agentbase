@@ -3,6 +3,7 @@
 import { useState, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Avatar, AvatarImage } from '@/components/ui/avatar'
+import { AvatarUpload } from '@/components/avatar-upload'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { AvatarPicker, AGENT_AVATAR_PRESETS } from '@/components/avatar-picker'
 import { Button } from '@/components/ui/button'
@@ -226,9 +227,19 @@ You're part of a workspace with humans and other agents. Make yourself useful.`}
         <div className="space-y-3">
           {agents.filter(a => !a.revoked_at).map(agent => (
             <div key={agent.id} className="flex items-center gap-4 rounded-lg border border-border p-4 hover:bg-muted/40 transition-colors">
-              <Avatar className="h-10 w-10 shrink-0">
-                <AvatarImage src={agent.avatar_url ?? '/avatars/avatar_anonymous.jpg'} alt={agent.name} />
-              </Avatar>
+              <AvatarUpload
+                currentUrl={agent.avatar_url}
+                name={agent.name}
+                uploadUrl={`/api/admin/agents/${agent.id}/avatar`}
+                presetUrl={`/api/admin/agents/${agent.id}/avatar-preset`}
+                size="sm"
+                mode="agent"
+                onSuccess={(newUrl) =>
+                  setAgents(prev => prev.map(a =>
+                    a.id === agent.id ? { ...a, avatar_url: newUrl } : a
+                  ))
+                }
+              />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium truncate">{agent.name}</p>
                 <p className="text-xs text-muted-foreground">Owner: {agent.owner_name}</p>
