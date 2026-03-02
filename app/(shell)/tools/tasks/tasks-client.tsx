@@ -20,7 +20,7 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { GripVertical, Plus, ChevronDown, ChevronRight, AlertCircle, ArrowUp, Minus, ArrowDown, X, Trash2, Calendar, Loader2, BarChart3 } from 'lucide-react'
+import { GripVertical, Plus, ChevronDown, ChevronRight, AlertCircle, ArrowUp, Minus, ArrowDown, X, Trash2, Calendar, Loader2, BarChart3, Circle, CheckCircle2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { SearchFilterBar } from '@/components/search-filter-bar'
 import { EntityShelf } from '@/components/entity-client/entity-shelf'
@@ -166,7 +166,7 @@ function groupByPriority(tasks: Task[]): Record<Priority, Task[]> {
 // Task grid card (for grid view)
 // ---------------------------------------------------------------------------
 
-function TaskGridCard({ task, onClick }: { task: Task; onClick: () => void }) {
+function TaskGridCard({ task, onClick, onMarkDone }: { task: Task; onClick: () => void; onMarkDone: () => void }) {
   const statusCfg = STATUS_CONFIG[task.status]
   const visibleTags = (task.tags ?? []).slice(0, 3)
   const extraTagCount = (task.tags ?? []).length - 3
@@ -176,13 +176,27 @@ function TaskGridCard({ task, onClick }: { task: Task; onClick: () => void }) {
       onClick={onClick}
       className="group rounded-lg border border-border bg-card p-4 cursor-pointer hover:border-primary/40 hover:shadow-md transition-all space-y-3"
     >
-      {/* Title */}
-      <h3 className={cn(
-        'text-sm font-medium leading-tight line-clamp-2',
-        task.status === 'cancelled' && 'line-through text-muted-foreground/60',
-      )}>
-        {task.title}
-      </h3>
+      {/* Title + done toggle */}
+      <div className="flex items-start gap-2">
+        <button
+          onClick={(e) => { e.stopPropagation(); onMarkDone() }}
+          className="shrink-0 mt-0.5"
+          title={task.status === 'done' ? 'Reopen' : 'Mark done'}
+        >
+          {task.status === 'done' ? (
+            <CheckCircle2 className="h-4 w-4 text-green-500" />
+          ) : (
+            <Circle className="h-4 w-4 text-muted-foreground hover:text-green-500 transition-colors" />
+          )}
+        </button>
+        <h3 className={cn(
+          'text-sm font-medium leading-tight line-clamp-2',
+          task.status === 'done' && 'line-through text-muted-foreground/60',
+          task.status === 'cancelled' && 'line-through text-muted-foreground/60',
+        )}>
+          {task.title}
+        </h3>
+      </div>
 
       {/* Status + Priority row */}
       <div className="flex items-center gap-2 flex-wrap">
@@ -250,12 +264,14 @@ function SortableTaskRow({
   selected,
   onToggle,
   selectionActive,
+  onMarkDone,
 }: {
   task: Task
   onClick: () => void
   selected: boolean
   onToggle: () => void
   selectionActive: boolean
+  onMarkDone: () => void
 }) {
   const {
     attributes,
@@ -324,8 +340,21 @@ function SortableTaskRow({
         <PriorityIcon priority={task.priority} />
       </span>
 
+      {/* Done toggle */}
+      <button
+        onClick={(e) => { e.stopPropagation(); onMarkDone() }}
+        className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+        title={task.status === 'done' ? 'Reopen' : 'Mark done'}
+      >
+        {task.status === 'done' ? (
+          <CheckCircle2 className="h-4 w-4 text-green-500" />
+        ) : (
+          <Circle className="h-4 w-4 text-muted-foreground hover:text-green-500" />
+        )}
+      </button>
+
       {/* Title */}
-      <span className={cn('flex-1 text-sm font-medium truncate', task.status === 'cancelled' && 'line-through text-muted-foreground/60')}>{task.title}</span>
+      <span className={cn('flex-1 text-sm font-medium truncate', task.status === 'done' && 'line-through text-muted-foreground/60', task.status === 'cancelled' && 'line-through text-muted-foreground/60')}>{task.title}</span>
 
       {/* Status badge */}
       <Badge
@@ -390,6 +419,7 @@ function PriorityGroup({
   onCreateTask,
   selectedIds,
   onToggleSelection,
+  onMarkDone,
 }: {
   priority: Priority
   tasks: Task[]
@@ -399,6 +429,7 @@ function PriorityGroup({
   onCreateTask: (title: string, priority: Priority) => void
   selectedIds: Set<string>
   onToggleSelection: (id: string) => void
+  onMarkDone: (taskId: string) => void
 }) {
   const [collapsed, setCollapsed] = useState(false)
   const [newTitle, setNewTitle] = useState('')
@@ -473,6 +504,7 @@ function PriorityGroup({
                 selected={selectedIds.has(task.id)}
                 onToggle={() => onToggleSelection(task.id)}
                 selectionActive={selectedIds.size > 0}
+                onMarkDone={() => onMarkDone(task.id)}
               />
             ))}
           </SortableContext>
@@ -1707,6 +1739,10 @@ export function TasksClient({
                     onCreateTask={createTask}
                     selectedIds={selectedIds}
                     onToggleSelection={toggleSelection}
+                    onMarkDone={(taskId) => {
+                      const task = filteredTasks.find(t => t.id === taskId)
+                      if (task) updateTaskField(taskId, { status: task.status === 'done' ? 'todo' : 'done' })
+                    }}
                   />
                 ))}
                 <DragOverlay dropAnimation={null}>
@@ -1853,6 +1889,7 @@ export function TasksClient({
                   key={task.id}
                   task={task}
                   onClick={() => handleTaskClick(task)}
+                  onMarkDone={() => updateTaskField(task.id, { status: task.status === 'done' ? 'todo' : 'done' })}
                 />
               ))}
             </EntityGrid>
