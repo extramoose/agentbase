@@ -3,7 +3,6 @@
 import { useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
-import { AiDust } from '@/components/ai-dust'
 import { Badge } from '@/components/ui/badge'
 import { ActorChip } from '@/components/actor-chip'
 
@@ -248,17 +247,15 @@ function StickyCard({
     <button
       onClick={onClick}
       className={cn(
-        'flex flex-col justify-between rounded-xl border-2 shadow-md p-4 text-left transition-shadow hover:shadow-lg hover:border-foreground/30 shrink-0 cursor-pointer relative',
+        'flex flex-col justify-between rounded-xl border-2 shadow-md p-4 text-left transition-shadow hover:shadow-lg hover:border-foreground/30 shrink-0 cursor-pointer',
         config.card,
         size === 'small'
           ? 'bg-gray-50 border-gray-200 opacity-80 dark:bg-gray-900/40 dark:border-gray-700'
           : PRIORITY_STYLES[task.priority],
         highlight && 'animate-sticky-pulse',
-        task.status === 'in_progress' && 'sticky-in-progress-border',
 
       )}
     >
-      {task.status === 'in_progress' && <AiDust active />}
       <div className="flex-1 min-h-0">
         <p className="text-muted-foreground text-xs mb-1">
           #{task.seq_id ?? task.ticket_id}
