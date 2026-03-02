@@ -32,7 +32,7 @@ export async function DELETE(
   try {
     const profile = await requireAdminApi()
 
-    if (profile.role !== 'owner') {
+    if (profile.tenant_role !== 'owner') {
       throw new ForbiddenError('Only owners can delete agents')
     }
 
