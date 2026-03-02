@@ -4,6 +4,7 @@ import { useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
+import { ActorChip } from '@/components/actor-chip'
 
 type Priority = 'urgent' | 'high' | 'medium' | 'low' | 'none'
 type Status = 'backlog' | 'todo' | 'in_progress' | 'blocked' | 'done' | 'cancelled'
@@ -17,6 +18,8 @@ interface StickyTask {
   priority: Priority
   due_date: string | null
   tags: string[]
+  assignee_id: string | null
+  assignee_type: string | null
 }
 
 interface StickiesViewProps {
@@ -256,6 +259,9 @@ function StickyCard({
         </p>
       </div>
       <div className="mt-3 flex flex-wrap items-center gap-1.5">
+        {task.assignee_id && (
+          <ActorChip actorId={task.assignee_id} actorType={task.assignee_type as 'human' | 'agent'} compact />
+        )}
         {task.due_date && (
           <span className="text-xs text-muted-foreground">
             {formatDueDate(task.due_date)}

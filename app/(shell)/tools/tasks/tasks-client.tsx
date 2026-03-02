@@ -982,7 +982,7 @@ export function TasksClient({
   const [view, setView] = useState<View>(
     () => {
       const v = searchParams.get('view')
-      return v === 'grid' ? 'grid' : v === 'stickies' ? 'stickies' : 'table'
+      return v === 'grid' ? 'grid' : v === 'table' ? 'table' : 'stickies'
     }
   )
   const [selectedTag, setSelectedTag] = useState<string | null>(
