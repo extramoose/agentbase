@@ -50,13 +50,13 @@ export function AvatarPicker({ selected, onSelect, onUpload }: AvatarPickerProps
             type="button"
             onClick={() => onSelect(url)}
             className={cn(
-              'rounded-full aspect-square flex items-center justify-center focus:outline-none transition-all',
+              'rounded-full h-14 w-14 overflow-hidden focus:outline-none transition-all',
               selected === url
                 ? 'ring-1 ring-white ring-offset-1 ring-offset-background'
                 : 'hover:opacity-80',
             )}
           >
-            <Avatar className="h-14 w-14">
+            <Avatar className="h-full w-full">
               <AvatarImage src={url} alt="Preset avatar" />
             </Avatar>
           </button>
