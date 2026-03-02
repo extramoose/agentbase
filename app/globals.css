@@ -223,49 +223,11 @@ input[type="checkbox"].cb-dark:focus-visible {
   animation: task-spark 0.4s ease-out;
 }
 
-/* AI Dust — in-progress stickies */
-@keyframes dust-glow {
-  0%, 100% { box-shadow: 0 0 8px 1px rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.15); }
-  50% { box-shadow: 0 0 20px 4px rgba(255,255,255,0.2); border-color: rgba(255,255,255,0.35); }
+/* In-progress border pulse — no glow, just border */
+@keyframes border-pulse {
+  0%, 100% { border-color: rgba(255, 255, 255, 0.12); }
+  50% { border-color: rgba(255, 255, 255, 0.35); }
 }
-@keyframes dust-drift-1 {
-  0% { top: 8%; left: 4%; opacity: 0; transform: scale(0.5); }
-  10% { opacity: 1; transform: scale(1); }
-  25% { top: 5%; left: 40%; }
-  50% { top: 12%; left: 85%; opacity: 0.7; transform: scale(1.2); }
-  75% { top: 70%; left: 90%; opacity: 0.5; }
-  90% { opacity: 0.8; transform: scale(0.8); }
-  100% { top: 92%; left: 50%; opacity: 0; transform: scale(0.3); }
-}
-@keyframes dust-drift-2 {
-  0% { bottom: 5%; right: 8%; opacity: 0; transform: scale(0.4); }
-  15% { opacity: 0.9; transform: scale(1.1); }
-  30% { bottom: 15%; right: 50%; }
-  55% { bottom: 60%; right: 88%; opacity: 0.6; transform: scale(0.9); }
-  80% { bottom: 85%; right: 30%; opacity: 0.8; }
-  100% { bottom: 90%; right: 5%; opacity: 0; transform: scale(0.2); }
-}
-.sticky-in-progress {
-  position: relative;
-  animation: dust-glow 4s ease-in-out infinite;
-}
-.sticky-in-progress::before,
-.sticky-in-progress::after {
-  content: '';
-  position: absolute;
-  width: 2.5px;
-  height: 2.5px;
-  border-radius: 50%;
-  background: white;
-  pointer-events: none;
-  z-index: 10;
-  box-shadow:
-    0 0 4px 2px rgba(255,255,255,0.5),
-    0 0 8px 3px rgba(255,255,255,0.2);
-}
-.sticky-in-progress::before {
-  animation: dust-drift-1 5s ease-in-out infinite;
-}
-.sticky-in-progress::after {
-  animation: dust-drift-2 6.5s ease-in-out 1.5s infinite;
+.sticky-in-progress-border {
+  animation: border-pulse 4s ease-in-out infinite;
 }
