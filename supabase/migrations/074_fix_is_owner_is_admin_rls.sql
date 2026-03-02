@@ -1,13 +1,15 @@
 -- Migration 074: Fix is_owner() and is_admin() to check tenant_members instead of profiles
--- Root cause: is_owner() checked profiles.role = 'owner' (legacy global role)
--- but multi-tenant role system uses tenant_members.role per workspace.
--- This broke agent creation (RLS violation on INSERT to agents table).
+-- Must drop ALL dependent policies before replacing functions
 
--- Step 1: Drop policies that depend on is_owner() / is_admin()
+-- Drop policies depending on is_owner()
 DROP POLICY IF EXISTS "Owners manage agents" ON agents;
 DROP POLICY IF EXISTS "Owner manages members" ON tenant_members;
 
--- Step 2: Replace the functions
+-- Drop policies depending on is_admin()
+DROP POLICY IF EXISTS "Admins read all profiles" ON profiles;
+DROP POLICY IF EXISTS "Admins can manage agent avatars" ON storage.objects;
+
+-- Replace is_owner() — now checks tenant_members
 DROP FUNCTION IF EXISTS is_owner();
 CREATE OR REPLACE FUNCTION is_owner()
 RETURNS boolean LANGUAGE sql SECURITY DEFINER SET search_path = public STABLE AS $$
@@ -20,6 +22,7 @@ RETURNS boolean LANGUAGE sql SECURITY DEFINER SET search_path = public STABLE AS
 $$;
 GRANT EXECUTE ON FUNCTION is_owner() TO authenticated, anon;
 
+-- Replace is_admin() — now checks tenant_members
 DROP FUNCTION IF EXISTS is_admin();
 CREATE OR REPLACE FUNCTION is_admin()
 RETURNS boolean LANGUAGE sql SECURITY DEFINER SET search_path = public STABLE AS $$
@@ -32,7 +35,7 @@ RETURNS boolean LANGUAGE sql SECURITY DEFINER SET search_path = public STABLE AS
 $$;
 GRANT EXECUTE ON FUNCTION is_admin() TO authenticated, anon;
 
--- Step 3: Recreate the policies
+-- Recreate all dropped policies
 CREATE POLICY "Owners manage agents" ON agents
   FOR ALL
   USING  (is_active_tenant(tenant_id) AND is_owner())
@@ -42,5 +45,14 @@ CREATE POLICY "Owner manages members" ON tenant_members
   FOR ALL
   USING  (tenant_id = get_my_tenant_id() AND is_owner())
   WITH CHECK (tenant_id = get_my_tenant_id() AND is_owner());
+
+CREATE POLICY "Admins read all profiles" ON profiles
+  FOR SELECT
+  USING (is_admin());
+
+CREATE POLICY "Admins can manage agent avatars" ON storage.objects
+  FOR ALL
+  USING (bucket_id = 'avatars' AND is_admin())
+  WITH CHECK (bucket_id = 'avatars' AND is_admin());
 
 NOTIFY pgrst, 'reload schema';
