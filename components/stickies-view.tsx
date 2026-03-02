@@ -253,7 +253,7 @@ function StickyCard({
           ? 'bg-gray-50 border-gray-200 opacity-80 dark:bg-gray-900/40 dark:border-gray-700'
           : PRIORITY_STYLES[task.priority],
         highlight && 'animate-sticky-pulse',
-        task.status === 'in_progress' && 'animate-in-progress-pulse',
+        task.status === 'in_progress' && 'sticky-in-progress',
       )}
     >
       <div className="flex-1 min-h-0">

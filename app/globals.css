@@ -223,11 +223,68 @@ input[type="checkbox"].cb-dark:focus-visible {
   animation: task-spark 0.4s ease-out;
 }
 
-/* Gentle pulse for in-progress stickies */
-@keyframes in-progress-pulse {
-  0%, 100% { border-color: rgba(255, 255, 255, 0.1); }
-  50% { border-color: rgba(255, 255, 255, 0.25); }
+/* AI Dust — in-progress stickies */
+@keyframes dust-glow {
+  0%, 100% { box-shadow: 0 0 8px 1px rgba(255,255,255,0.08), inset 0 0 8px 1px rgba(255,255,255,0.03); border-color: rgba(255,255,255,0.12); }
+  50% { box-shadow: 0 0 16px 3px rgba(255,255,255,0.15), inset 0 0 12px 2px rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.3); }
 }
-.animate-in-progress-pulse {
-  animation: in-progress-pulse 4s ease-in-out infinite;
+@keyframes dust-1 {
+  0% { top: 10%; left: -2px; opacity: 0; }
+  20% { opacity: 0.8; }
+  80% { opacity: 0.6; }
+  100% { top: 85%; left: -2px; opacity: 0; }
+}
+@keyframes dust-2 {
+  0% { top: -2px; left: 20%; opacity: 0; }
+  25% { opacity: 0.7; }
+  75% { opacity: 0.5; }
+  100% { top: -2px; left: 90%; opacity: 0; }
+}
+@keyframes dust-3 {
+  0% { bottom: -2px; right: 15%; opacity: 0; }
+  30% { opacity: 0.9; }
+  70% { opacity: 0.4; }
+  100% { bottom: -2px; right: 80%; opacity: 0; }
+}
+@keyframes dust-4 {
+  0% { right: -2px; bottom: 20%; opacity: 0; }
+  15% { opacity: 0.6; }
+  85% { opacity: 0.7; }
+  100% { right: -2px; bottom: 80%; opacity: 0; }
+}
+@keyframes dust-5 {
+  0% { top: 50%; left: -2px; opacity: 0; }
+  30% { opacity: 0.5; }
+  100% { top: 5%; left: -2px; opacity: 0; }
+}
+@keyframes dust-6 {
+  0% { bottom: -2px; left: 60%; opacity: 0; }
+  25% { opacity: 0.7; }
+  100% { bottom: -2px; left: 10%; opacity: 0; }
+}
+.sticky-in-progress {
+  position: relative;
+  overflow: visible;
+  animation: dust-glow 4s ease-in-out infinite;
+}
+.sticky-in-progress::before,
+.sticky-in-progress::after {
+  content: '';
+  position: absolute;
+  width: 2px;
+  height: 2px;
+  border-radius: 50%;
+  background: white;
+  pointer-events: none;
+  z-index: 10;
+}
+.sticky-in-progress::before {
+  animation: dust-1 6s linear infinite, dust-2 8s linear 2s infinite;
+  box-shadow:
+    0 0 3px 1px rgba(255,255,255,0.4);
+}
+.sticky-in-progress::after {
+  animation: dust-3 7s linear 1s infinite, dust-4 5s linear 3s infinite;
+  box-shadow:
+    0 0 3px 1px rgba(255,255,255,0.3);
 }
