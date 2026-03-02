@@ -535,6 +535,7 @@ export function TaskShelfContent({
 }) {
   const [title, setTitle] = useState(task.title)
   const [status, setStatus] = useState<Status>(task.status)
+  const [prevStatus, setPrevStatus] = useState<Status>(task.status === 'done' ? 'todo' : task.status)
   const [priority, setPriority] = useState<Priority>(task.priority)
   const [taskType, setTaskType] = useState<TaskType | null>(task.type)
   const [assigneeId, setAssigneeId] = useState<string | null>(task.assignee_id)
@@ -575,17 +576,36 @@ export function TaskShelfContent({
 
   return (
     <div className="space-y-5">
-      {/* Title */}
+      {/* Title + done checkbox */}
       <div>
         <label className="text-xs text-muted-foreground font-medium mb-1 block">
           Title
         </label>
-        <Input
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          onBlur={(e) => saveField({ title: e.target.value })}
-          className="text-base font-medium"
-        />
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => {
+              const newStatus = status === 'done' ? prevStatus : 'done'
+              if (status !== 'done') setPrevStatus(status)
+              setStatus(newStatus)
+              saveField({ status: newStatus })
+            }}
+            className="shrink-0"
+            title={status === 'done' ? 'Reopen' : 'Mark done'}
+          >
+            {status === 'done' ? (
+              <CheckCircle2 className="h-6 w-6 text-green-500" />
+            ) : (
+              <Circle className="h-6 w-6 text-muted-foreground hover:text-green-500 transition-colors" />
+            )}
+          </button>
+          <Input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            onBlur={(e) => saveField({ title: e.target.value })}
+            className={cn('text-base font-medium', status === 'done' && 'line-through text-muted-foreground/60')}
+          />
+        </div>
       </div>
 
       {/* Status + Priority row */}
