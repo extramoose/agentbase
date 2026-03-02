@@ -506,6 +506,7 @@ export function AppSidebar({ profile, workspaces, onNavigate }: { profile: UserP
                 uploadUrl="/api/profile/avatar"
                 presetUrl="/api/profile/avatar-preset"
                 size="lg"
+                mode="user"
               />
             </div>
             <div className="grid gap-2">

@@ -15,6 +15,8 @@ interface AvatarUploadProps {
   presetUrl?: string
   size?: 'sm' | 'md' | 'lg'
   onSuccess?: (newUrl: string) => void
+  /** 'agent' = 11 colorful presets + upload. 'user' = gray anonymous + upload. */
+  mode?: 'agent' | 'user'
 }
 
 const sizeClasses = {
@@ -36,6 +38,7 @@ export function AvatarUpload({
   presetUrl,
   size = 'md',
   onSuccess,
+  mode = 'agent',
 }: AvatarUploadProps) {
   const [uploading, setUploading] = useState(false)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
@@ -127,6 +130,7 @@ export function AvatarUpload({
             selected={displayUrl}
             onSelect={handlePresetSelect}
             onUpload={handleFileUpload}
+            mode={mode}
           />
         </PopoverContent>
       )}
