@@ -1,5 +1,6 @@
 import { resolveActorUnified } from '@/lib/api/resolve-actor'
 import { apiError, NotFoundError } from '@/lib/api/errors'
+import { embedActivity } from '@/lib/api/embed-activity'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -37,7 +38,8 @@ export async function GET(
     }
 
     if (!row) throw new NotFoundError()
-    return Response.json({ data: row })
+    const activity = await embedActivity(supabase, tenantId, 'task', row.id as string)
+    return Response.json({ data: { ...row, activity } })
   } catch (err) {
     return apiError(err)
   }

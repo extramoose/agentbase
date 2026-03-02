@@ -1,3 +1,4 @@
+import { embedActivity } from '@/lib/api/embed-activity'
 import { resolveActorUnified } from '@/lib/api/resolve-actor'
 import { apiError } from '@/lib/api/errors'
 import { parseListParams, applySearch, applyPagination, filterInMemory, paginateInMemory } from '@/lib/api/list-query'
@@ -31,6 +32,16 @@ export async function GET(request: Request) {
     }
 
     if (error) return Response.json({ error: error.message }, { status: 400 })
+    const include = new URL(request.url).searchParams.get('include')
+    if (include === 'activity' && data && data.length <= 20) {
+      const withActivity = await Promise.all(
+        data.map(async (row: Record<string, unknown>) => ({
+          ...row,
+          activity: await embedActivity(supabase, tenantId, 'deal', row.id as string),
+        }))
+      )
+      return Response.json({ data: withActivity, total: withActivity.length, page, limit })
+    }
     return Response.json({ data, total: data?.length ?? 0, page, limit })
   } catch (err) {
     return apiError(err)

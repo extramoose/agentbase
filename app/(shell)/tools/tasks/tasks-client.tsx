@@ -1076,6 +1076,11 @@ export function TasksClient({
   useEffect(() => {
     async function fetchMembers() {
       try {
+        // Try cache first for instant render
+        const cached = sessionStorage.getItem('workspace-members')
+        if (cached) {
+          try { setWorkspaceMembers(JSON.parse(cached)) } catch { /* ignore */ }
+        }
         const res = await fetch('/api/workspace/members')
         if (!res.ok) return
         const json = await res.json() as {
@@ -1091,6 +1096,7 @@ export function TasksClient({
           ...json.data.agents.map((a) => ({ id: a.id, name: a.name, avatarUrl: a.avatar_url, role: 'agent' as const })),
         ]
         setWorkspaceMembers(members)
+        try { sessionStorage.setItem('workspace-members', JSON.stringify(members)) } catch { /* ignore */ }
       } catch {
         // silently ignore — filter chips just won't show
       }
