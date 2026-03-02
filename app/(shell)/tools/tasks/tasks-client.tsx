@@ -999,6 +999,7 @@ export function TasksClient({
   const searchParams = useSearchParams()
 
   const [tasks, setTasks] = useState<Task[]>(initialTasks)
+  const [recentlyChanged, setRecentlyChanged] = useState<Set<string>>(new Set())
   const [search, setSearch] = useState(searchParams.get('q') ?? '')
   const [statusFilter, setStatusFilter] = useState<Status | 'all'>(
     () => {
@@ -1201,7 +1202,14 @@ export function TasksClient({
         { event: 'UPDATE', schema: 'public', table: 'tasks' },
         (payload) => {
           const updated = payload.new as Task
-          setTasks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)))
+          setTasks((prev) => {
+            const old = prev.find(t => t.id === updated.id)
+            if (old && old.status !== updated.status) {
+              setRecentlyChanged(s => { const n = new Set(s); n.add(updated.id); return n })
+              setTimeout(() => setRecentlyChanged(s => { const n = new Set(s); n.delete(updated.id); return n }), 3000)
+            }
+            return prev.map((t) => (t.id === updated.id ? updated : t))
+          })
           // Also update selectedTask if it's the one being updated
           setSelectedTask((prev) => (prev && prev.id === updated.id ? updated : prev))
         }
@@ -1957,6 +1965,7 @@ export function TasksClient({
           tasks={filteredTasks}
           onTaskClick={handleTaskClick}
           mode={stickiesMode}
+          recentlyChanged={recentlyChanged}
         />
       )}
 

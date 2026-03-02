@@ -26,6 +26,7 @@ interface StickiesViewProps {
   tasks: StickyTask[]
   onTaskClick: (task: any) => void
   mode?: 'timeframe' | 'status'
+  recentlyChanged?: Set<string>
 }
 
 const PRIORITY_STYLES: Record<Priority, string> = {
@@ -225,10 +226,12 @@ function StickyCard({
   task,
   size,
   onClick,
+  highlight,
 }: {
   task: StickyTask
   size: 'large' | 'medium' | 'small'
   onClick: () => void
+  highlight?: boolean
 }) {
   const config = SIZE_CONFIG[size]
   const visibleTags = (task.tags ?? []).slice(0, size === 'small' ? 1 : 3)
@@ -243,6 +246,7 @@ function StickyCard({
         size === 'small'
           ? 'bg-gray-50 border-gray-200 opacity-80 dark:bg-gray-900/40 dark:border-gray-700'
           : PRIORITY_STYLES[task.priority],
+        highlight && 'animate-sticky-pulse',
       )}
     >
       <div className="flex-1 min-h-0">
@@ -289,9 +293,11 @@ function StickyCard({
 function SwimLane({
   lane,
   onTaskClick,
+  recentlyChanged,
 }: {
   lane: Lane
   onTaskClick: (task: any) => void
+  recentlyChanged?: Set<string>
 }) {
   const router = useRouter()
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -357,6 +363,7 @@ function SwimLane({
               task={task}
               size={lane.size}
               onClick={() => onTaskClick(task)}
+              highlight={recentlyChanged?.has(task.id)}
             />
           ))}
           {lane.overflow != null && lane.overflow > 0 && (
@@ -376,7 +383,7 @@ function SwimLane({
   )
 }
 
-export function StickiesView({ tasks, onTaskClick, mode }: StickiesViewProps) {
+export function StickiesView({ tasks, onTaskClick, mode = 'timeframe', recentlyChanged }: StickiesViewProps) {
   const lanes = useMemo(
     () => mode === 'status' ? categorizeByStatus(tasks) : categorizeTasks(tasks),
     [tasks, mode],
@@ -389,6 +396,7 @@ export function StickiesView({ tasks, onTaskClick, mode }: StickiesViewProps) {
           key={lane.key}
           lane={lane}
           onTaskClick={onTaskClick}
+          recentlyChanged={recentlyChanged}
         />
       ))}
     </div>
