@@ -201,6 +201,18 @@ export function AgentsClient({ agents: initialAgents, currentUserName, currentUs
               <p className="text-xs text-muted-foreground">
                 Paste this as <code className="text-xs bg-muted px-1 rounded">AGENT_API_KEY</code> in the agent&apos;s environment config. It will not be shown again.
               </p>
+              <div className="mt-4 rounded-md bg-muted/50 p-3 space-y-2">
+                <p className="text-xs font-medium">Quick setup</p>
+                <ol className="text-xs text-muted-foreground space-y-1.5 list-decimal list-inside">
+                  <li>Copy the API key above</li>
+                  <li>Add it to your agent&apos;s environment as <code className="bg-muted px-1 rounded">AGENT_API_KEY</code></li>
+                  <li>Set <code className="bg-muted px-1 rounded">AGENTBASE_URL</code> to your AgentBase URL</li>
+                  <li>Your agent can now create tasks, update entities, and read data via the API</li>
+                </ol>
+                <p className="text-[11px] text-muted-foreground/70 mt-2">
+                  Agents authenticate with <code className="bg-muted px-0.5 rounded">Authorization: Bearer YOUR_KEY</code>. Rate limit: 300 req/min.
+                </p>
+              </div>
             </>
           ) : (
             <p className="text-xs text-muted-foreground">No API key was returned.</p>
