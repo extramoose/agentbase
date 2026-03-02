@@ -25,14 +25,14 @@ function StepDots({ current, total }: { current: number; total: number }) {
   )
 }
 
-export function OnboardingClient({ skipWorkspace }: { skipWorkspace?: boolean }) {
+export function OnboardingClient({ skipWorkspace, skipProfile }: { skipWorkspace?: boolean; skipProfile?: boolean }) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const joined = searchParams.get('joined') === 'true' || skipWorkspace
   const stepParam = searchParams.get('step')
 
   const skipWs = joined || stepParam === 'profile'
-  const [step, setStep] = useState<Step>(skipWs ? 'profile' : 'workspace')
+  const [step, setStep] = useState<Step>(skipWs ? (skipProfile ? 'intro-you' : 'profile') : 'workspace')
   const [workspaceName, setWorkspaceName] = useState('')
   const [profileName, setProfileName] = useState('')
   const [avatarUrl, setAvatarUrl] = useState<string | null>('/avatars/avatar_anonymous.jpg')
@@ -40,8 +40,8 @@ export function OnboardingClient({ skipWorkspace }: { skipWorkspace?: boolean })
   const [loading, setLoading] = useState(false)
 
   const steps: Step[] = skipWs
-    ? ['profile', 'intro-you', 'intro-agents']
-    : ['workspace', 'profile', 'intro-you', 'intro-agents']
+    ? (skipProfile ? ['intro-you', 'intro-agents'] : ['profile', 'intro-you', 'intro-agents'])
+    : (skipProfile ? ['workspace', 'intro-you', 'intro-agents'] : ['workspace', 'profile', 'intro-you', 'intro-agents'])
   const stepIndex = steps.indexOf(step)
 
   async function handleCreateWorkspace() {
@@ -60,7 +60,7 @@ export function OnboardingClient({ skipWorkspace }: { skipWorkspace?: boolean })
         setLoading(false)
         return
       }
-      setStep('profile')
+      setStep(skipProfile ? 'intro-you' : 'profile')
     } catch {
       setError('Something went wrong. Please try again.')
     } finally {

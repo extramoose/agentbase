@@ -25,5 +25,5 @@ export default async function OnboardingPage({
     redirect('/')
   }
 
-  return <OnboardingClient />
+  return <OnboardingClient skipProfile={!!hasName} />
 }
