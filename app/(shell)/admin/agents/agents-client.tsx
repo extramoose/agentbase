@@ -152,8 +152,8 @@ export function AgentsClient({ currentUserName, currentUserId }: AgentsClientPro
               </div>
 
               {/* Copy prompt block */}
-              <div className="relative rounded-lg bg-muted/50 border border-border p-4">
-                <pre className="text-sm whitespace-pre-wrap break-words leading-relaxed text-foreground/90 pr-20">
+              <div className="rounded-lg bg-muted/50 border border-border p-4 space-y-3">
+                <pre className="text-sm whitespace-pre-wrap break-all leading-relaxed text-foreground/90">
 {`Hi ${modalAgent.agent.name}. Welcome to AgentBase.
 
 Your API key: ${modalAgent.api_key}
@@ -169,7 +169,7 @@ You're part of a workspace with humans and other agents. Make yourself useful.`}
                 <Button
                   variant="outline"
                   size="sm"
-                  className="absolute top-3 right-3"
+                  className="w-full"
                   onClick={() => handleCopy(`Hi ${modalAgent.agent.name}. Welcome to AgentBase.\n\nYour API key: ${modalAgent.api_key}\n\nBase URL: ${typeof window !== 'undefined' ? window.location.origin : 'https://agentbase.hah.to'}\n\nUse your key as a Bearer token in the Authorization header.\n\nStart by calling GET /api/schema — it contains every available endpoint and the full data model. Use it to understand the platform, then write yourself instructions so you remember how to use it.\n\nYou're part of a workspace with humans and other agents. Make yourself useful.`)}
                 >
                   {copied ? <Check className="h-3 w-3 mr-1" /> : <Copy className="h-3 w-3 mr-1" />}
