@@ -142,7 +142,7 @@ export function TagCombobox({ selected, onChange, className }: TagComboboxProps)
               <li
                 key={tag}
                 className={cn(
-                  'px-3 py-1.5 text-sm cursor-pointer',
+                  'px-3 py-1.5 text-sm cursor-pointer hover:bg-muted/50',
                   i === activeIndex ? 'bg-accent text-accent-foreground' : 'hover:bg-accent/50'
                 )}
                 onMouseDown={(e) => { e.preventDefault(); addTag(tag) }}
@@ -153,7 +153,7 @@ export function TagCombobox({ selected, onChange, className }: TagComboboxProps)
             {inputValue.trim() && !allTags.includes(inputValue.trim()) && (
               <li
                 className={cn(
-                  'px-3 py-1.5 text-sm cursor-pointer text-muted-foreground',
+                  'px-3 py-1.5 text-sm cursor-pointer text-muted-foreground hover:bg-muted/50',
                   activeIndex === suggestions.length ? 'bg-accent' : 'hover:bg-accent/50'
                 )}
                 onMouseDown={(e) => { e.preventDefault(); addTag(inputValue) }}

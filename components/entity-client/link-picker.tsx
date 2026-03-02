@@ -408,7 +408,7 @@ export function LinkPicker({ sourceType, sourceId, value, onChange, className }:
                 <li
                   key={`${item.type}-${item.id}`}
                   className={cn(
-                    'px-3 py-1.5 text-sm cursor-pointer flex items-center gap-2',
+                    'px-3 py-1.5 text-sm cursor-pointer flex items-center gap-2 hover:bg-muted/50',
                     i === activeIndex ? 'bg-accent text-accent-foreground' : 'hover:bg-accent/50',
                   )}
                   onMouseDown={(e) => { e.preventDefault(); handleAdd(item) }}

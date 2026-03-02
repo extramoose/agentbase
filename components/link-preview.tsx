@@ -65,7 +65,7 @@ export function LinkPreview({ url, onDismiss, className }: LinkPreviewProps) {
   return (
     <div
       className={cn(
-        'bg-zinc-800 border border-zinc-700 rounded-lg p-3 flex gap-3 items-start cursor-pointer',
+        'bg-zinc-800 border border-zinc-700 rounded-lg p-3 flex gap-3 items-start cursor-pointer hover:bg-zinc-700 hover:border-zinc-600 transition-colors',
         className
       )}
       onClick={() => window.open(url, '_blank', 'noopener,noreferrer')}

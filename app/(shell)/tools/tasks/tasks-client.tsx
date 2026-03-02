@@ -1699,7 +1699,7 @@ export function TasksClient({
                 ? tab.value === 'all'
                   ? 'bg-muted text-foreground font-medium'
                   : cn('font-medium', TASK_TYPE_CONFIG[tab.value].className)
-                : 'bg-zinc-800 text-zinc-500'
+                : 'bg-zinc-800 text-zinc-500 hover:text-foreground hover:bg-zinc-700'
             )}
           >
             {tab.label}

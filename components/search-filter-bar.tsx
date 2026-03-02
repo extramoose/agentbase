@@ -44,7 +44,7 @@ export function SearchFilterBar({
             <Badge
               key={tag}
               variant="outline"
-              className={cn("cursor-pointer text-xs", selectedTag === tag && "bg-white text-black border-black")}
+              className={cn("cursor-pointer text-xs hover:bg-muted/50", selectedTag === tag && "bg-white text-black border-black")}
               onClick={() => onTagChange(selectedTag === tag ? null : tag)}
             >
               {tag}
