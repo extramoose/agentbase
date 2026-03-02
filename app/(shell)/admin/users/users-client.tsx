@@ -188,6 +188,7 @@ export function UsersClient({ currentUserId }: UsersClientProps) {
                         currentUrl={member.avatar_url}
                         name={displayName}
                         uploadUrl="/api/profile/avatar"
+                        presetUrl="/api/profile/avatar-preset"
                         size="sm"
                         mode="user"
                         onSuccess={(newUrl) =>
