@@ -219,16 +219,20 @@ export function UsersClient({ currentUserId }: UsersClientProps) {
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="sm" className="h-7 text-xs">
-                              Role <ChevronDown className="h-3 w-3 ml-1" />
+                              {member.role === 'admin' ? 'Admin' : 'Member'} <ChevronDown className="h-3 w-3 ml-1" />
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => changeRole(member.id, 'member')}>
-                              Member
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => changeRole(member.id, 'admin')}>
-                              Admin
-                            </DropdownMenuItem>
+                            {member.role !== 'admin' && (
+                              <DropdownMenuItem onClick={() => changeRole(member.id, 'admin')}>
+                                Promote to Admin
+                              </DropdownMenuItem>
+                            )}
+                            {member.role === 'admin' && (
+                              <DropdownMenuItem onClick={() => changeRole(member.id, 'member')}>
+                                Downgrade to Member
+                              </DropdownMenuItem>
+                            )}
                           </DropdownMenuContent>
                         </DropdownMenu>
                         <Button
