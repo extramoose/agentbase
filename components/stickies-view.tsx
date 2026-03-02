@@ -103,9 +103,10 @@ function categorizeTasks(tasks: StickyTask[]): Lane[] {
   const tomorrowTasks: StickyTask[] = []
   const thisWeekTasks: StickyTask[] = []
   const thisMonthTasks: StickyTask[] = []
+  const undated: StickyTask[] = []
 
   for (const task of active) {
-    if (!task.due_date) continue
+    if (!task.due_date) { undated.push(task); continue }
     const d = task.due_date.slice(0, 10)
     if (d < todayStr) {
       overdue.push(task)
@@ -155,6 +156,10 @@ function categorizeTasks(tasks: StickyTask[]): Lane[] {
     })
   }
 
+  if (undated.length > 0) {
+    lanes.push({ key: 'undated', label: 'Undated', tasks: sortByPriority(undated), size: 'small' })
+  }
+
   const CAP = 20
   for (const lane of lanes) {
     if (lane.size === 'small' && lane.tasks.length > CAP) {
@@ -181,6 +186,7 @@ function categorizeByStatus(tasks: StickyTask[]): Lane[] {
       lanes.push({ key: bucket.key, label: bucket.label, tasks: matching, size: bucket.size })
     }
   }
+
 
   const CAP = 20
   for (const lane of lanes) {
