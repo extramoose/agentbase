@@ -18,6 +18,7 @@ import {
   Pencil,
   Trash2,
 } from 'lucide-react'
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import { AvatarUpload } from '@/components/avatar-upload'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -352,14 +353,12 @@ export function AppSidebar({ profile, workspaces, onNavigate }: { profile: UserP
       <Separator />
 
       <div className="flex items-center gap-3 p-4">
-        <AvatarUpload
-          currentUrl={profile?.avatar_url ?? null}
-          name={profile?.full_name ?? profile?.email ?? 'User'}
-          uploadUrl="/api/profile/avatar"
-          presetUrl="/api/profile/avatar-preset"
-          size="sm"
-          pickerMode="user"
-        />
+        <Avatar className="h-8 w-8 shrink-0">
+          <AvatarImage src={profile?.avatar_url ?? '/avatars/avatar_anonymous.jpg'} alt={profile?.full_name ?? 'User'} />
+          <AvatarFallback className="text-xs">
+            {(profile?.full_name ?? '?').split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)}
+          </AvatarFallback>
+        </Avatar>
         <button
           type="button"
           className="flex-1 truncate text-left"
@@ -507,7 +506,6 @@ export function AppSidebar({ profile, workspaces, onNavigate }: { profile: UserP
                 uploadUrl="/api/profile/avatar"
                 presetUrl="/api/profile/avatar-preset"
                 size="lg"
-                pickerMode="user"
               />
             </div>
             <div className="grid gap-2">

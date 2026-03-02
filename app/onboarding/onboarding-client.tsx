@@ -25,7 +25,7 @@ function StepDots({ current, total }: { current: number; total: number }) {
   )
 }
 
-export function OnboardingClient({ skipWorkspace, skipProfile, googleAvatarUrl }: { skipWorkspace?: boolean; skipProfile?: boolean; googleAvatarUrl?: string | null }) {
+export function OnboardingClient({ skipWorkspace, skipProfile }: { skipWorkspace?: boolean; skipProfile?: boolean }) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const joined = searchParams.get('joined') === 'true' || skipWorkspace
@@ -172,7 +172,6 @@ export function OnboardingClient({ skipWorkspace, skipProfile, googleAvatarUrl }
                 selected={avatarUrl}
                 onSelect={setAvatarUrl}
                 mode="user"
-                googleAvatarUrl={googleAvatarUrl}
                 onUpload={async (file) => {
                   const body = new FormData()
                   body.append('file', file)

@@ -12,12 +12,9 @@ export default async function OnboardingPage({
   const { joined } = await searchParams
 
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  const googleAvatarUrl = user?.user_metadata?.avatar_url ?? null
-
   // If joined via invite, skip workspace step — user already has a tenant
   if (joined === 'true') {
-    return <OnboardingClient skipWorkspace googleAvatarUrl={googleAvatarUrl} />
+    return <OnboardingClient skipWorkspace />
   }
 
   // If user already has a tenant, skip onboarding entirely
@@ -28,5 +25,5 @@ export default async function OnboardingPage({
     redirect('/')
   }
 
-  return <OnboardingClient skipProfile={!!hasName} googleAvatarUrl={googleAvatarUrl} />
+  return <OnboardingClient skipProfile={!!hasName} />
 }

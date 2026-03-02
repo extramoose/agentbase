@@ -189,7 +189,6 @@ export function UsersClient({ currentUserId }: UsersClientProps) {
                         name={displayName}
                         uploadUrl="/api/profile/avatar"
                         size="sm"
-                        pickerMode="user"
                         onSuccess={(newUrl) =>
                           setMembers(prev => prev.map(m =>
                             m.id === member.id ? { ...m, avatar_url: newUrl } : m

@@ -233,7 +233,6 @@ You're part of a workspace with humans and other agents. Make yourself useful.`}
                 uploadUrl={`/api/admin/agents/${agent.id}/avatar`}
                 presetUrl={`/api/admin/agents/${agent.id}/avatar-preset`}
                 size="sm"
-                pickerMode="agent"
                 onSuccess={(newUrl) =>
                   setAgents(prev => prev.map(a =>
                     a.id === agent.id ? { ...a, avatar_url: newUrl } : a

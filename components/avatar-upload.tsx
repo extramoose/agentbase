@@ -15,9 +15,6 @@ interface AvatarUploadProps {
   presetUrl?: string
   size?: 'sm' | 'md' | 'lg'
   onSuccess?: (newUrl: string) => void
-  /** 'agent' = character presets, 'user' = anonymous + google + upload */
-  pickerMode?: 'agent' | 'user'
-  googleAvatarUrl?: string | null
 }
 
 const sizeClasses = {
@@ -39,8 +36,6 @@ export function AvatarUpload({
   presetUrl,
   size = 'md',
   onSuccess,
-  pickerMode = 'agent',
-  googleAvatarUrl,
 }: AvatarUploadProps) {
   const [uploading, setUploading] = useState(false)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
@@ -132,8 +127,6 @@ export function AvatarUpload({
             selected={displayUrl}
             onSelect={handlePresetSelect}
             onUpload={handleFileUpload}
-            mode={pickerMode}
-            googleAvatarUrl={googleAvatarUrl}
           />
         </PopoverContent>
       )}
