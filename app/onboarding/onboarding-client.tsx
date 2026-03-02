@@ -232,17 +232,16 @@ export function OnboardingClient({ skipWorkspace, skipProfile, googleAvatarUrl }
                   size="lg"
                   onClick={() => router.push('/admin/agents?create=true')}
                 >
-                  Get started
+                  Add an Agent
                 </Button>
-                <div className="text-center">
-                  <button
-                    type="button"
-                    className="text-sm text-muted-foreground hover:text-foreground transition-colors underline underline-offset-4"
-                    onClick={() => router.push('/tools/tasks')}
-                  >
-                    skip for now
-                  </button>
-                </div>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  size="lg"
+                  onClick={() => router.push('/tools/tasks')}
+                >
+                  Take me to My Tasks
+                </Button>
               </div>
             </div>
           </div>
