@@ -11,14 +11,23 @@ const schema = z.object({
   body: z.string().min(1).max(50000),
 })
 
+const ENTITY_TYPE_ALIASES: Record<string, string> = {
+  task: 'tasks',
+  library_item: 'library_items',
+  person: 'people',
+  company: 'companies',
+  deal: 'deals',
+}
+
 export async function POST(request: Request) {
   try {
     const { supabase, actorId, actorType, tenantId } = await resolveActorUnified(request)
     const body = await request.json()
     const input = schema.parse(body)
+    const normalizedType = ENTITY_TYPE_ALIASES[input.entity_type] ?? input.entity_type
 
     const { data, error } = await supabase.rpc('rpc_add_comment', {
-      p_entity_type: input.entity_type,
+      p_entity_type: normalizedType,
       p_entity_id: input.entity_id,
       p_entity_label: input.entity_label ?? null,
       p_body: input.body,
