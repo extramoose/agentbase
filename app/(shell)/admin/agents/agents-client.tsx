@@ -4,7 +4,7 @@ import { useState, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Avatar, AvatarImage } from '@/components/ui/avatar'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
-import { AVATAR_PRESETS } from '@/components/avatar-picker'
+import { AGENT_AVATAR_PRESETS } from '@/components/avatar-picker'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -56,7 +56,7 @@ export function AgentsClient({ agents: initialAgents, currentUserName, currentUs
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: name.trim(),
-          avatar_url: AVATAR_PRESETS[Math.floor(Math.random() * AVATAR_PRESETS.length)],
+          avatar_url: AGENT_AVATAR_PRESETS[Math.floor(Math.random() * AGENT_AVATAR_PRESETS.length)],
         }),
       })
       const json = await res.json()

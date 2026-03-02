@@ -358,6 +358,7 @@ export function AppSidebar({ profile, workspaces, onNavigate }: { profile: UserP
           uploadUrl="/api/profile/avatar"
           presetUrl="/api/profile/avatar-preset"
           size="sm"
+          pickerMode="user"
         />
         <button
           type="button"
@@ -506,6 +507,7 @@ export function AppSidebar({ profile, workspaces, onNavigate }: { profile: UserP
                 uploadUrl="/api/profile/avatar"
                 presetUrl="/api/profile/avatar-preset"
                 size="lg"
+                pickerMode="user"
               />
             </div>
             <div className="grid gap-2">
