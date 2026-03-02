@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from '@/hooks/use-toast'
-import { Check, Copy, Loader2, Plus, X } from 'lucide-react'
+import { Check, Copy, Loader2, Plus } from 'lucide-react'
 
 type Agent = {
   id: string
@@ -89,47 +89,44 @@ export function AgentsClient({ currentUserName, currentUserId }: AgentsClientPro
     <div className="space-y-4 sm:space-y-6">
       <div className="flex items-center justify-between gap-2">
         <h1 className="text-xl sm:text-2xl font-bold">Agents</h1>
-        {!showCreate && !createResult && (
-          <Button size="sm" onClick={() => setShowCreate(true)}>
-            <Plus className="h-4 w-4" />
-            Create Agent
-          </Button>
-        )}
+        <Button size="sm" onClick={() => setShowCreate(true)}>
+          <Plus className="h-4 w-4" />
+          Create Agent
+        </Button>
       </div>
 
-      {/* Create form */}
-      {showCreate && !createResult && (
-        <div className="rounded-lg border border-border p-4 space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-medium">New Agent</h2>
-            <Button variant="ghost" size="icon-xs" onClick={() => { setShowCreate(false); setName('') }}>
-              <X className="h-4 w-4" />
-            </Button>
+      {/* Create agent modal */}
+      <Dialog open={showCreate && !createResult} onOpenChange={(open) => { if (!open) { setShowCreate(false); setName('') } }}>
+        <DialogContent className="sm:max-w-md">
+          <div className="space-y-4">
+            <h2 className="text-base font-semibold">New Agent</h2>
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">Name</label>
+              <Input
+                autoFocus
+                placeholder="e.g. Lucy"
+                value={name}
+                onChange={e => setName(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && name.trim() && !creating) handleCreate() }}
+                disabled={creating}
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">Owner</label>
+              <p className="text-sm">{currentUserName}</p>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={() => { setShowCreate(false); setName('') }} disabled={creating}>
+                Cancel
+              </Button>
+              <Button size="sm" onClick={handleCreate} disabled={creating || !name.trim()}>
+                {creating && <Loader2 className="h-4 w-4 animate-spin" />}
+                Create
+              </Button>
+            </div>
           </div>
-          <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">Name</label>
-            <Input
-              placeholder="e.g. Lucy"
-              value={name}
-              onChange={e => setName(e.target.value)}
-              disabled={creating}
-            />
-          </div>
-          <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">Owner</label>
-            <p className="text-sm">{currentUserName}</p>
-          </div>
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" size="sm" onClick={() => { setShowCreate(false); setName('') }} disabled={creating}>
-              Cancel
-            </Button>
-            <Button size="sm" onClick={handleCreate} disabled={creating || !name.trim()}>
-              {creating && <Loader2 className="h-4 w-4 animate-spin" />}
-              Create
-            </Button>
-          </div>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
 
       {/* Agent welcome modal */}
       <Dialog open={!!modalAgent} onOpenChange={(open) => { if (!open) { setModalAgent(null); setCreateResult(null); setShowCreate(false) } }}>
