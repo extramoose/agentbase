@@ -194,59 +194,55 @@ export function OnboardingClient({ skipWorkspace, skipProfile, googleAvatarUrl }
         )}
 
         {step === 'intro-you' && (
-          <div className="rounded-xl border border-border bg-card p-8">
-            <div className="space-y-2 text-center mb-8">
-              <h1 className="text-2xl font-semibold tracking-tight">
-                How AgentBase works for you
+          <div className="rounded-xl border border-border bg-card overflow-hidden">
+            <div className="p-2">
+              <img
+                src="/onboarding/onboarding1.png"
+                alt="You, doing everything alone"
+                className="w-full rounded-lg object-cover"
+              />
+            </div>
+            <div className="px-8 pb-8 pt-4 space-y-6">
+              <h1 className="text-2xl font-semibold tracking-tight text-center">
+                You, doing everything alone.
               </h1>
-              <p className="text-sm text-muted-foreground">
-                Manage tasks, collaborate with your team, and let agents handle
-                the rest.
-              </p>
+              <Button className="w-full" size="lg" onClick={() => setStep('intro-agents')}>
+                Next
+              </Button>
             </div>
-            <div className="flex items-center justify-center rounded-lg border border-dashed border-border bg-muted/50 h-48 mb-6">
-              <span className="text-sm text-muted-foreground">
-                Illustration TBD
-              </span>
-            </div>
-            <Button className="w-full" onClick={() => setStep('intro-agents')}>
-              Next
-            </Button>
           </div>
         )}
 
         {step === 'intro-agents' && (
-          <div className="rounded-xl border border-border bg-card p-8">
-            <div className="space-y-2 text-center mb-8">
-              <h1 className="text-2xl font-semibold tracking-tight">
-                How it works for agents
+          <div className="rounded-xl border border-border bg-card overflow-hidden">
+            <div className="p-2">
+              <img
+                src="/onboarding/onboarding2.png"
+                alt="Now you have help"
+                className="w-full rounded-lg object-cover"
+              />
+            </div>
+            <div className="px-8 pb-8 pt-4 space-y-6">
+              <h1 className="text-2xl font-semibold tracking-tight text-center">
+                Now you have help.
               </h1>
-              <p className="text-sm text-muted-foreground">
-                Agents pick up tasks, use tools, and report back — all inside
-                AgentBase.
-              </p>
-            </div>
-            <div className="flex items-center justify-center rounded-lg border border-dashed border-border bg-muted/50 h-48 mb-6">
-              <span className="text-sm text-muted-foreground">
-                Illustration TBD
-              </span>
-            </div>
-            <div className="space-y-3">
-              <Button
-                className="w-full"
-                size="lg"
-                onClick={() => router.push('/admin/agents?create=true')}
-              >
-                Add your first agent
-              </Button>
-              <div className="text-center">
-                <button
-                  type="button"
-                  className="text-sm text-muted-foreground hover:text-foreground transition-colors underline underline-offset-4"
-                  onClick={() => router.push('/tools/tasks?create=true')}
+              <div className="space-y-3">
+                <Button
+                  className="w-full"
+                  size="lg"
+                  onClick={() => router.push('/admin/agents?create=true')}
                 >
-                  or create a task
-                </button>
+                  Get started
+                </Button>
+                <div className="text-center">
+                  <button
+                    type="button"
+                    className="text-sm text-muted-foreground hover:text-foreground transition-colors underline underline-offset-4"
+                    onClick={() => router.push('/tools/tasks')}
+                  >
+                    skip for now
+                  </button>
+                </div>
               </div>
             </div>
           </div>
