@@ -52,7 +52,7 @@ export function AvatarPicker({ selected, onSelect, onUpload }: AvatarPickerProps
             className={cn(
               'rounded-full h-14 w-14 overflow-hidden focus:outline-none transition-all',
               selected === url
-                ? 'ring-1 ring-white ring-offset-1 ring-offset-background'
+                ? 'ring-2 ring-primary'
                 : 'hover:opacity-80',
             )}
           >

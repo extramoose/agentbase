@@ -108,7 +108,7 @@ export function AvatarUpload({
             </Avatar>
             <span
               className={cn(
-                'absolute inset-0 flex items-center justify-center rounded-full bg-black/60 transition-opacity',
+                'absolute inset-0 flex items-center justify-center rounded-full bg-black/40 transition-opacity',
                 uploading ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
               )}
             >
