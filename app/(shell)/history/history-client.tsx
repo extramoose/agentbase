@@ -622,6 +622,18 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
     )
   }
 
+  // Daily stats from today's entries
+  const dailyStats = useMemo(() => {
+    const todayStart = new Date()
+    todayStart.setHours(0, 0, 0, 0)
+    const todayEntries = entries.filter(e => new Date(e.created_at) >= todayStart)
+    const created = todayEntries.filter(e => e.event_type === 'created').length
+    const completed = todayEntries.filter(e => e.event_type === 'field_updated' && e.new_value === 'done').length
+    const comments = todayEntries.filter(e => e.event_type === 'commented').length
+    const updates = todayEntries.filter(e => e.event_type === 'field_updated').length
+    return { created, completed, comments, updates, total: todayEntries.length }
+  }, [entries])
+
   return (
     <div className="space-y-4">
       {/* Title row */}
@@ -658,6 +670,17 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
             ))}
           </SearchFilterBar>
         </div>
+      </div>
+
+
+      {/* Daily stats */}
+      <div className="flex items-center gap-4 text-xs text-muted-foreground">
+        <span>Today:</span>
+        {dailyStats.created > 0 && <span><span className="font-medium text-foreground">{dailyStats.created}</span> created</span>}
+        {dailyStats.completed > 0 && <span><span className="font-medium text-green-500">{dailyStats.completed}</span> completed</span>}
+        {dailyStats.comments > 0 && <span><span className="font-medium text-foreground">{dailyStats.comments}</span> comments</span>}
+        {dailyStats.updates > 0 && <span><span className="font-medium text-foreground">{dailyStats.updates}</span> updates</span>}
+        {dailyStats.total === 0 && <span>No activity yet</span>}
       </div>
 
       {/* Day navigation */}
