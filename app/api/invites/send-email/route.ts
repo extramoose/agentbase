@@ -16,48 +16,41 @@ export async function POST(request: Request) {
     const body = await request.json()
     const { email, role } = schema.parse(body)
 
-    // 1. Create workspace invite via RPC (uses caller's auth context for tenant)
     const supabase = await createClient()
+
+    // 1. Create workspace invite with email
     const { data, error } = await supabase.rpc('rpc_create_invite')
     if (error) throw new ApiError(error.message)
     const invite = data as { token: string; id: string }
 
-    // 2. Build the invite URL
+    // 2. Store email on invite (migration 069 adds email column)
+    // Using the caller's supabase client — RLS allows workspace members to manage invites
+    await supabase
+      .from('workspace_invites')
+      .update({ email })
+      .eq('id', invite.id)
+
+    // TODO: store role on invite once role column is added
+    void role
+
+    // 3. Send magic link via Supabase auth (uses Resend SMTP)
     const h = await headers()
     const host = h.get('x-forwarded-host') ?? h.get('host') ?? 'localhost:3000'
     const proto = h.get('x-forwarded-proto') ?? 'http'
     const origin = `${proto}://${host}`
-    const inviteUrl = `${origin}/invite/${invite.token}?email=${encodeURIComponent(email)}`
+    const redirectTo = `${origin}/invite/${invite.token}`
 
-    // 3. Send email via Resend API (no service_role needed)
-    const resendKey = process.env.RESEND_API_KEY
-    if (resendKey) {
-      const emailRes = await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${resendKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          from: 'AgentBase <noreply@hah.to>',
-          to: [email],
-          subject: 'You\'ve been invited to AgentBase',
-          text: `You've been invited to join a workspace on AgentBase.
+    const { error: otpError } = await supabase.auth.signInWithOtp({
+      email,
+      options: { emailRedirectTo: redirectTo },
+    })
 
-Accept your invite: ${inviteUrl}`,
-        }),
-      })
-      if (!emailRes.ok) {
-        const errBody = await emailRes.text()
-        console.error('Resend error:', errBody)
-        // Don't throw — still return the link as fallback
-      }
+    if (otpError) {
+      console.error('OTP error:', otpError.message)
+      throw new ApiError(`Failed to send invite: ${otpError.message}`)
     }
 
-    // TODO: store role on invite once role column is added to workspace_invites
-    void role
-
-    return apiResponse({ id: invite.id, token: invite.token, url: inviteUrl, email_sent: !!resendKey })
+    return apiResponse({ id: invite.id, sent: true })
   } catch (err) {
     return apiError(err)
   }

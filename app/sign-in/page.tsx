@@ -11,8 +11,7 @@ function SignInForm() {
   const router = useRouter()
   const error = searchParams.get('error')
   const code = searchParams.get('code')
-  const inviteEmail = searchParams.get('invite_email')
-  const [email, setEmail] = useState(inviteEmail ?? '')
+  const [email, setEmail] = useState('')
   const [sent, setSent] = useState(false)
   const [sending, setSending] = useState(false)
 

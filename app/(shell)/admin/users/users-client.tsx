@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from '@/hooks/use-toast'
 import { formatDistanceToNow } from 'date-fns'
-import { Check, ChevronDown, Copy, Link, Loader2, Mail, Shield, ShieldAlert, Trash2, User } from 'lucide-react'
+import { Check, ChevronDown, Loader2, Mail, Shield, ShieldAlert, Trash2, User } from 'lucide-react'
 
 type Invite = {
   id: string
@@ -54,8 +54,6 @@ export function UsersClient({ currentUserId }: UsersClientProps) {
   const [inviteRole, setInviteRole] = useState<'member' | 'admin'>('member')
   const [sending, setSending] = useState(false)
   const [sent, setSent] = useState(false)
-  const [generating, setGenerating] = useState(false)
-  const [newInviteUrl, setNewInviteUrl] = useState<string | null>(null)
 
   const fetchInvites = useCallback(async () => {
     const res = await fetch('/api/invites/list')
@@ -97,24 +95,6 @@ export function UsersClient({ currentUserId }: UsersClientProps) {
       toast({ type: 'error', message: err instanceof Error ? err.message : 'Failed to update role' })
     }
   }, [])
-
-  const handleGenerateInvite = useCallback(async () => {
-    setGenerating(true)
-    setNewInviteUrl(null)
-    try {
-      const res = await fetch('/api/invites/create', { method: 'POST' })
-      const json = await res.json()
-      if (!res.ok) throw new Error(json.error ?? 'Failed to generate invite')
-      const url = `${window.location.origin}/invite/${json.data.token}`
-      setNewInviteUrl(url)
-      await fetchInvites()
-      toast({ type: 'success', message: 'Invite link generated' })
-    } catch (err) {
-      toast({ type: 'error', message: err instanceof Error ? err.message : 'Failed to generate invite' })
-    } finally {
-      setGenerating(false)
-    }
-  }, [fetchInvites])
 
   const handleSendEmailInvite = useCallback(async (e: React.FormEvent) => {
     e.preventDefault()
@@ -332,29 +312,6 @@ export function UsersClient({ currentUserId }: UsersClientProps) {
           {sending ? 'Sending...' : sent ? 'Sent' : 'Send invite'}
         </Button>
       </form>
-
-      <div className="flex items-center gap-3">
-        <Button variant="ghost" size="sm" className="text-xs text-muted-foreground" onClick={handleGenerateInvite} disabled={generating}>
-          <Link className="mr-2 h-3 w-3" />
-          {generating ? 'Generating...' : 'Copy invite link instead'}
-        </Button>
-      </div>
-
-      {newInviteUrl && (
-        <div className="flex items-center gap-2">
-          <Input value={newInviteUrl} readOnly className="text-sm font-mono" />
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              navigator.clipboard.writeText(newInviteUrl)
-              toast({ type: 'success', message: 'Copied to clipboard' })
-            }}
-          >
-            <Copy className="h-4 w-4" />
-          </Button>
-        </div>
-      )}
 
       {/* Pending Invites */}
       {pendingInvites.length > 0 && (
