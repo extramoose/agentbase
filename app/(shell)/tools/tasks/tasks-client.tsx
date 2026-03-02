@@ -1035,7 +1035,12 @@ export function TasksClient({
   const [view, setView] = useState<View>(
     () => {
       const v = searchParams.get('view')
-      return v === 'grid' ? 'grid' : v === 'table' ? 'table' : 'stickies'
+      if (v === 'grid' || v === 'table' || v === 'stickies') return v
+      try {
+        const saved = localStorage.getItem(`tasks-view-${_currentUser?.id}`)
+        if (saved === 'grid' || saved === 'table' || saved === 'stickies') return saved
+      } catch { /* ignore */ }
+      return 'stickies'
     }
   )
   const [selectedTag, setSelectedTag] = useState<string | null>(
@@ -1592,6 +1597,7 @@ export function TasksClient({
 
   const handleViewChange = useCallback((newView: View) => {
     setView(newView)
+    try { localStorage.setItem(`tasks-view-${_currentUser?.id}`, newView) } catch { /* ignore */ }
     if (newView === 'stickies' && !assigneeFilter && _currentUser?.id) {
       setAssigneeFilter(_currentUser.id)
     }
