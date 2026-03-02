@@ -706,17 +706,19 @@ function NewTaskShelf({
   onCreated,
   onClose,
   defaultStatus,
+  currentUserId,
 }: {
   onCreated: (task: Task) => void
   onClose: () => void
   defaultStatus: Status
+  currentUserId?: string
 }) {
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
   const [priority, setPriority] = useState<Priority>('medium')
   const [status, setStatus] = useState<Status>(defaultStatus)
-  const [assigneeId, setAssigneeId] = useState<string | null>(null)
-  const [assigneeType, setAssigneeType] = useState<string | null>(null)
+  const [assigneeId, setAssigneeId] = useState<string | null>(currentUserId ?? null)
+  const [assigneeType, setAssigneeType] = useState<string | null>(currentUserId ? 'human' : null)
   const [tags, setTags] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
 
@@ -1273,8 +1275,8 @@ export function TasksClient({
         type: null,
         tags: [],
         due_date: null,
-        assignee_id: null,
-        assignee_type: null,
+        assignee_id: _currentUser?.id ?? null,
+        assignee_type: _currentUser?.id ? 'human' : null,
         sort_order: 0,
         source_meeting_id: null,
         created_at: new Date().toISOString(),
@@ -1291,6 +1293,8 @@ export function TasksClient({
             title,
             priority,
             status: statusFilter !== 'all' ? statusFilter : 'todo',
+            assignee_id: _currentUser?.id ?? 'unassigned',
+            assignee_type: _currentUser?.id ? 'human' : undefined,
           }),
         })
         const json = await res.json()
@@ -1909,6 +1913,7 @@ export function TasksClient({
       {/* New task creation shelf */}
       {creatingTask && (
         <NewTaskShelf
+          currentUserId={_currentUser?.id}
           defaultStatus={statusFilter !== 'all' ? statusFilter : 'todo'}
           onClose={() => setCreatingTask(false)}
           onCreated={(created) => {
