@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from '@/hooks/use-toast'
-import { Check, Copy, Loader2, Plus } from 'lucide-react'
+import { Check, Copy, KeyRound, Loader2, Plus, Trash2 } from 'lucide-react'
 
 type Agent = {
   id: string
@@ -23,13 +23,17 @@ type Agent = {
 }
 
 interface AgentsClientProps {
+  agents: Agent[]
   currentUserName: string
   currentUserId: string
 }
 
-export function AgentsClient({ currentUserName, currentUserId }: AgentsClientProps) {
+export function AgentsClient({ agents: initialAgents, currentUserName, currentUserId }: AgentsClientProps) {
   const searchParams = useSearchParams()
+  const [agents, setAgents] = useState(initialAgents)
   const [showCreate, setShowCreate] = useState(searchParams.get("create") === "true")
+  const [revoking, setRevoking] = useState<string | null>(null)
+  const [regenerating, setRegenerating] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
 
   // Create form state
@@ -68,6 +72,7 @@ export function AgentsClient({ currentUserName, currentUserId }: AgentsClientPro
         created_at: new Date().toISOString(),
         owner_name: currentUserName,
       }
+      setAgents(prev => [newAgent, ...prev])
       setCreateResult({ agent: newAgent, api_key: json.api_key })
       setModalAgent({ agent: newAgent, api_key: json.api_key })
       setName('')
@@ -78,6 +83,40 @@ export function AgentsClient({ currentUserName, currentUserId }: AgentsClientPro
       setCreating(false)
     }
   }, [name, currentUserName, currentUserId])
+
+  const handleRevoke = useCallback(async (agent: Agent) => {
+    const confirmed = confirm(`Permanently revoke ${agent.name}? This CANNOT be undone. The agent will lose all API access immediately.`)
+    if (!confirmed) return
+    setRevoking(agent.id)
+    try {
+      const res = await fetch(`/api/admin/agents/${agent.id}`, { method: 'PATCH' })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? 'Failed to revoke agent')
+      setAgents(prev => prev.filter(a => a.id !== agent.id))
+      toast({ type: 'success', message: `${agent.name} has been revoked` })
+    } catch (err) {
+      toast({ type: 'error', message: err instanceof Error ? err.message : 'Failed to revoke agent' })
+    } finally {
+      setRevoking(null)
+    }
+  }, [])
+
+  const handleRegenerate = useCallback(async (agent: Agent) => {
+    const confirmed = confirm(`Regenerate API key for ${agent.name}? The old key will stop working immediately.`)
+    if (!confirmed) return
+    setRegenerating(agent.id)
+    try {
+      const res = await fetch(`/api/admin/agents/${agent.id}/regenerate`, { method: 'POST' })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? 'Failed to regenerate key')
+      setModalAgent({ agent, api_key: json.api_key })
+      toast({ type: 'success', message: `New API key generated for ${agent.name}` })
+    } catch (err) {
+      toast({ type: 'error', message: err instanceof Error ? err.message : 'Failed to regenerate key' })
+    } finally {
+      setRegenerating(null)
+    }
+  }, [])
 
   const handleCopy = useCallback(async (text: string) => {
     await navigator.clipboard.writeText(text)
@@ -181,7 +220,47 @@ You're part of a workspace with humans and other agents. Make yourself useful.`}
         </DialogContent>
       </Dialog>
 
-
+      {/* Agent cards */}
+      {agents.filter(a => !a.revoked_at).length > 0 ? (
+        <div className="space-y-3">
+          {agents.filter(a => !a.revoked_at).map(agent => (
+            <div key={agent.id} className="flex items-center gap-4 rounded-lg border border-border p-4 hover:bg-muted/40 transition-colors">
+              <Avatar className="h-10 w-10 shrink-0">
+                <AvatarImage src={agent.avatar_url ?? '/avatars/avatar_anonymous.jpg'} alt={agent.name} />
+              </Avatar>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium truncate">{agent.name}</p>
+                <p className="text-xs text-muted-foreground">Owner: {agent.owner_name}</p>
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  onClick={() => handleRegenerate(agent)}
+                  disabled={regenerating === agent.id}
+                >
+                  {regenerating === agent.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <KeyRound className="h-3 w-3" />}
+                  <span className="hidden sm:inline">Regenerate</span>
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  className="text-destructive hover:text-destructive"
+                  onClick={() => handleRevoke(agent)}
+                  disabled={revoking === agent.id}
+                >
+                  {revoking === agent.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
+                  <span className="hidden sm:inline">Revoke</span>
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="text-center py-12 text-muted-foreground">
+          <p className="text-sm">No agents yet. Create one to get started.</p>
+        </div>
+      )}
     </div>
   )
 }
