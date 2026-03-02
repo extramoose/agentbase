@@ -23,8 +23,7 @@ export async function POST(request: Request) {
     if (error) throw new ApiError(error.message)
     const invite = data as { token: string; id: string }
 
-    // 2. Store email on invite (migration 069 adds email column)
-    // Using the caller's supabase client — RLS allows workspace members to manage invites
+    // 2. Store email on invite
     await supabase
       .from('workspace_invites')
       .update({ email })
@@ -33,21 +32,34 @@ export async function POST(request: Request) {
     // TODO: store role on invite once role column is added
     void role
 
-    // 3. Send magic link via Supabase auth (uses Resend SMTP)
+    // 3. Send invite email via Resend
     const h = await headers()
     const host = h.get('x-forwarded-host') ?? h.get('host') ?? 'localhost:3000'
     const proto = h.get('x-forwarded-proto') ?? 'http'
     const origin = `${proto}://${host}`
-    const redirectTo = `${origin}/invite/${invite.token}`
+    const inviteUrl = `${origin}/invite/${invite.token}`
 
-    const { error: otpError } = await supabase.auth.signInWithOtp({
-      email,
-      options: { emailRedirectTo: redirectTo },
+    const resendKey = process.env.RESEND_API_KEY
+    if (!resendKey) throw new ApiError('Email not configured')
+
+    const emailRes = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${resendKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: 'AgentBase <noreply@hah.to>',
+        to: [email],
+        subject: "You've been invited to AgentBase",
+        text: `You've been invited to join a workspace on AgentBase.\n\nAccept your invite: ${inviteUrl}`,
+      }),
     })
 
-    if (otpError) {
-      console.error('OTP error:', otpError.message)
-      throw new ApiError(`Failed to send invite: ${otpError.message}`)
+    if (!emailRes.ok) {
+      const errBody = await emailRes.text()
+      console.error('Resend error:', errBody)
+      throw new ApiError('Failed to send invite email')
     }
 
     return apiResponse({ id: invite.id, sent: true })
