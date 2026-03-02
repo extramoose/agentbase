@@ -1558,7 +1558,7 @@ export function TasksClient({
             selectedTag={selectedTag}
             onTagChange={handleTagChange}
           />
-          <ViewToggle onChange={handleViewChange} showStickies />
+          <ViewToggle onChange={handleViewChange} showStickies defaultView={view} />
           <Button size="sm" onClick={handleNewTask}>
             <Plus className="h-4 w-4 mr-1" />
             <span className="hidden sm:inline">New Task</span>
