@@ -112,7 +112,7 @@ export function AppSidebar({ profile, workspaces, onNavigate }: { profile: UserP
   const isOwner = tenantRole === 'owner'
   const canLeave = tenantRole === 'admin' || tenantRole === 'member'
   const isAdmin =
-    tenantRole === 'admin' || tenantRole === 'owner' || profile?.role === 'owner'
+    tenantRole === 'admin' || tenantRole === 'owner'
 
   function openDialog(type: 'create' | 'rename' | 'delete' | 'leave') {
     setDialogInput(type === 'rename' ? activeWorkspace?.name ?? '' : '')

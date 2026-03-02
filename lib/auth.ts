@@ -51,8 +51,7 @@ export async function requireAuth() {
 export async function requireAdmin(): Promise<UserProfile> {
   const profile = await getUserProfile()
   const isTenantAdmin = profile?.tenant_role === 'owner' || profile?.tenant_role === 'admin'
-  const isGlobalOwner = profile?.role === 'owner'
-  if (!profile || (!isTenantAdmin && !isGlobalOwner)) {
+  if (!profile || !isTenantAdmin) {
     redirect('/')
   }
   return profile
@@ -75,8 +74,7 @@ export async function requireAuthApi() {
 export async function requireAdminApi(): Promise<UserProfile> {
   const profile = await getUserProfile()
   const isTenantAdmin = profile?.tenant_role === 'owner' || profile?.tenant_role === 'admin'
-  const isGlobalOwner = profile?.role === 'owner'
-  if (!profile || (!isTenantAdmin && !isGlobalOwner)) {
+  if (!profile || !isTenantAdmin) {
     throw new ForbiddenError()
   }
   return profile
