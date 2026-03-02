@@ -48,10 +48,12 @@ export default async function HomePage() {
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
         <StatCard label="In progress" value={taskCount ?? 0} href="/tools/tasks?status=in_progress" icon={CheckSquare} />
-        <StatCard label="Done today" value={doneToday ?? 0} href="/tools/tasks?status=done" icon={CheckSquare} accent />
+        <StatCard label="Done today" value={doneToday ?? 0} href="/tools/tasks?status=done" icon={CheckSquare} />
         <StatCard label="Contacts" value={crmCount ?? 0} href="/tools/crm" icon={UserCircle} />
         <StatCard label="Library" value={libraryCount ?? 0} href="/tools/library" icon={BookOpen} />
       </div>
+
+      <div className="border-t border-border my-2" />
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {TOOLS.map(tool => {
@@ -73,13 +75,13 @@ export default async function HomePage() {
   )
 }
 
-function StatCard({ label, value, href, icon: Icon, accent }: { label: string; value: number; href: string; icon: React.ElementType; accent?: boolean }) {
+function StatCard({ label, value, href, icon: Icon }: { label: string; value: number; href: string; icon: React.ElementType }) {
   return (
     <Link href={href} className="rounded-xl border border-border bg-card p-4 hover:border-foreground/20 transition-colors block group">
       <div className="flex items-center justify-between mb-1">
         <Icon className="h-3.5 w-3.5 text-muted-foreground" />
       </div>
-      <p className={`text-2xl font-semibold tracking-tight ${accent ? 'text-green-500' : ''}`}>{value}</p>
+      <p className="text-2xl font-semibold tracking-tight">{value}</p>
       <p className="text-xs text-muted-foreground mt-0.5">{label}</p>
     </Link>
   )
