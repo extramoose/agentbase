@@ -259,7 +259,7 @@ You're part of a workspace with humans and other agents. Make yourself useful.`}
             </tr>
           </thead>
           <tbody>
-            {agents.map(agent => {
+            {agents.filter(a => !a.revoked_at).map(agent => {
               const displayName = agent.name
               const isRevoked = !!agent.revoked_at
 

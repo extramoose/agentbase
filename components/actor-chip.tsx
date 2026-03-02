@@ -9,6 +9,7 @@ type ActorDisplay = {
   id: string
   displayName: string
   avatar_url: string | null
+  revoked?: boolean
 }
 
 // Simple in-memory cache
@@ -41,11 +42,11 @@ export function ActorChip({ actorId, actorType, compact = false, nameOnly = fals
       if (actorType === 'agent') {
         const { data } = await supabase
           .from('agents')
-          .select('id, name, avatar_url')
+          .select('id, name, avatar_url, revoked_at')
           .eq('id', actorId)
           .single()
         if (data) {
-          const resolved = { id: data.id, displayName: data.name, avatar_url: data.avatar_url }
+          const resolved = { id: data.id, displayName: data.name, avatar_url: data.revoked_at ? null : data.avatar_url, revoked: !!data.revoked_at }
           actorCache.set(actorId, resolved)
           setActor(resolved)
           return
@@ -73,12 +74,12 @@ export function ActorChip({ actorId, actorType, compact = false, nameOnly = fals
       // Fallback: try agents table (actor_type not passed but actor is an agent)
       const { data: agent } = await supabase
         .from('agents')
-        .select('id, name, avatar_url')
+        .select('id, name, avatar_url, revoked_at')
         .eq('id', actorId)
         .single()
 
       if (agent) {
-        const resolved = { id: agent.id, displayName: agent.name, avatar_url: agent.avatar_url }
+        const resolved = { id: agent.id, displayName: agent.name, avatar_url: agent.revoked_at ? null : agent.avatar_url, revoked: !!agent.revoked_at }
         actorCache.set(actorId, resolved)
         setActor(resolved)
         return
@@ -101,7 +102,11 @@ export function ActorChip({ actorId, actorType, compact = false, nameOnly = fals
   const initials = displayName === '…' ? '?' : displayName.slice(0, 2).toUpperCase()
   const avatarSrc = actor?.avatar_url ?? null
 
-  const avatarContent = avatarSrc && !imgError ? (
+  const isRevoked = actor?.revoked === true
+
+  const avatarContent = isRevoked ? (
+    <AvatarFallback className="bg-transparent border border-border" />
+  ) : avatarSrc && !imgError ? (
     // eslint-disable-next-line @next/next/no-img-element
     <img
       src={avatarSrc}
