@@ -4,13 +4,14 @@ import { useState, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { AvatarUpload } from '@/components/avatar-upload'
 import { Avatar, AvatarImage } from '@/components/ui/avatar'
+import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { AVATAR_PRESETS } from '@/components/avatar-picker'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from '@/hooks/use-toast'
 import { formatDistanceToNow } from 'date-fns'
-import { Bot, Check, Copy, Loader2, Plus, Trash2, X } from 'lucide-react'
+import { Bot, Check, Copy, KeyRound, Loader2, Plus, Trash2, X } from 'lucide-react'
 
 type Agent = {
   id: string
@@ -47,6 +48,8 @@ export function AgentsClient({ agents: initialAgents, currentUserName, currentUs
     api_key: string | null
   } | null>(null)
   const [copied, setCopied] = useState(false)
+  const [regenerating, setRegenerating] = useState<string | null>(null)
+  const [modalAgent, setModalAgent] = useState<{ agent: Agent; api_key: string } | null>(null)
 
   const handleCreate = useCallback(async () => {
     if (!name.trim()) return
@@ -75,6 +78,7 @@ export function AgentsClient({ agents: initialAgents, currentUserName, currentUs
       }
       setAgents(prev => [newAgent, ...prev])
       setCreateResult({ agent: newAgent, api_key: json.api_key })
+      setModalAgent({ agent: newAgent, api_key: json.api_key })
       setName('')
       toast({ type: 'success', message: `Agent "${newAgent.name}" created` })
     } catch (err) {
@@ -127,6 +131,23 @@ export function AgentsClient({ agents: initialAgents, currentUserName, currentUs
     setTimeout(() => setCopied(false), 2000)
   }, [])
 
+  const handleRegenerate = useCallback(async (agent: Agent) => {
+    const confirmed = confirm(`Regenerate API key for ${agent.name}? The old key will stop working immediately.`)
+    if (!confirmed) return
+    setRegenerating(agent.id)
+    try {
+      const res = await fetch(`/api/admin/agents/${agent.id}/regenerate`, { method: 'POST' })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? 'Failed to regenerate key')
+      setModalAgent({ agent, api_key: json.api_key })
+      toast({ type: 'success', message: `New API key generated for ${agent.name}` })
+    } catch (err) {
+      toast({ type: 'error', message: err instanceof Error ? err.message : 'Failed to regenerate key' })
+    } finally {
+      setRegenerating(null)
+    }
+  }, [])
+
   return (
     <div className="space-y-4 sm:space-y-6">
       <div className="flex items-center justify-between gap-2">
@@ -173,40 +194,35 @@ export function AgentsClient({ agents: initialAgents, currentUserName, currentUs
         </div>
       )}
 
-      {/* Agent welcome screen */}
-      {createResult && (
-        <div className="rounded-xl border border-border p-6 sm:p-8 space-y-6">
-          <div className="flex justify-end">
-            <Button variant="ghost" size="icon-xs" onClick={() => { setCreateResult(null); setShowCreate(false) }}>
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
+      {/* Agent welcome modal */}
+      <Dialog open={!!modalAgent} onOpenChange={(open) => { if (!open) { setModalAgent(null); setCreateResult(null); setShowCreate(false) } }}>
+        <DialogContent className="sm:max-w-lg">
+          {modalAgent && (
+            <div className="space-y-6 pt-2">
+              {/* Avatar + welcome */}
+              <div className="flex flex-col items-center text-center space-y-3">
+                <Avatar className="h-24 w-24">
+                  <AvatarImage src={modalAgent.agent.avatar_url ?? '/avatars/avatar_anonymous.jpg'} alt={modalAgent.agent.name} />
+                </Avatar>
+                <h2 className="text-lg font-semibold">
+                  Welcome to AgentBase, {modalAgent.agent.name}!
+                </h2>
+              </div>
 
-          {/* Avatar + welcome */}
-          <div className="flex flex-col items-center text-center space-y-3">
-            <Avatar className="h-24 w-24">
-              <AvatarImage src={createResult.agent.avatar_url ?? '/avatars/avatar_anonymous.jpg'} alt={createResult.agent.name} />
-            </Avatar>
-            <h2 className="text-lg font-semibold">
-              Welcome to AgentBase, {createResult.agent.name}!
-            </h2>
-          </div>
+              {/* Agent type selector */}
+              <div className="flex items-center justify-center gap-2 flex-wrap">
+                <Badge className="bg-primary text-primary-foreground px-3 py-1 text-xs font-medium">OpenClaw</Badge>
+                <Badge variant="secondary" className="px-3 py-1 text-xs text-muted-foreground">MCP <span className="ml-1 text-[10px] opacity-60">soon</span></Badge>
+                <Badge variant="secondary" className="px-3 py-1 text-xs text-muted-foreground">Claude Code <span className="ml-1 text-[10px] opacity-60">soon</span></Badge>
+                <Badge variant="secondary" className="px-3 py-1 text-xs text-muted-foreground">Custom API <span className="ml-1 text-[10px] opacity-60">soon</span></Badge>
+              </div>
 
-          {/* Agent type selector */}
-          <div className="flex items-center justify-center gap-2 flex-wrap">
-            <Badge className="bg-primary text-primary-foreground px-3 py-1 text-xs font-medium">OpenClaw</Badge>
-            <Badge variant="secondary" className="px-3 py-1 text-xs text-muted-foreground">MCP <span className="ml-1 text-[10px] opacity-60">soon</span></Badge>
-            <Badge variant="secondary" className="px-3 py-1 text-xs text-muted-foreground">Claude Code <span className="ml-1 text-[10px] opacity-60">soon</span></Badge>
-            <Badge variant="secondary" className="px-3 py-1 text-xs text-muted-foreground">Custom API <span className="ml-1 text-[10px] opacity-60">soon</span></Badge>
-          </div>
+              {/* Copy prompt block */}
+              <div className="relative rounded-lg bg-muted/50 border border-border p-4">
+                <pre className="text-sm whitespace-pre-wrap break-words leading-relaxed text-foreground/90 pr-20">
+{`Hi ${modalAgent.agent.name}. Welcome to AgentBase.
 
-          {/* Copy prompt block */}
-          {createResult.api_key && (
-            <div className="relative rounded-lg bg-muted/50 border border-border p-4">
-              <pre className="text-sm whitespace-pre-wrap break-words leading-relaxed text-foreground/90">
-{`Hi ${createResult.agent.name}. Welcome to AgentBase.
-
-Your API key: ${createResult.api_key}
+Your API key: ${modalAgent.api_key}
 
 Base URL: ${typeof window !== 'undefined' ? window.location.origin : 'https://agentbase.hah.to'}
 
@@ -215,24 +231,21 @@ Use your key as a Bearer token in the Authorization header.
 Start by calling GET /api/schema — it contains every available endpoint and the full data model. Use it to understand the platform, then write yourself instructions so you remember how to use it.
 
 You're part of a workspace with humans and other agents. Make yourself useful.`}
-              </pre>
-              <Button
-                variant="outline"
-                size="sm"
-                className="absolute top-3 right-3"
-                onClick={() => handleCopy(`Hi ${createResult.agent.name}. Welcome to AgentBase.\n\nYour API key: ${createResult.api_key}\n\nBase URL: ${typeof window !== 'undefined' ? window.location.origin : 'https://agentbase.hah.to'}\n\nUse your key as a Bearer token in the Authorization header.\n\nStart by calling GET /api/schema — it contains every available endpoint and the full data model. Use it to understand the platform, then write yourself instructions so you remember how to use it.\n\nYou're part of a workspace with humans and other agents. Make yourself useful.`)}
-              >
-                {copied ? <Check className="h-3 w-3 mr-1" /> : <Copy className="h-3 w-3 mr-1" />}
-                {copied ? 'Copied' : 'Copy prompt'}
-              </Button>
+                </pre>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="absolute top-3 right-3"
+                  onClick={() => handleCopy(`Hi ${modalAgent.agent.name}. Welcome to AgentBase.\n\nYour API key: ${modalAgent.api_key}\n\nBase URL: ${typeof window !== 'undefined' ? window.location.origin : 'https://agentbase.hah.to'}\n\nUse your key as a Bearer token in the Authorization header.\n\nStart by calling GET /api/schema — it contains every available endpoint and the full data model. Use it to understand the platform, then write yourself instructions so you remember how to use it.\n\nYou're part of a workspace with humans and other agents. Make yourself useful.`)}
+                >
+                  {copied ? <Check className="h-3 w-3 mr-1" /> : <Copy className="h-3 w-3 mr-1" />}
+                  {copied ? 'Copied' : 'Copy prompt'}
+                </Button>
+              </div>
             </div>
           )}
-
-          {!createResult.api_key && (
-            <p className="text-xs text-muted-foreground text-center">No API key was returned.</p>
-          )}
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
 
       {/* Agents table */}
       <div className="rounded-lg border border-border overflow-x-auto">
@@ -297,20 +310,35 @@ You're part of a workspace with humans and other agents. Make yourself useful.`}
                   </td>
                   <td className="px-4 py-3">
                     {!isRevoked && (
-                      <Button
-                        variant="ghost"
-                        size="xs"
-                        className="text-destructive hover:text-destructive"
-                        onClick={() => handleRevoke(agent.id)}
-                        disabled={revoking === agent.id}
-                      >
-                        {revoking === agent.id ? (
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                        ) : (
-                          <Trash2 className="h-3 w-3" />
-                        )}
-                        Revoke
-                      </Button>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="xs"
+                          onClick={() => handleRegenerate(agent)}
+                          disabled={regenerating === agent.id}
+                        >
+                          {regenerating === agent.id ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <KeyRound className="h-3 w-3" />
+                          )}
+                          Regenerate
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="xs"
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => handleRevoke(agent.id)}
+                          disabled={revoking === agent.id}
+                        >
+                          {revoking === agent.id ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <Trash2 className="h-3 w-3" />
+                          )}
+                          Revoke
+                        </Button>
+                      </div>
                     )}
                     {isRevoked && isOwner && (
                       <Button
