@@ -343,7 +343,9 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
         ...(search.trim() ? { p_search: search.trim() } : {}),
       })
       if (cancelled) return
-      const results = (data ?? []) as ActivityLogEntry[]
+      const raw = (data ?? []) as ActivityLogEntry[]
+      const seen = new Set<string>()
+      const results = raw.filter(e => { if (seen.has(e.id)) return false; seen.add(e.id); return true })
       await resolveSeqIds(results)
       setEntries(results)
       offsetRef.current = results.length
@@ -374,7 +376,9 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
             ...(search.trim() ? { p_search: search.trim() } : {}),
           })
           .then(async ({ data }) => {
-            const results = (data ?? []) as ActivityLogEntry[]
+            const raw = (data ?? []) as ActivityLogEntry[]
+            const seen = new Set<string>()
+            const results = raw.filter(e => { if (seen.has(e.id)) return false; seen.add(e.id); return true })
             await resolveSeqIds(results)
             setEntries(results)
             offsetRef.current = results.length
