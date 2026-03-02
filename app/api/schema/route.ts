@@ -350,6 +350,7 @@ const API_SCHEMA = {
           assignee_id: { type: 'string', description: 'Filter by assignee UUID' },
           type: { type: 'string', description: 'Filter by type', enum: ['bug', 'improvement', 'feature'] },
           tag: { type: 'string', description: 'Filter by tag (exact match)' },
+          include: { type: 'string', description: 'Comma-separated includes. "activity" embeds activity array (only when ≤ 20 results)' },
         },
       },
       {
@@ -372,6 +373,7 @@ const API_SCHEMA = {
           q: { type: 'string', description: 'Search query (searches name, notes, url)' },
           type: { type: 'string', description: 'Filter by type', enum: ['favorite', 'flag', 'restaurant', 'note', 'idea', 'article'] },
           tag: { type: 'string', description: 'Filter by tag (exact match)' },
+          include: { type: 'string', description: 'Comma-separated includes. "activity" embeds activity array (only when ≤ 20 results)' },
         },
       },
       {
@@ -393,6 +395,7 @@ const API_SCHEMA = {
           limit: { type: 'number', default: '50', description: 'Items per page (max 200)' },
           q: { type: 'string', description: 'Search query (searches name, website, notes)' },
           tag: { type: 'string', description: 'Filter by tag (exact match)' },
+          include: { type: 'string', description: 'Comma-separated includes. "activity" embeds activity array (only when ≤ 20 results)' },
         },
       },
       {
@@ -414,6 +417,7 @@ const API_SCHEMA = {
           limit: { type: 'number', default: '50', description: 'Items per page (max 200)' },
           q: { type: 'string', description: 'Search query (searches name, email, title, notes)' },
           tag: { type: 'string', description: 'Filter by tag (exact match)' },
+          include: { type: 'string', description: 'Comma-separated includes. "activity" embeds activity array (only when ≤ 20 results)' },
         },
       },
       {
@@ -435,6 +439,7 @@ const API_SCHEMA = {
           limit: { type: 'number', default: '50', description: 'Items per page (max 200)' },
           q: { type: 'string', description: 'Search query (searches title, notes)' },
           tag: { type: 'string', description: 'Filter by tag (exact match)' },
+          include: { type: 'string', description: 'Comma-separated includes. "activity" embeds activity array (only when ≤ 20 results)' },
         },
       },
       {
