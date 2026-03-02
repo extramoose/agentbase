@@ -210,3 +210,7 @@ input[type="checkbox"].cb-dark:focus-visible {
 .animate-sticky-pulse {
   animation: sticky-pulse 3s ease-in-out;
 }
+
+/* Hide scrollbar for horizontal scroll containers on mobile */
+.scrollbar-none::-webkit-scrollbar { display: none; }
+.scrollbar-none { -ms-overflow-style: none; scrollbar-width: none; }
