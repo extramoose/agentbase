@@ -57,6 +57,17 @@ function SignInForm() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-background">
       <div className="w-full max-w-sm space-y-6 p-8 rounded-xl border border-border bg-card">
+        {/* Invite context */}
+        {searchParams.get('inviter') && (
+          <div className="rounded-lg bg-muted/50 border border-border p-4 text-center space-y-1">
+            <p className="text-sm font-medium">
+              {searchParams.get('inviter')} invited you to{' '}
+              <span className="font-semibold">{searchParams.get('workspace') ?? 'a workspace'}</span>
+            </p>
+            <p className="text-xs text-muted-foreground">Sign in to accept the invite</p>
+          </div>
+        )}
+
         <div className="space-y-2 text-center">
           <h1 className="text-2xl font-semibold tracking-tight">AgentBase</h1>
           <p className="text-sm text-muted-foreground">Your multi-agent Life OS</p>

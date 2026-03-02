@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from '@/hooks/use-toast'
 import { formatDistanceToNow } from 'date-fns'
-import { Check, ChevronDown, Loader2, Mail, Shield, ShieldAlert, Trash2, User } from 'lucide-react'
+import { Check, ChevronDown, Copy, Link, Loader2, Shield, ShieldAlert, Trash2, User } from 'lucide-react'
 
 type Invite = {
   id: string
@@ -47,13 +47,10 @@ interface UsersClientProps {
 export function UsersClient({ currentUserId }: UsersClientProps) {
   const [members, setMembers] = useState<Member[]>([])
   const [loading, setLoading] = useState(true)
-
-  // Invite state
   const [invites, setInvites] = useState<Invite[]>([])
-  const [inviteEmail, setInviteEmail] = useState('')
-  const [inviteRole, setInviteRole] = useState<'member' | 'admin'>('member')
-  const [sending, setSending] = useState(false)
-  const [sent, setSent] = useState(false)
+  const [inviteUrl, setInviteUrl] = useState<string | null>(null)
+  const [generating, setGenerating] = useState(false)
+  const [copied, setCopied] = useState(false)
 
   const fetchInvites = useCallback(async () => {
     const res = await fetch('/api/invites/list')
@@ -73,9 +70,7 @@ export function UsersClient({ currentUserId }: UsersClientProps) {
   }, [fetchInvites])
 
   const changeRole = useCallback(async (userId: string, newRole: 'member' | 'admin') => {
-    // Optimistic update
     setMembers(prev => prev.map(m => m.id === userId ? { ...m, role: newRole } : m))
-
     try {
       const res = await fetch(`/api/admin/users/${userId}`, {
         method: 'PATCH',
@@ -83,42 +78,15 @@ export function UsersClient({ currentUserId }: UsersClientProps) {
         body: JSON.stringify({ role: newRole }),
       })
       const json = await res.json()
-      if (!res.ok) {
-        throw new Error(json.error ?? 'Failed to update role')
-      }
+      if (!res.ok) throw new Error(json.error ?? 'Failed to update role')
       toast({ type: 'success', message: `Role updated to ${newRole}` })
     } catch (err) {
-      // Rollback
       const res = await fetch('/api/admin/users')
       const json = await res.json()
       if (res.ok) setMembers(json.data ?? [])
       toast({ type: 'error', message: err instanceof Error ? err.message : 'Failed to update role' })
     }
   }, [])
-
-  const handleSendEmailInvite = useCallback(async (e: React.FormEvent) => {
-    e.preventDefault()
-    setSending(true)
-    setSent(false)
-    try {
-      const res = await fetch('/api/invites/send-email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: inviteEmail, role: inviteRole }),
-      })
-      const json = await res.json()
-      if (!res.ok) throw new Error(json.error ?? 'Failed to send invite')
-      setSent(true)
-      setInviteEmail('')
-      setInviteRole('member')
-      await fetchInvites()
-      toast({ type: 'success', message: `Invite sent to ${inviteEmail}` })
-    } catch (err) {
-      toast({ type: 'error', message: err instanceof Error ? err.message : 'Failed to send invite' })
-    } finally {
-      setSending(false)
-    }
-  }, [inviteEmail, inviteRole, fetchInvites])
 
   const handleRevokeInvite = useCallback(async (inviteId: string) => {
     try {
@@ -152,8 +120,33 @@ export function UsersClient({ currentUserId }: UsersClientProps) {
     }
   }, [])
 
+  const handleGenerateInvite = useCallback(async () => {
+    setGenerating(true)
+    setCopied(false)
+    setInviteUrl(null)
+    try {
+      const res = await fetch('/api/invites/create', { method: 'POST' })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? 'Failed to create invite')
+      const token = json.data?.token ?? json.token
+      setInviteUrl(`${window.location.origin}/invite/${token}`)
+      await fetchInvites()
+    } catch (err) {
+      toast({ type: 'error', message: err instanceof Error ? err.message : 'Failed to create invite' })
+    } finally {
+      setGenerating(false)
+    }
+  }, [fetchInvites])
+
+  const handleCopy = useCallback(() => {
+    if (!inviteUrl) return
+    navigator.clipboard.writeText(inviteUrl)
+    setCopied(true)
+    toast({ type: 'success', message: 'Copied to clipboard' })
+    setTimeout(() => setCopied(false), 2000)
+  }, [inviteUrl])
+
   const pendingInvites = invites.filter(i => !i.accepted_at && !i.revoked_at)
-  const acceptedInvites = invites.filter(i => i.accepted_at)
 
   if (loading) {
     return (
@@ -201,15 +194,17 @@ export function UsersClient({ currentUserId }: UsersClientProps) {
                             m.id === member.id ? { ...m, avatar_url: newUrl } : m
                           ))
                         }
+                        
                       />
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium truncate">{displayName}</p>
-                        <p className="text-xs text-muted-foreground truncate">{member.email}</p>
+                      <div>
+                        <p className="text-sm font-medium">{displayName}</p>
+                        <p className="text-xs text-muted-foreground">{member.email}</p>
                       </div>
                     </div>
                   </td>
                   <td className="px-4 py-3">
-                    <Badge variant="secondary" className={config.color}>
+                    <Badge variant="secondary" className={`text-xs ${config.color}`}>
+                      <config.icon className="h-3 w-3 mr-1" />
                       {config.label}
                     </Badge>
                   </td>
@@ -219,32 +214,19 @@ export function UsersClient({ currentUserId }: UsersClientProps) {
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    {isSelf || isOwner ? (
-                      <span className="text-xs text-muted-foreground">
-                        {isSelf ? 'You' : '—'}
-                      </span>
-                    ) : (
+                    {!isSelf && !isOwner && (
                       <div className="flex items-center gap-1">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="sm" className="h-7 text-xs">
-                              Change role
-                              <ChevronDown className="ml-1 h-3 w-3" />
+                              Role <ChevronDown className="h-3 w-3 ml-1" />
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              onClick={() => changeRole(member.id, 'member')}
-                              disabled={member.role === 'member'}
-                            >
-                              <User className="mr-2 h-4 w-4" />
+                            <DropdownMenuItem onClick={() => changeRole(member.id, 'member')}>
                               Member
                             </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => changeRole(member.id, 'admin')}
-                              disabled={member.role === 'admin'}
-                            >
-                              <Shield className="mr-2 h-4 w-4" />
+                            <DropdownMenuItem onClick={() => changeRole(member.id, 'admin')}>
                               Admin
                             </DropdownMenuItem>
                           </DropdownMenuContent>
@@ -270,48 +252,31 @@ export function UsersClient({ currentUserId }: UsersClientProps) {
         )}
       </div>
 
-      {/* Invite */}
-      <h2 className="text-lg font-semibold mt-8">Invite</h2>
+      {/* Invite link */}
+      <div className="space-y-3">
+        <h2 className="text-lg font-semibold">Invite</h2>
+        <p className="text-sm text-muted-foreground">Generate a one-time invite link to share with someone.</p>
 
-      <form onSubmit={handleSendEmailInvite} className="flex flex-col sm:flex-row items-start sm:items-end gap-3">
-        <div className="flex-1 w-full sm:w-auto">
-          <label htmlFor="invite-email" className="text-xs font-medium text-muted-foreground mb-1 block">
-            Email address
-          </label>
-          <Input
-            id="invite-email"
-            type="email"
-            placeholder="colleague@company.com"
-            value={inviteEmail}
-            onChange={e => { setInviteEmail(e.target.value); setSent(false) }}
-            required
-          />
-        </div>
-        <div className="w-full sm:w-[140px]">
-          <label htmlFor="invite-role" className="text-xs font-medium text-muted-foreground mb-1 block">
-            Role
-          </label>
-          <select
-            id="invite-role"
-            value={inviteRole}
-            onChange={e => setInviteRole(e.target.value as 'member' | 'admin')}
-            className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-          >
-            <option value="member">Member</option>
-            <option value="admin">Admin</option>
-          </select>
-        </div>
-        <Button type="submit" disabled={sending || !inviteEmail} size="sm" className="h-9">
-          {sending ? (
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          ) : sent ? (
-            <Check className="mr-2 h-4 w-4" />
+        <div className="flex items-center gap-2">
+          {inviteUrl ? (
+            <>
+              <Input value={inviteUrl} readOnly className="text-sm font-mono" />
+              <Button variant="outline" size="sm" className="h-9 shrink-0" onClick={handleCopy}>
+                {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+              </Button>
+            </>
           ) : (
-            <Mail className="mr-2 h-4 w-4" />
+            <Button onClick={handleGenerateInvite} disabled={generating} size="sm" className="h-9">
+              {generating ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Link className="mr-2 h-4 w-4" />
+              )}
+              Generate invite link
+            </Button>
           )}
-          {sending ? 'Sending...' : sent ? 'Sent' : 'Send invite'}
-        </Button>
-      </form>
+        </div>
+      </div>
 
       {/* Pending Invites */}
       {pendingInvites.length > 0 && (
@@ -321,11 +286,6 @@ export function UsersClient({ currentUserId }: UsersClientProps) {
             {pendingInvites.map(invite => (
               <div key={invite.id} className="flex items-center justify-between px-4 py-2">
                 <div className="flex items-center gap-3">
-                  {invite.email ? (
-                    <span className="text-sm">{invite.email}</span>
-                  ) : (
-                    <span className="text-sm text-muted-foreground">Link invite</span>
-                  )}
                   <Badge variant="secondary" className="text-xs">Pending</Badge>
                   <span suppressHydrationWarning className="text-xs text-muted-foreground">
                     {formatDistanceToNow(new Date(invite.created_at), { addSuffix: true })}
@@ -339,30 +299,6 @@ export function UsersClient({ currentUserId }: UsersClientProps) {
                 >
                   Revoke
                 </Button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Accepted Invites */}
-      {acceptedInvites.length > 0 && (
-        <div>
-          <h3 className="text-sm font-medium text-muted-foreground mb-2">Accepted invites</h3>
-          <div className="rounded-lg border border-border divide-y divide-border">
-            {acceptedInvites.map(invite => (
-              <div key={invite.id} className="flex items-center justify-between px-4 py-2">
-                <div className="flex items-center gap-3">
-                  {invite.email ? (
-                    <span className="text-sm">{invite.email}</span>
-                  ) : (
-                    <span className="text-sm text-muted-foreground">Link invite</span>
-                  )}
-                  <Badge variant="secondary" className="text-xs bg-green-500/20 text-green-400">Accepted</Badge>
-                  <span suppressHydrationWarning className="text-xs text-muted-foreground">
-                    {invite.accepted_at && formatDistanceToNow(new Date(invite.accepted_at), { addSuffix: true })}
-                  </span>
-                </div>
               </div>
             ))}
           </div>

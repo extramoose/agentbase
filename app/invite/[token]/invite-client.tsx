@@ -1,12 +1,10 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 import { toast } from '@/hooks/use-toast'
 
 export function InviteClient({ token }: { token: string }) {
-  const router = useRouter()
   const [error, setError] = useState('')
 
   useEffect(() => {
@@ -29,7 +27,6 @@ export function InviteClient({ token }: { token: string }) {
           message: `Joined ${workspace_name ?? 'workspace'}`,
         })
 
-        // Hard nav to pick up new workspace context
         window.location.href = '/tools/tasks'
       } catch {
         setError('Something went wrong. Please try again.')
@@ -37,7 +34,7 @@ export function InviteClient({ token }: { token: string }) {
     }
 
     acceptInvite()
-  }, [token, router])
+  }, [token])
 
   if (error) {
     return (
@@ -47,7 +44,7 @@ export function InviteClient({ token }: { token: string }) {
           <p className="text-sm text-destructive">{error}</p>
           <button
             className="text-sm text-muted-foreground hover:text-foreground underline underline-offset-4"
-            onClick={() => window.location.href = '/'}
+            onClick={() => { window.location.href = '/' }}
           >
             Go to dashboard
           </button>
