@@ -752,6 +752,8 @@ function NewTaskShelf({
   const [assigneeId, setAssigneeId] = useState<string | null>(currentUserId ?? null)
   const [assigneeType, setAssigneeType] = useState<string | null>(currentUserId ? 'human' : null)
   const [tags, setTags] = useState<string[]>([])
+  const [dueDate, setDueDate] = useState<string>('')
+  const [taskType, setTaskType] = useState<TaskType | ''>('')
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -777,6 +779,8 @@ function NewTaskShelf({
           status,
           assignee_id: assigneeId ?? 'unassigned',
           tags,
+          due_date: dueDate || undefined,
+          type: taskType || undefined,
         }),
       })
       const json = await res.json()
@@ -883,6 +887,36 @@ function NewTaskShelf({
                   setAssigneeType(actor?.type ?? null)
                 }}
               />
+            </div>
+
+            {/* Due Date + Type row */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs text-muted-foreground font-medium mb-1 block">
+                  Due Date
+                </label>
+                <input
+                  type="date"
+                  value={dueDate}
+                  onChange={(e) => setDueDate(e.target.value)}
+                  className="w-full h-9 rounded-md border border-input bg-transparent px-3 text-sm focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] outline-none"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground font-medium mb-1 block">
+                  Type
+                </label>
+                <select
+                  value={taskType}
+                  onChange={(e) => setTaskType(e.target.value as TaskType | '')}
+                  className="w-full h-9 rounded-md border border-input bg-transparent px-3 text-sm focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] outline-none"
+                >
+                  <option value="">None</option>
+                  {Object.entries(TASK_TYPE_CONFIG).map(([key, cfg]) => (
+                    <option key={key} value={key}>{cfg.label}</option>
+                  ))}
+                </select>
+              </div>
             </div>
 
             {/* Description */}
