@@ -5,7 +5,6 @@ import { useSearchParams } from 'next/navigation'
 import { Avatar, AvatarImage } from '@/components/ui/avatar'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { AGENT_AVATAR_PRESETS } from '@/components/avatar-picker'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from '@/hooks/use-toast'
@@ -180,14 +179,6 @@ export function AgentsClient({ agents: initialAgents, currentUserName, currentUs
                 <h2 className="text-lg font-semibold">
                   Welcome to AgentBase, {modalAgent.agent.name}!
                 </h2>
-              </div>
-
-              {/* Agent type selector */}
-              <div className="flex items-center justify-center gap-2 flex-wrap">
-                <Badge className="bg-primary text-primary-foreground px-3 py-1 text-xs font-medium">OpenClaw</Badge>
-                <Badge variant="secondary" className="px-3 py-1 text-xs text-muted-foreground">MCP <span className="ml-1 text-[10px] opacity-60">soon</span></Badge>
-                <Badge variant="secondary" className="px-3 py-1 text-xs text-muted-foreground">Claude Code <span className="ml-1 text-[10px] opacity-60">soon</span></Badge>
-                <Badge variant="secondary" className="px-3 py-1 text-xs text-muted-foreground">Custom API <span className="ml-1 text-[10px] opacity-60">soon</span></Badge>
               </div>
 
               {/* Copy prompt block */}
