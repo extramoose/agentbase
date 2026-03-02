@@ -244,6 +244,7 @@ export function AgentsClient({ agents: initialAgents, currentUserName, currentUs
                         currentUrl={agent.avatar_url}
                         name={displayName}
                         uploadUrl={`/api/admin/agents/${agent.id}/avatar`}
+                        presetUrl={`/api/admin/agents/${agent.id}/avatar-preset`}
                         size="sm"
                         onSuccess={(newUrl) =>
                           setAgents(prev => prev.map(a =>
