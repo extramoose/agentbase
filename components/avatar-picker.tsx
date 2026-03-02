@@ -78,41 +78,38 @@ export function AvatarPicker({ selected, onSelect, onUpload, mode = 'agent', goo
     ]
 
     return (
-      <div className="space-y-3">
-        <div className="flex items-center gap-3">
-          {userOptions.map(({ url, label }) => (
-            <button
-              key={url}
-              type="button"
-              onClick={() => onSelect(url)}
-              className={cn(
-                'rounded-full h-14 w-14 overflow-hidden focus:outline-none transition-all',
-                selected === url
-                  ? 'ring-[1.5px] ring-white'
-                  : 'hover:opacity-80',
-              )}
-              title={label}
-            >
-              <Avatar className="h-full w-full">
-                <AvatarImage src={url} alt={label} />
-              </Avatar>
-            </button>
-          ))}
-          {/* Upload button as a circle */}
+      <div className="inline-flex items-center gap-3">
+        {userOptions.map(({ url, label }) => (
           <button
+            key={url}
             type="button"
-            onClick={() => inputRef.current?.click()}
-            disabled={uploading}
-            className="h-14 w-14 rounded-full border-2 border-dashed border-border flex items-center justify-center hover:border-foreground/40 transition-colors"
-            title="Upload custom"
-          >
-            {uploading ? (
-              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-            ) : (
-              <Upload className="h-4 w-4 text-muted-foreground" />
+            onClick={() => onSelect(url)}
+            className={cn(
+              'rounded-full h-12 w-12 overflow-hidden focus:outline-none transition-all',
+              selected === url
+                ? 'ring-[1.5px] ring-white'
+                : 'hover:opacity-80',
             )}
+            title={label}
+          >
+            <Avatar className="h-full w-full">
+              <AvatarImage src={url} alt={label} />
+            </Avatar>
           </button>
-        </div>
+        ))}
+        <button
+          type="button"
+          onClick={() => inputRef.current?.click()}
+          disabled={uploading}
+          className="h-12 w-12 rounded-full border-2 border-dashed border-border flex items-center justify-center hover:border-foreground/40 transition-colors"
+          title="Upload custom"
+        >
+          {uploading ? (
+            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+          ) : (
+            <Upload className="h-4 w-4 text-muted-foreground" />
+          )}
+        </button>
         <input
           ref={inputRef}
           type="file"
