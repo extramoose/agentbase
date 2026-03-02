@@ -3,6 +3,7 @@
 import { useState, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { AvatarUpload } from '@/components/avatar-upload'
+import { Avatar, AvatarImage } from '@/components/ui/avatar'
 import { AVATAR_PRESETS } from '@/components/avatar-picker'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -172,50 +173,63 @@ export function AgentsClient({ agents: initialAgents, currentUserName, currentUs
         </div>
       )}
 
-      {/* API key result */}
+      {/* Agent welcome screen */}
       {createResult && (
-        <div className="rounded-lg border border-border p-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-medium text-green-400">
-              Agent &quot;{createResult.agent.name}&quot; created
-            </h2>
+        <div className="rounded-xl border border-border p-6 sm:p-8 space-y-6">
+          <div className="flex justify-end">
             <Button variant="ghost" size="icon-xs" onClick={() => { setCreateResult(null); setShowCreate(false) }}>
               <X className="h-4 w-4" />
             </Button>
           </div>
-          {createResult.api_key ? (
-            <>
-              <div className="relative">
-                <pre className="rounded-md bg-muted p-3 text-xs font-mono break-all whitespace-pre-wrap">
-                  {createResult.api_key}
-                </pre>
-                <Button
-                  variant="ghost"
-                  size="icon-xs"
-                  className="absolute top-2 right-2"
-                  onClick={() => handleCopy(createResult.api_key!)}
-                >
-                  {copied ? <Check className="h-3 w-3 text-green-400" /> : <Copy className="h-3 w-3" />}
-                </Button>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Paste this as <code className="text-xs bg-muted px-1 rounded">AGENT_API_KEY</code> in the agent&apos;s environment config. It will not be shown again.
-              </p>
-              <div className="mt-4 rounded-md bg-muted/50 p-3 space-y-2">
-                <p className="text-xs font-medium">Quick setup</p>
-                <ol className="text-xs text-muted-foreground space-y-1.5 list-decimal list-inside">
-                  <li>Copy the API key above</li>
-                  <li>Add it to your agent&apos;s environment as <code className="bg-muted px-1 rounded">AGENT_API_KEY</code></li>
-                  <li>Set <code className="bg-muted px-1 rounded">AGENTBASE_URL</code> to your AgentBase URL</li>
-                  <li>Your agent can now create tasks, update entities, and read data via the API</li>
-                </ol>
-                <p className="text-[11px] text-muted-foreground/70 mt-2">
-                  Agents authenticate with <code className="bg-muted px-0.5 rounded">Authorization: Bearer YOUR_KEY</code>. Rate limit: 300 req/min.
-                </p>
-              </div>
-            </>
-          ) : (
-            <p className="text-xs text-muted-foreground">No API key was returned.</p>
+
+          {/* Avatar + welcome */}
+          <div className="flex flex-col items-center text-center space-y-3">
+            <Avatar className="h-24 w-24">
+              <AvatarImage src={createResult.agent.avatar_url ?? '/avatars/avatar_anonymous.jpg'} alt={createResult.agent.name} />
+            </Avatar>
+            <h2 className="text-lg font-semibold">
+              Welcome to AgentBase, {createResult.agent.name}!
+            </h2>
+          </div>
+
+          {/* Agent type selector */}
+          <div className="flex items-center justify-center gap-2 flex-wrap">
+            <Badge className="bg-primary text-primary-foreground px-3 py-1 text-xs font-medium">OpenClaw</Badge>
+            <Badge variant="secondary" className="px-3 py-1 text-xs text-muted-foreground">MCP <span className="ml-1 text-[10px] opacity-60">soon</span></Badge>
+            <Badge variant="secondary" className="px-3 py-1 text-xs text-muted-foreground">Claude Code <span className="ml-1 text-[10px] opacity-60">soon</span></Badge>
+            <Badge variant="secondary" className="px-3 py-1 text-xs text-muted-foreground">Custom API <span className="ml-1 text-[10px] opacity-60">soon</span></Badge>
+          </div>
+
+          {/* Copy prompt block */}
+          {createResult.api_key && (
+            <div className="relative rounded-lg bg-muted/50 border border-border p-4">
+              <pre className="text-sm whitespace-pre-wrap break-words leading-relaxed text-foreground/90">
+{`Hi ${createResult.agent.name}. Welcome to AgentBase.
+
+Your API key: ${createResult.api_key}
+
+Base URL: ${typeof window !== 'undefined' ? window.location.origin : 'https://agentbase.hah.to'}
+
+Use your key as a Bearer token in the Authorization header.
+
+Start by calling GET /api/schema — it contains every available endpoint and the full data model. Use it to understand the platform, then write yourself instructions so you remember how to use it.
+
+You're part of a workspace with humans and other agents. Make yourself useful.`}
+              </pre>
+              <Button
+                variant="outline"
+                size="sm"
+                className="absolute top-3 right-3"
+                onClick={() => handleCopy(`Hi ${createResult.agent.name}. Welcome to AgentBase.\n\nYour API key: ${createResult.api_key}\n\nBase URL: ${typeof window !== 'undefined' ? window.location.origin : 'https://agentbase.hah.to'}\n\nUse your key as a Bearer token in the Authorization header.\n\nStart by calling GET /api/schema — it contains every available endpoint and the full data model. Use it to understand the platform, then write yourself instructions so you remember how to use it.\n\nYou're part of a workspace with humans and other agents. Make yourself useful.`)}
+              >
+                {copied ? <Check className="h-3 w-3 mr-1" /> : <Copy className="h-3 w-3 mr-1" />}
+                {copied ? 'Copied' : 'Copy prompt'}
+              </Button>
+            </div>
+          )}
+
+          {!createResult.api_key && (
+            <p className="text-xs text-muted-foreground text-center">No API key was returned.</p>
           )}
         </div>
       )}
