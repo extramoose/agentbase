@@ -1,14 +1,14 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useTaskFilters } from '@/hooks/use-task-filters'
 import { PageHeader } from '@/components/page-header'
 import { StickiesView } from '@/components/stickies-view'
-import { EntityShelf } from '@/components/entity-client/entity-shelf'
-import { TaskShelfContent, type Task } from '@/app/(shell)/tasks/tasks-client'
+import { type Task } from '@/app/(shell)/tasks/tasks-client'
 import { Button } from '@/components/ui/button'
-import { Trash2, Loader2, X } from 'lucide-react'
+import { Loader2, X } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { DateInput } from '@/components/ui/date-input'
 import { AssigneePicker } from '@/components/assignee-picker'
@@ -259,8 +259,8 @@ export function DashboardClient({
 }) {
   const [tasks, setTasks] = useState<Task[]>(initialTasks)
   const [recentlyChanged, setRecentlyChanged] = useState<Set<string>>(new Set())
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [creatingTask, setCreatingTask] = useState(false)
+  const router = useRouter()
 
   const {
     facePile,
@@ -313,7 +313,6 @@ export function DashboardClient({
             }
             return prev.map((t) => (t.id === updated.id ? updated : t))
           })
-          setSelectedTask((prev) => (prev && prev.id === updated.id ? updated : prev))
         }
       )
       .on(
@@ -322,7 +321,6 @@ export function DashboardClient({
         (payload) => {
           const deletedId = (payload.old as { id: string }).id
           setTasks((prev) => prev.filter((t) => t.id !== deletedId))
-          setSelectedTask((prev) => (prev && prev.id === deletedId ? null : prev))
         }
       )
       .subscribe()
@@ -361,14 +359,10 @@ export function DashboardClient({
   const filteredTasks = useMemo(() => applyFilters(tasks), [tasks, applyFilters])
 
   const handleTaskClick = useCallback((task: Task | { id: string }) => {
-    // StickiesView passes minimal task objects — find full task
+    // Find full task to get ticket_id for the URL
     const full = tasks.find((t) => t.id === task.id)
-    if (full) setSelectedTask(full)
-  }, [tasks])
-
-  const handleShelfClose = useCallback(() => {
-    setSelectedTask(null)
-  }, [])
+    if (full) router.push(`/tasks/${full.ticket_id}`)
+  }, [tasks, router])
 
   return (
     <div className="flex flex-col h-full">
@@ -394,47 +388,6 @@ export function DashboardClient({
         recentlyChanged={recentlyChanged}
       />
 
-      {/* Task detail shelf */}
-      {selectedTask && (
-        <EntityShelf
-          entity={selectedTask}
-          entityType="task"
-          onClose={handleShelfClose}
-          footer={
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={async () => {
-                if (!window.confirm('Delete this task? This cannot be undone.')) return
-                try {
-                  const res = await fetch('/api/commands/delete-entity', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ table: 'tasks', id: selectedTask.id }),
-                  })
-                  if (!res.ok) {
-                    const json = await res.json()
-                    throw new Error(json.error ?? 'Delete failed')
-                  }
-                  handleShelfClose()
-                } catch (err) {
-                  toast({
-                    type: 'error',
-                    message: err instanceof Error ? err.message : 'Delete failed',
-                  })
-                }
-              }}
-              className="text-muted-foreground hover:text-red-400"
-            >
-              <Trash2 className="h-4 w-4 mr-1" />
-              Delete task
-            </Button>
-          }
-        >
-          <TaskShelfContent task={selectedTask} />
-        </EntityShelf>
-      )}
-
       {/* New task creation shelf */}
       {creatingTask && (
         <NewTaskShelf
@@ -445,7 +398,8 @@ export function DashboardClient({
               prev.some((t) => t.id === created.id) ? prev : [created, ...prev]
             )
             setCreatingTask(false)
-            setSelectedTask(created)
+            // Open the task shelf via intercepting route
+            router.push(`/tasks/${created.ticket_id}`)
           }}
         />
       )}

@@ -6,8 +6,10 @@ import { CmdK } from '@/components/cmd-k'
 
 export default async function ShellLayout({
   children,
+  shelf,
 }: {
   children: React.ReactNode
+  shelf: React.ReactNode
 }) {
   const profile = await getUserProfile()
 
@@ -29,6 +31,7 @@ export default async function ShellLayout({
       <MobileShell profile={profile} workspaces={workspaces ?? []}>
         {children}
       </MobileShell>
+      {shelf}
       <CmdK />
     </>
   )

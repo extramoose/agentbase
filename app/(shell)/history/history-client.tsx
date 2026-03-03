@@ -1,10 +1,11 @@
 'use client'
 
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { ActorChip } from '@/components/actor-chip'
 import { SearchFilterBar } from '@/components/search-filter-bar'
-import { EntityShelf } from '@/components/entity-client/entity-shelf'
+
 import { Badge } from '@/components/ui/badge'
 import { formatDistanceToNow, isToday, isYesterday, format, addDays } from 'date-fns'
 import { ChevronLeft, ChevronRight, Loader2, Plus, Minus } from 'lucide-react'
@@ -14,8 +15,6 @@ import {
   type ActivityLogEntry,
 } from '@/lib/format-activity'
 import { MarkdownRenderer } from '@/components/markdown-renderer'
-import { type BaseEntity, type EntityType } from '@/types/entities'
-import { TaskShelfContent, type Task } from '@/app/(shell)/tasks/tasks-client'
 
 /** Maps entity_type (table name) to the front-end path prefix */
 function getEntityPath(entityType: string): string {
@@ -59,9 +58,6 @@ function formatEntityBadge(type: string, seqId: number | undefined): string {
   return seqId != null ? `${singular} #${seqId}` : singular
 }
 
-const TABLE_TO_ENTITY_TYPE: Record<string, EntityType> = {
-  tasks: 'task',
-}
 
 // ---------------------------------------------------------------------------
 // Consecutive event grouping — same actor + event type + entity type within 5 min
@@ -237,12 +233,7 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
   const [selectedDate, setSelectedDate] = useState(new Date())
   const supabase = createClient()
 
-  // Inline shelf state
-  const [shelfData, setShelfData] = useState<{
-    entity: BaseEntity
-    entityType: EntityType
-    label: string
-  } | null>(null)
+  const router = useRouter()
 
   // Expand/collapse state for consecutive event groups
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
@@ -416,25 +407,9 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
     })
   }, [])
 
-  const openShelf = useCallback(async (entityId: string, entityType: string) => {
-    const normalized = normalizeEntityType(entityType)
-    const mappedType = TABLE_TO_ENTITY_TYPE[normalized]
-    if (!mappedType) return
-    const { data } = await supabase.from(normalized).select('*').eq('id', entityId).single()
-    if (!data) return
-    const entity = data as BaseEntity
-    const label = (data as Record<string, unknown>).title as string
-      ?? (data as Record<string, unknown>).name as string
-      ?? ''
-    setShelfData({ entity, entityType: mappedType, label })
-  }, [supabase])
-
   function handleEntityClick(entry: ActivityLogEntry) {
-    const normalized = normalizeEntityType(entry.entity_type)
-    if (!getEntityPath(normalized)) return
     const seqId = seqIdMap.get(entry.entity_id)
-    if (seqId == null) return
-    openShelf(entry.entity_id, entry.entity_type)
+    if (seqId != null) router.push(`/tasks/${seqId}`)
   }
 
   function renderSingleEntry(entry: ActivityLogEntry) {
@@ -678,21 +653,7 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
         )}
       </div>
 
-      {/* Inline entity shelf */}
-      {shelfData && (
-        <EntityShelf
-          entity={shelfData.entity}
-          entityType={shelfData.entityType}
-          onClose={() => setShelfData(null)}
-          title={shelfData.label}
-        >
-          {shelfData.entityType === 'task' && (
-            <TaskShelfContent
-              task={shelfData.entity as Task}
-            />
-          )}
-        </EntityShelf>
-      )}
+
     </div>
   )
 }

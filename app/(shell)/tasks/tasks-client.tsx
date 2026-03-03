@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import {
   DndContext,
   DragOverlay,
@@ -20,10 +20,10 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { GripVertical, Plus, ChevronDown, ChevronRight, AlertCircle, ArrowUp, Minus, ArrowDown, X, Trash2, Loader2, Square, CheckSquare } from 'lucide-react'
+import { GripVertical, Plus, ChevronDown, ChevronRight, AlertCircle, ArrowUp, Minus, ArrowDown, X, Loader2, Square, CheckSquare } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { SearchFilterBar } from '@/components/search-filter-bar'
-import { EntityShelf } from '@/components/entity-client/entity-shelf'
+
 import { PageHeader } from '@/components/page-header'
 import { useTaskFilters } from '@/hooks/use-task-filters'
 import { toast } from '@/hooks/use-toast'
@@ -886,15 +886,14 @@ const BASE_PATH = '/tasks'
 export function TasksClient({
   initialTasks,
   currentUser: _currentUser,
-  initialSelectedTask,
   workspaceId,
 }: {
   initialTasks: Task[]
   currentUser: CurrentUser
-  initialSelectedTask?: Task
   workspaceId: string
 }) {
   const searchParams = useSearchParams()
+  const router = useRouter()
 
   const {
     facePile,
@@ -927,17 +926,6 @@ export function TasksClient({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [mounted, setMounted] = useState(false)
   const [activeDragId, setActiveDragId] = useState<string | null>(null)
-  const [selectedTask, setSelectedTask] = useState<Task | null>(() => {
-    if (initialSelectedTask) return initialSelectedTask
-    const idParam = searchParams.get('id')
-    if (idParam) {
-      const n = Number(idParam)
-      if (!Number.isNaN(n)) {
-        return initialTasks.find((t) => (t.seq_id ?? t.ticket_id) === n) ?? null
-      }
-    }
-    return null
-  })
   const [selectedTag, setSelectedTag] = useState<string | null>(
     () => searchParams.get('tag') ?? null
   )
@@ -993,43 +981,11 @@ export function TasksClient({
       .map(([tag]) => tag)
   }, [tasks, applyFilters, statusFilter, typeFilter, search])
 
-  // ----- Shelf open/close with URL sync (?id=seq_id via pushState) -----
+  // ----- Task click → navigate to /tasks/[id] (intercepted by @shelf) -----
 
   const handleTaskClick = useCallback((task: Task) => {
-    setSelectedTask(task)
-    const params = new URLSearchParams(window.location.search)
-    params.set('id', String(task.seq_id ?? task.ticket_id))
-    const qs = params.toString()
-    window.history.pushState(null, '', `${BASE_PATH}${qs ? `?${qs}` : ''}`)
-  }, [])
-
-  const handleShelfClose = useCallback(() => {
-    setSelectedTask(null)
-    const params = new URLSearchParams(window.location.search)
-    params.delete('id')
-    const qs = params.toString()
-    window.history.pushState(null, '', `${BASE_PATH}${qs ? `?${qs}` : ''}`)
-  }, [])
-
-  // Handle browser back/forward button
-  useEffect(() => {
-    const handler = () => {
-      const idParam = new URLSearchParams(window.location.search).get('id')
-      if (idParam) {
-        const n = Number(idParam)
-        if (!Number.isNaN(n)) {
-          const task = tasks.find((t) => (t.seq_id ?? t.ticket_id) === n)
-          if (task) {
-            setSelectedTask(task)
-            return
-          }
-        }
-      }
-      setSelectedTask(null)
-    }
-    window.addEventListener('popstate', handler)
-    return () => window.removeEventListener('popstate', handler)
-  }, [tasks])
+    router.push(`/tasks/${task.ticket_id}`)
+  }, [router])
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
@@ -1066,8 +1022,6 @@ export function TasksClient({
         (payload) => {
           const updated = payload.new as Task
           setTasks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)))
-          // Also update selectedTask if it's the one being updated
-          setSelectedTask((prev) => (prev && prev.id === updated.id ? updated : prev))
         }
       )
       .on(
@@ -1085,8 +1039,6 @@ export function TasksClient({
             next.delete(deletedId)
             return next
           })
-          // Close shelf if the deleted task was open
-          setSelectedTask((prev) => (prev && prev.id === deletedId ? null : prev))
         }
       )
       .subscribe()
@@ -1695,47 +1647,6 @@ export function TasksClient({
         </div>
       </>
 
-      {/* Task detail shelf (EntityShelf from S1) */}
-      {selectedTask && (
-        <EntityShelf
-          entity={selectedTask}
-          entityType="task"
-          onClose={handleShelfClose}
-          footer={
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={async () => {
-                if (!window.confirm('Delete this task? This cannot be undone.')) return
-                try {
-                  const res = await fetch('/api/commands/delete-entity', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ table: 'tasks', id: selectedTask.id }),
-                  })
-                  if (!res.ok) {
-                    const json = await res.json()
-                    throw new Error(json.error ?? 'Delete failed')
-                  }
-                  handleShelfClose()
-                } catch (err) {
-                  toast({
-                    type: 'error',
-                    message: err instanceof Error ? err.message : 'Delete failed',
-                  })
-                }
-              }}
-              className="text-muted-foreground hover:text-red-400"
-            >
-              <Trash2 className="h-4 w-4 mr-1" />
-              Delete task
-            </Button>
-          }
-        >
-          <TaskShelfContent task={selectedTask} />
-        </EntityShelf>
-      )}
-
       {/* New task creation shelf */}
       {creatingTask && (
         <NewTaskShelf
@@ -1747,12 +1658,8 @@ export function TasksClient({
               prev.some((t) => t.id === created.id) ? prev : [created, ...prev]
             )
             setCreatingTask(false)
-            // Open the real task shelf so the user can add links
-            setSelectedTask(created)
-            const params = new URLSearchParams(window.location.search)
-            params.set('id', String(created.seq_id ?? created.ticket_id))
-            const qs = params.toString()
-            window.history.pushState(null, '', `${BASE_PATH}${qs ? `?${qs}` : ''}`)
+            // Open the task shelf via intercepting route
+            router.push(`/tasks/${created.ticket_id}`)
           }}
         />
       )}

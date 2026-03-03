@@ -3,13 +3,14 @@ import { notFound } from 'next/navigation'
 import { requireAuth } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { TasksClient } from '../tasks-client'
+import { TaskShelfOverlay } from '@/app/(shell)/@shelf/(.)tasks/[id]/task-shelf-overlay'
 
-export default async function TaskDetailPage({ params }: { params: Promise<{ ticketId: string }> }) {
-  const { ticketId } = await params
+export default async function TaskDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const user = await requireAuth()
   const supabase = await createClient()
 
-  const isNumeric = /^\d+$/.test(ticketId)
+  const isNumeric = /^\d+$/.test(id)
 
   const [{ data: tasks }, { data: selectedTask }, { data: profile }] = await Promise.all([
     supabase
@@ -20,7 +21,7 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ tic
     supabase
       .from('tasks')
       .select('*')
-      .eq(isNumeric ? 'ticket_id' : 'id', isNumeric ? Number(ticketId) : ticketId)
+      .eq(isNumeric ? 'ticket_id' : 'id', isNumeric ? Number(id) : id)
       .single(),
     supabase
       .from('profiles')
@@ -34,13 +35,15 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ tic
   const workspaceId = profile?.active_tenant_id ?? ''
 
   return (
-    <Suspense fallback={null}>
-      <TasksClient
-        initialTasks={tasks ?? []}
-        currentUser={profile}
-        initialSelectedTask={selectedTask}
-        workspaceId={workspaceId}
-      />
-    </Suspense>
+    <>
+      <Suspense fallback={null}>
+        <TasksClient
+          initialTasks={tasks ?? []}
+          currentUser={profile}
+          workspaceId={workspaceId}
+        />
+      </Suspense>
+      <TaskShelfOverlay task={selectedTask} />
+    </>
   )
 }
