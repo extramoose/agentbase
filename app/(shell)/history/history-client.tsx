@@ -14,41 +14,34 @@ import {
   type ActivityLogEntry,
 } from '@/lib/format-activity'
 import { MarkdownRenderer } from '@/components/markdown-renderer'
-import { type BaseEntity, type EntityType, ENTITY_TABLE } from '@/types/entities'
-import { toast } from '@/hooks/use-toast'
+import { type BaseEntity, type EntityType } from '@/types/entities'
 import { TaskShelfContent, type Task } from '@/app/(shell)/tools/tasks/tasks-client'
-import { LibraryShelfContent, type LibraryItem } from '@/app/(shell)/tools/library/library-client'
 
 /** Maps entity_type (table name) to the front-end path prefix */
 function getEntityPath(entityType: string): string {
   switch (normalizeEntityType(entityType)) {
     case 'tasks':         return '/tools/tasks'
-    case 'library_items': return '/tools/library'
     default:              return ''
   }
 }
 
 /**
- * Normalize entity_type values — handles both table name format (tasks,
- * library_items) and legacy singular/hyphenated format written by older
- * delete-entity / batch-update routes before the fix.
+ * Normalize entity_type values — handles both table name format (tasks)
+ * and legacy singular format written by older routes.
  */
 function normalizeEntityType(raw: string): string {
   const map: Record<string, string> = {
     task: 'tasks',
-    'library-item': 'library_items',
-    'library-items': 'library_items',
   }
   return map[raw] ?? raw
 }
 
 const ENTITY_COLORS: Record<string, string> = {
   tasks:          'bg-blue-500/20 text-blue-400',
-  library_items:  'bg-yellow-500/20 text-yellow-400',
 }
 
 const ENTITY_TYPES = [
-  'tasks', 'library_items',
+  'tasks',
 ] as const
 
 function formatEntityType(type: string): string {
@@ -58,7 +51,6 @@ function formatEntityType(type: string): string {
 
 const ENTITY_TYPE_SINGULAR: Record<string, string> = {
   tasks: 'Task',
-  library_items: 'Item',
 }
 
 function formatEntityBadge(type: string, seqId: number | undefined): string {
@@ -69,7 +61,6 @@ function formatEntityBadge(type: string, seqId: number | undefined): string {
 
 const TABLE_TO_ENTITY_TYPE: Record<string, EntityType> = {
   tasks: 'task',
-  library_items: 'library_item',
 }
 
 // ---------------------------------------------------------------------------
@@ -438,26 +429,6 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
     setShelfData({ entity, entityType: mappedType, label })
   }, [supabase])
 
-  const handleEntityUpdate = useCallback(
-    async (id: string, table: string, fields: Record<string, unknown>) => {
-      try {
-        const res = await fetch('/api/commands/update', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ table, id, fields }),
-        })
-        const json = await res.json()
-        if (!res.ok) throw new Error(json.error ?? 'Update failed')
-      } catch (err) {
-        toast({
-          type: 'error',
-          message: err instanceof Error ? err.message : 'Update failed',
-        })
-      }
-    },
-    [],
-  )
-
   function handleEntityClick(entry: ActivityLogEntry) {
     const normalized = normalizeEntityType(entry.entity_type)
     if (!getEntityPath(normalized)) return
@@ -718,14 +689,6 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
           {shelfData.entityType === 'task' && (
             <TaskShelfContent
               task={shelfData.entity as Task}
-            />
-          )}
-          {shelfData.entityType === 'library_item' && (
-            <LibraryShelfContent
-              item={shelfData.entity as LibraryItem}
-              onUpdate={(id: string, fields: Record<string, unknown>) =>
-                handleEntityUpdate(id, ENTITY_TABLE[shelfData.entityType], fields)
-              }
             />
           )}
         </EntityShelf>

@@ -25,17 +25,14 @@ import { useEntitySearch, type EntitySearchResult } from '@/hooks/use-entity-sea
 
 const ENTITY_COLORS: Record<string, string> = {
   tasks:         'bg-blue-500/20 text-blue-400',
-  library_items: 'bg-yellow-500/20 text-yellow-400',
 }
 
 const TABLE_LABELS: Record<string, string> = {
   tasks:         'Task',
-  library_items: 'Library',
 }
 
 const ENTITY_PATH: Record<string, string> = {
   tasks:         '/tools/tasks',
-  library_items: '/tools/library',
 }
 
 function getChipHref(entityType: string, seqId?: number): string | null {
@@ -80,13 +77,6 @@ async function resolveNames(links: RawLink[]): Promise<Map<string, ResolvedEntit
         supabase.from('tasks').select('id,title,ticket_id,seq_id').in('id', uniqueIds)
           .then(({ data }) => {
             for (const row of data ?? []) nameMap.set(`tasks:${row.id}`, { name: `Task #${row.ticket_id}: ${row.title}`, seqId: row.seq_id ?? undefined })
-          })
-      )
-    } else if (type === 'library_items') {
-      queries.push(
-        supabase.from('library_items').select('id,title,seq_id').in('id', uniqueIds)
-          .then(({ data }) => {
-            for (const row of data ?? []) nameMap.set(`library_items:${row.id}`, { name: row.title, seqId: row.seq_id ?? undefined })
           })
       )
     }

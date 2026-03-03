@@ -2,12 +2,11 @@ import { requireAuth } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import {
-  CheckSquare, BookOpen, Clock
+  CheckSquare, Clock
 } from 'lucide-react'
 
 const TOOLS = [
   { href: '/tools/tasks',    label: 'Tasks',    icon: CheckSquare, desc: 'Manage your work queue' },
-  { href: '/tools/library',  label: 'Library',  icon: BookOpen,    desc: 'Save links, notes & ideas' },
   { href: '/history',        label: 'History',  icon: Clock,       desc: 'All recent activity' },
 ]
 
@@ -17,11 +16,9 @@ export default async function HomePage() {
 
   const [
     { count: taskCount },
-    { count: libraryCount },
     { count: doneToday },
   ] = await Promise.all([
     supabase.from('tasks').select('*', { count: 'exact', head: true }).eq('status', 'in_progress'),
-    supabase.from('library_items').select('*', { count: 'exact', head: true }),
     supabase.from('tasks').select('*', { count: 'exact', head: true })
       .eq('status', 'done')
       .gte('updated_at', new Date(new Date().setHours(0, 0, 0, 0)).toISOString()),
@@ -46,7 +43,6 @@ export default async function HomePage() {
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-8">
         <StatCard label="In progress" value={taskCount ?? 0} href="/tools/tasks?status=in_progress" icon={CheckSquare} />
         <StatCard label="Done today" value={doneToday ?? 0} href="/tools/tasks?status=done" icon={CheckSquare} />
-        <StatCard label="Library" value={libraryCount ?? 0} href="/tools/library" icon={BookOpen} />
       </div>
 
       <div className="border-t border-border my-2" />

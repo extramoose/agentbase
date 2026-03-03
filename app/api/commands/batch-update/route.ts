@@ -4,7 +4,7 @@ import { apiError } from '@/lib/api/errors'
 import { broadcastMutation } from '@/lib/api/broadcast'
 
 const ALLOWED_TABLES = [
-  'tasks', 'library_items',
+  'tasks',
 ] as const
 
 const schema = z.object({

@@ -1,7 +1,7 @@
 import { resolveActorUnified } from '@/lib/api/resolve-actor'
 import { apiError } from '@/lib/api/errors'
 
-const ENTITY_TYPES = ['tasks', 'library_items'] as const
+const ENTITY_TYPES = ['tasks'] as const
 
 const UPDATABLE_FIELDS = {
   tasks: {
@@ -14,19 +14,7 @@ const UPDATABLE_FIELDS = {
     due_date: { type: 'date | null', description: 'ISO date string (YYYY-MM-DD)' },
     tags: { type: 'text[]' },
   },
-  library_items: {
-    title: { type: 'string' },
-    body: { type: 'string' },
-    type: { type: 'string', enum: ['favorite', 'flag', 'restaurant', 'note', 'idea', 'article'] },
-    url: { type: 'string' },
-    source: { type: 'string' },
-    excerpt: { type: 'string' },
-    location_name: { type: 'string' },
-    latitude: { type: 'number' },
-    longitude: { type: 'number' },
-    is_public: { type: 'boolean' },
-    tags: { type: 'text[]' },
-  },
+
 }
 
 const API_SCHEMA = {
@@ -65,27 +53,7 @@ const API_SCHEMA = {
           idempotency_key: { type: 'string', description: 'Unique key to prevent duplicate creation (max 128 chars)' },
         },
       },
-      {
-        method: 'POST',
-        path: '/api/commands/create-library-item',
-        description: 'Create a new library item',
-        required_fields: {
-          type: { type: 'string', enum: ['favorite', 'flag', 'restaurant', 'note', 'idea', 'article'] },
-          title: { type: 'string', description: 'Item title (1-500 chars)' },
-        },
-        optional_fields: {
-          url: { type: 'string | null' },
-          source: { type: 'string | null' },
-          excerpt: { type: 'string | null' },
-          body: { type: 'string | null' },
-          location_name: { type: 'string | null' },
-          latitude: { type: 'number | null' },
-          longitude: { type: 'number | null' },
-          tags: { type: 'string[]', default: '[]' },
-          is_public: { type: 'boolean', default: 'false' },
-          idempotency_key: { type: 'string', description: 'Max 128 chars' },
-        },
-      },
+
       {
         method: 'PATCH',
         path: '/api/commands/update',
@@ -121,7 +89,7 @@ const API_SCHEMA = {
       {
         method: 'POST',
         path: '/api/commands/delete-entity',
-        description: 'Delete an entity. Soft delete for library_items (sets deleted_at). Hard delete for tasks. Agents cannot delete tasks (403).',
+        description: 'Delete an entity. Hard delete for tasks. Agents cannot delete tasks (403).',
         required_fields: {
           table: { type: 'string', enum: [...ENTITY_TYPES] },
           id: { type: 'string', description: 'UUID of the entity to delete' },
@@ -202,29 +170,7 @@ const API_SCHEMA = {
         },
         optional_fields: {},
       },
-      {
-        method: 'GET',
-        path: '/api/library',
-        description: 'List library items with optional filtering, search, and pagination',
-        required_fields: {},
-        optional_fields: {
-          page: { type: 'number', default: '1', description: '1-based page number' },
-          limit: { type: 'number', default: '50', description: 'Items per page (max 200)' },
-          q: { type: 'string', description: 'Search query (searches name, notes, url)' },
-          type: { type: 'string', description: 'Filter by type', enum: ['favorite', 'flag', 'restaurant', 'note', 'idea', 'article'] },
-          tag: { type: 'string', description: 'Filter by tag (exact match)' },
-          include: { type: 'string', description: 'Comma-separated includes. "activity" embeds activity array (only when ≤ 20 results)' },
-        },
-      },
-      {
-        method: 'GET',
-        path: '/api/library/:id',
-        description: 'Get a single library item by UUID or seq_id',
-        required_fields: {
-          id: { type: 'string', description: 'UUID or sequential ID (path param)' },
-        },
-        optional_fields: {},
-      },
+
       {
         method: 'GET',
         path: '/api/activity',
@@ -258,7 +204,7 @@ const API_SCHEMA = {
         },
         optional_fields: {
           limit: { type: 'number', default: '10', description: 'Max results per entity type (max 200)' },
-          types: { type: 'string', description: 'Comma-separated entity types to search', enum: ['tasks', 'library'] },
+          types: { type: 'string', description: 'Comma-separated entity types to search', enum: ['tasks'] },
         },
       },
       {

@@ -1,4 +1,4 @@
-export type EntityType = 'task' | 'library_item'
+export type EntityType = 'task'
 
 export interface BaseEntity {
   id: string
@@ -32,5 +32,4 @@ export interface EntityClientProps<T extends BaseEntity> {
 /** Maps EntityType to the Supabase table name */
 export const ENTITY_TABLE: Record<EntityType, string> = {
   task: 'tasks',
-  library_item: 'library_items',
 }

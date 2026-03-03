@@ -6,7 +6,7 @@ import { validateAssignee } from '@/lib/api/validate-assignee'
 import { broadcastMutation } from '@/lib/api/broadcast'
 
 const ALLOWED_TABLES = [
-  'tasks', 'library_items',
+  'tasks',
 ] as const
 
 const schema = z.object({

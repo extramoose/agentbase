@@ -18,12 +18,11 @@ All mutating endpoints attribute actions to the authenticated actor. `actor_id` 
 
 ## Entity types
 
-The platform has five entity types:
+The platform has four entity types:
 
 | Entity | Table | Subtypes |
 |--------|-------|----------|
 | Tasks | `tasks` | — |
-| Library items | `library_items` | `favorite`, `flag`, `restaurant`, `note`, `idea`, `article` |
 | Companies | `companies` | — |
 | People | `people` | — |
 | Deals | `deals` | — |
@@ -52,25 +51,6 @@ Create a task.
 - Optional: `assignee_id` (uuid), `assignee_type` (`human` | `agent`), `type` (`bug` | `improvement` | `feature`), `due_date`, `tags`, `idempotency_key`
 
 **Response:** `{ "data": { ...task } }` — HTTP 201
-
----
-
-### POST /api/commands/create-library-item
-
-**Body:**
-```json
-{
-  "type": "note",
-  "title": "Van maintenance log",
-  "body": "Replaced brake pads...",
-  "tags": ["van", "maintenance"],
-  "is_public": false
-}
-```
-- `type` — one of: `favorite`, `flag`, `restaurant`, `note`, `idea`, `article`
-- Optional: `url`, `source`, `excerpt`, `location_name`, `latitude`, `longitude`, `tags`, `is_public`, `idempotency_key`
-
-**Response:** `{ "data": { ...library_item } }` — HTTP 201
 
 ---
 
@@ -140,7 +120,7 @@ Delete any entity. Agents cannot use this endpoint.
 }
 ```
 
-**`table`** — one of: `tasks`, `library_items`, `companies`, `people`, `deals`
+**`table`** — one of: `tasks`, `companies`, `people`, `deals`
 
 **Response:** `{ "success": true }`
 
@@ -162,7 +142,7 @@ Update any field on any entity.
 }
 ```
 
-**`table`** — one of: `tasks`, `library_items`, `companies`, `people`, `deals`
+**`table`** — one of: `tasks`, `companies`, `people`, `deals`
 
 **`fields`** — any updatable columns. Protected fields (`id`, `tenant_id`, `created_at`, `ticket_id`) are rejected. Type coercions:
 - `tags` → `string[]` (JSON array)
@@ -212,7 +192,7 @@ Batch update multiple entities of the same type.
 ```
 
 - `ids` — 1–100 UUIDs
-- `table` — one of: `tasks`, `library_items`, `companies`, `people`, `deals`
+- `table` — one of: `tasks`, `companies`, `people`, `deals`
 
 **Response:** `{ "success": true, "updated": 2 }`
 
@@ -271,14 +251,6 @@ assignee_type, due_date, tags, sort_order, ticket_id, seq_id,
 created_at, updated_at
 ```
 
-### GET /api/library
-
-Returns library items with pagination, search, and type filtering.
-
-**Query params:** `page`, `limit`, `q` (search), `type` (filter by item type)
-
-**Item types:** `favorite` | `flag` | `restaurant` | `note` | `idea` | `article`
-
 ### GET /api/crm/companies
 
 Returns companies with pagination and search.
@@ -303,7 +275,7 @@ Global search across multiple entity types.
 
 **Query params:**
 - `q` (required) — search query
-- `types` — comma-separated list: `tasks`, `people`, `companies`, `deals`, `library`
+- `types` — comma-separated list: `tasks`, `people`, `companies`, `deals`
 - `limit` — 1–200
 
 **Response:** Results organized by type.

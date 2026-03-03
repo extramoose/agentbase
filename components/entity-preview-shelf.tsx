@@ -7,7 +7,6 @@ import { MarkdownRenderer } from '@/components/markdown-renderer'
 
 const TABLE_MAP: Record<string, string> = {
   tasks: 'tasks',
-  library_items: 'library_items',
 }
 
 interface EntityPreviewShelfProps {
@@ -92,13 +91,6 @@ function EntityFields({ entityType, entity }: { entityType: string; entity: Reco
       { label: 'Due date', value: entity.due_date },
       { label: 'Tags', value: Array.isArray(entity.tags) ? (entity.tags as string[]).join(', ') : null },
       { label: 'Body', value: entity.body },
-    )
-  } else if (entityType === 'library_items') {
-    rows.push(
-      { label: 'Type', value: entity.type },
-      { label: 'URL', value: entity.url },
-      { label: 'Body', value: entity.body },
-      { label: 'Tags', value: Array.isArray(entity.tags) ? (entity.tags as string[]).join(', ') : null },
     )
   }
 

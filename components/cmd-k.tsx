@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import {
-  CheckSquare, BookOpen, Clock,
+  CheckSquare, Clock,
   ArrowRight, Loader2, Hash
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -15,23 +15,20 @@ type SearchResult = {
   subtitle?: string
   icon: React.ElementType
   action: () => void
-  section: 'nav' | 'tasks' | 'library'
+  section: 'nav' | 'tasks'
 }
 
 const NAV_ITEMS = [
   { id: 'tasks',    label: 'Tasks',    icon: CheckSquare, href: '/tools/tasks' },
-  { id: 'library',  label: 'Library',  icon: BookOpen,    href: '/tools/library' },
   { id: 'history',  label: 'History',  icon: Clock,       href: '/history' },
 ]
 
 const ENTITY_ICON: Record<string, React.ElementType> = {
   tasks: CheckSquare,
-  library_items: BookOpen,
 }
 
 const ENTITY_SECTION: Record<string, SearchResult['section']> = {
   tasks: 'tasks',
-  library_items: 'library',
 }
 
 function entityRoute(entity: EntitySearchResult): string {
@@ -40,7 +37,6 @@ function entityRoute(entity: EntitySearchResult): string {
       const ticketId = entity.subtitle?.match(/^Task #(\d+)$/)?.[1]
       return `/tools/tasks/${ticketId ?? entity.id}`
     }
-    case 'library_items': return `/tools/library/${entity.id}`
     default: return '/'
   }
 }
@@ -115,9 +111,6 @@ export function CmdK() {
 
   const taskResults = searchResults.filter(i => i.section === 'tasks')
   if (taskResults.length > 0) sections.push({ key: 'tasks', title: 'Tasks', items: taskResults })
-
-  const libResults = searchResults.filter(i => i.section === 'library')
-  if (libResults.length > 0) sections.push({ key: 'library', title: 'Library', items: libResults })
 
   // Flat list for keyboard navigation
   const flatItems = sections.flatMap(s => s.items)

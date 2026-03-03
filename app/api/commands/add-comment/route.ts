@@ -13,7 +13,6 @@ const schema = z.object({
 
 const ENTITY_TYPE_ALIASES: Record<string, string> = {
   task: 'tasks',
-  library_item: 'library_items',
 }
 
 export async function POST(request: Request) {
