@@ -52,3 +52,10 @@ export async function GET(request: Request) {
     return apiError(err)
   }
 }
+
+export async function POST() {
+  return Response.json(
+    { error: 'Method not allowed. Use POST /api/commands/create-task to create tasks.' },
+    { status: 405, headers: { Allow: 'GET' } },
+  )
+}
