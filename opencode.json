@@ -1,0 +1,5 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "anthropic/claude-opus-4-6",
+  "instructions": "This is AgentBase — a Next.js 15 + Supabase task orchestration platform. Key rules:\n- Always run `npx tsc --noEmit` before committing. Fix all type errors.\n- API auth uses `Authorization: Bearer <key>`, never X-API-Key.\n- Task create: POST /api/commands/create-task. Task update: POST /api/commands/update-task with {id: UUID, fields: {...}}.\n- Never use service_role key. All DB ops go through anon key + RLS or SECURITY DEFINER RPCs.\n- Migrations are run manually by Hunter in Supabase SQL editor — create the file and flag it.\n- Do not call router.refresh() in real-time handlers.\n- Soft delete only (deleted_at timestamp) for CRM and library entities."
+}
