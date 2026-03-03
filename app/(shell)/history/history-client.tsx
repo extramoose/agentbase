@@ -17,14 +17,6 @@ import { MarkdownRenderer } from '@/components/markdown-renderer'
 import { type BaseEntity, type EntityType, ENTITY_TABLE } from '@/types/entities'
 import { toast } from '@/hooks/use-toast'
 import { TaskShelfContent, type Task } from '@/app/(shell)/tools/tasks/tasks-client'
-import {
-  DealShelfContent,
-  CompanyShelfContent,
-  PersonShelfContent,
-  type CrmDeal,
-  type CrmCompany,
-  type CrmPerson,
-} from '@/app/(shell)/tools/crm/crm-client'
 import { LibraryShelfContent, type LibraryItem } from '@/app/(shell)/tools/library/library-client'
 
 /** Maps entity_type (table name) to the front-end path prefix */
@@ -32,9 +24,6 @@ function getEntityPath(entityType: string): string {
   switch (normalizeEntityType(entityType)) {
     case 'tasks':         return '/tools/tasks'
     case 'library_items': return '/tools/library'
-    case 'companies':     return '/tools/crm/companies'
-    case 'people':        return '/tools/crm/people'
-    case 'deals':         return '/tools/crm/deals'
     default:              return ''
   }
 }
@@ -49,10 +38,6 @@ function normalizeEntityType(raw: string): string {
     task: 'tasks',
     'library-item': 'library_items',
     'library-items': 'library_items',
-    company: 'companies',
-    companie: 'companies', // legacy bug
-    person: 'people',
-    deal: 'deals',
   }
   return map[raw] ?? raw
 }
@@ -60,14 +45,10 @@ function normalizeEntityType(raw: string): string {
 const ENTITY_COLORS: Record<string, string> = {
   tasks:          'bg-blue-500/20 text-blue-400',
   library_items:  'bg-yellow-500/20 text-yellow-400',
-  companies:      'bg-red-500/20 text-red-400',
-  people:         'bg-pink-500/20 text-pink-400',
-  deals:          'bg-emerald-500/20 text-emerald-400',
 }
 
 const ENTITY_TYPES = [
   'tasks', 'library_items',
-  'companies', 'people', 'deals',
 ] as const
 
 function formatEntityType(type: string): string {
@@ -78,9 +59,6 @@ function formatEntityType(type: string): string {
 const ENTITY_TYPE_SINGULAR: Record<string, string> = {
   tasks: 'Task',
   library_items: 'Item',
-  companies: 'Company',
-  people: 'Person',
-  deals: 'Deal',
 }
 
 function formatEntityBadge(type: string, seqId: number | undefined): string {
@@ -92,9 +70,6 @@ function formatEntityBadge(type: string, seqId: number | undefined): string {
 const TABLE_TO_ENTITY_TYPE: Record<string, EntityType> = {
   tasks: 'task',
   library_items: 'library_item',
-  people: 'person',
-  companies: 'company',
-  deals: 'deal',
 }
 
 // ---------------------------------------------------------------------------
@@ -745,34 +720,10 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
               task={shelfData.entity as Task}
             />
           )}
-          {shelfData.entityType === 'deal' && (
-            <DealShelfContent
-              deal={shelfData.entity as CrmDeal}
-              onUpdate={(fields) =>
-                handleEntityUpdate(shelfData.entity.id, ENTITY_TABLE[shelfData.entityType], fields)
-              }
-            />
-          )}
-          {shelfData.entityType === 'company' && (
-            <CompanyShelfContent
-              company={shelfData.entity as CrmCompany}
-              onUpdate={(fields) =>
-                handleEntityUpdate(shelfData.entity.id, ENTITY_TABLE[shelfData.entityType], fields)
-              }
-            />
-          )}
-          {shelfData.entityType === 'person' && (
-            <PersonShelfContent
-              person={shelfData.entity as CrmPerson}
-              onUpdate={(fields) =>
-                handleEntityUpdate(shelfData.entity.id, ENTITY_TABLE[shelfData.entityType], fields)
-              }
-            />
-          )}
           {shelfData.entityType === 'library_item' && (
             <LibraryShelfContent
               item={shelfData.entity as LibraryItem}
-              onUpdate={(id, fields) =>
+              onUpdate={(id: string, fields: Record<string, unknown>) =>
                 handleEntityUpdate(id, ENTITY_TABLE[shelfData.entityType], fields)
               }
             />

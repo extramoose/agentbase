@@ -26,25 +26,16 @@ import { useEntitySearch, type EntitySearchResult } from '@/hooks/use-entity-sea
 const ENTITY_COLORS: Record<string, string> = {
   tasks:         'bg-blue-500/20 text-blue-400',
   library_items: 'bg-yellow-500/20 text-yellow-400',
-  companies:     'bg-red-500/20 text-red-400',
-  people:        'bg-pink-500/20 text-pink-400',
-  deals:         'bg-emerald-500/20 text-emerald-400',
 }
 
 const TABLE_LABELS: Record<string, string> = {
   tasks:         'Task',
   library_items: 'Library',
-  companies:     'Company',
-  people:        'Person',
-  deals:         'Deal',
 }
 
 const ENTITY_PATH: Record<string, string> = {
   tasks:         '/tools/tasks',
   library_items: '/tools/library',
-  companies:     '/tools/crm/companies',
-  people:        '/tools/crm/people',
-  deals:         '/tools/crm/deals',
 }
 
 function getChipHref(entityType: string, seqId?: number): string | null {
@@ -91,32 +82,11 @@ async function resolveNames(links: RawLink[]): Promise<Map<string, ResolvedEntit
             for (const row of data ?? []) nameMap.set(`tasks:${row.id}`, { name: `Task #${row.ticket_id}: ${row.title}`, seqId: row.seq_id ?? undefined })
           })
       )
-    } else if (type === 'companies') {
-      queries.push(
-        supabase.from('companies').select('id,name,seq_id').in('id', uniqueIds)
-          .then(({ data }) => {
-            for (const row of data ?? []) nameMap.set(`companies:${row.id}`, { name: row.name, seqId: row.seq_id ?? undefined })
-          })
-      )
-    } else if (type === 'people') {
-      queries.push(
-        supabase.from('people').select('id,name,seq_id').in('id', uniqueIds)
-          .then(({ data }) => {
-            for (const row of data ?? []) nameMap.set(`people:${row.id}`, { name: row.name, seqId: row.seq_id ?? undefined })
-          })
-      )
     } else if (type === 'library_items') {
       queries.push(
         supabase.from('library_items').select('id,title,seq_id').in('id', uniqueIds)
           .then(({ data }) => {
             for (const row of data ?? []) nameMap.set(`library_items:${row.id}`, { name: row.title, seqId: row.seq_id ?? undefined })
-          })
-      )
-    } else if (type === 'deals') {
-      queries.push(
-        supabase.from('deals').select('id,title,seq_id').in('id', uniqueIds)
-          .then(({ data }) => {
-            for (const row of data ?? []) nameMap.set(`deals:${row.id}`, { name: row.title, seqId: row.seq_id ?? undefined })
           })
       )
     }

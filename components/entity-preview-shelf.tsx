@@ -8,10 +8,6 @@ import { MarkdownRenderer } from '@/components/markdown-renderer'
 const TABLE_MAP: Record<string, string> = {
   tasks: 'tasks',
   library_items: 'library_items',
-  
-  companies: 'companies',
-  people: 'people',
-  deals: 'deals',
 }
 
 interface EntityPreviewShelfProps {
@@ -96,26 +92,6 @@ function EntityFields({ entityType, entity }: { entityType: string; entity: Reco
       { label: 'Due date', value: entity.due_date },
       { label: 'Tags', value: Array.isArray(entity.tags) ? (entity.tags as string[]).join(', ') : null },
       { label: 'Body', value: entity.body },
-    )
-  } else if (entityType === 'companies') {
-    rows.push(
-      { label: 'Domain', value: entity.domain },
-      { label: 'Industry', value: entity.industry },
-      { label: 'Notes', value: entity.notes },
-      { label: 'Tags', value: Array.isArray(entity.tags) ? (entity.tags as string[]).join(', ') : null },
-    )
-  } else if (entityType === 'people') {
-    rows.push(
-      { label: 'Email', value: entity.email },
-      { label: 'Phone', value: entity.phone },
-      { label: 'Title', value: entity.title },
-      { label: 'Notes', value: entity.notes },
-    )
-  } else if (entityType === 'deals') {
-    rows.push(
-      { label: 'Status', value: entity.status },
-      { label: 'Value', value: entity.value ? `$${entity.value}` : null },
-      { label: 'Notes', value: entity.notes },
     )
   } else if (entityType === 'library_items') {
     rows.push(

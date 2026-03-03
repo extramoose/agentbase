@@ -3,8 +3,8 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import {
-  CheckSquare, BookOpen, Users, Clock,
-  ArrowRight, Building2, User, Loader2, Hash, Handshake
+  CheckSquare, BookOpen, Clock,
+  ArrowRight, Loader2, Hash
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useEntitySearch, type EntitySearchResult } from '@/hooks/use-entity-search'
@@ -15,30 +15,23 @@ type SearchResult = {
   subtitle?: string
   icon: React.ElementType
   action: () => void
-  section: 'nav' | 'tasks' | 'library' | 'crm'
+  section: 'nav' | 'tasks' | 'library'
 }
 
 const NAV_ITEMS = [
   { id: 'tasks',    label: 'Tasks',    icon: CheckSquare, href: '/tools/tasks' },
   { id: 'library',  label: 'Library',  icon: BookOpen,    href: '/tools/library' },
-  { id: 'crm',      label: 'CRM',      icon: Users,       href: '/tools/crm' },
   { id: 'history',  label: 'History',  icon: Clock,       href: '/history' },
 ]
 
 const ENTITY_ICON: Record<string, React.ElementType> = {
   tasks: CheckSquare,
   library_items: BookOpen,
-  companies: Building2,
-  people: User,
-  deals: Handshake,
 }
 
 const ENTITY_SECTION: Record<string, SearchResult['section']> = {
   tasks: 'tasks',
   library_items: 'library',
-  companies: 'crm',
-  people: 'crm',
-  deals: 'crm',
 }
 
 function entityRoute(entity: EntitySearchResult): string {
@@ -48,9 +41,7 @@ function entityRoute(entity: EntitySearchResult): string {
       return `/tools/tasks/${ticketId ?? entity.id}`
     }
     case 'library_items': return `/tools/library/${entity.id}`
-    case 'companies': return `/tools/crm/companies?id=${entity.seq_id ?? entity.id}`
-    case 'people': return `/tools/crm/people?id=${entity.seq_id ?? entity.id}`
-    case 'deals': return `/tools/crm/deals?id=${entity.seq_id ?? entity.id}`
+    default: return '/'
   }
 }
 
@@ -76,7 +67,7 @@ export function CmdK() {
     label: entity.name,
     subtitle: entity.subtitle,
     icon: ENTITY_ICON[entity.type] ?? Hash,
-    section: ENTITY_SECTION[entity.type] ?? 'crm',
+    section: ENTITY_SECTION[entity.type] ?? 'tasks',
     action: () => { router.push(entityRoute(entity)); close() },
   }))
 
@@ -127,9 +118,6 @@ export function CmdK() {
 
   const libResults = searchResults.filter(i => i.section === 'library')
   if (libResults.length > 0) sections.push({ key: 'library', title: 'Library', items: libResults })
-
-  const crmResults = searchResults.filter(i => i.section === 'crm')
-  if (crmResults.length > 0) sections.push({ key: 'crm', title: 'CRM', items: crmResults })
 
   // Flat list for keyboard navigation
   const flatItems = sections.flatMap(s => s.items)

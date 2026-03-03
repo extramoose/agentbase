@@ -1,7 +1,7 @@
 import { resolveActorUnified } from '@/lib/api/resolve-actor'
 import { apiError } from '@/lib/api/errors'
 
-const ENTITY_TYPES = ['tasks', 'library_items', 'companies', 'people', 'deals'] as const
+const ENTITY_TYPES = ['tasks', 'library_items'] as const
 
 const UPDATABLE_FIELDS = {
   tasks: {
@@ -26,47 +26,6 @@ const UPDATABLE_FIELDS = {
     longitude: { type: 'number' },
     is_public: { type: 'boolean' },
     tags: { type: 'text[]' },
-  },
-  companies: {
-    name: { type: 'string' },
-    domain: { type: 'string' },
-    industry: { type: 'string' },
-    notes: { type: 'string' },
-    website: { type: 'string' },
-    linkedin: { type: 'string' },
-    twitter: { type: 'string' },
-    instagram: { type: 'string' },
-    location: { type: 'string' },
-    source: { type: 'string' },
-    tags: { type: 'text[]' },
-    last_enriched: { type: 'timestamptz', description: 'ISO-8601 timestamp of last agent enrichment' },
-  },
-  people: {
-    name: { type: 'string' },
-    email: { type: 'string' },
-    phone: { type: 'string' },
-    title: { type: 'string' },
-    notes: { type: 'string' },
-    emails: { type: 'jsonb', description: 'Array of {label, value} objects' },
-    phones: { type: 'jsonb', description: 'Array of {label, value} objects' },
-    linkedin: { type: 'string' },
-    twitter: { type: 'string' },
-    instagram: { type: 'string' },
-    source: { type: 'string' },
-    tags: { type: 'text[]' },
-    last_enriched: { type: 'timestamptz', description: 'ISO-8601 timestamp of last agent enrichment' },
-  },
-  deals: {
-    title: { type: 'string' },
-    status: { type: 'string', enum: ['prospect', 'active', 'won', 'lost'] },
-    value: { type: 'number' },
-    notes: { type: 'string' },
-    follow_up_date: { type: 'date | null', description: 'ISO date string (YYYY-MM-DD)' },
-    source: { type: 'string' },
-    primary_contact_id: { type: 'string | null', description: 'UUID of primary contact (person)' },
-    expected_close_date: { type: 'date | null', description: 'ISO date string (YYYY-MM-DD)' },
-    tags: { type: 'text[]' },
-    last_enriched: { type: 'timestamptz', description: 'ISO-8601 timestamp of last agent enrichment' },
   },
 }
 
@@ -128,68 +87,6 @@ const API_SCHEMA = {
         },
       },
       {
-        method: 'POST',
-        path: '/api/commands/create-person',
-        description: 'Create a new person (CRM contact)',
-        required_fields: {
-          name: { type: 'string', description: 'Person name (1-500 chars)' },
-        },
-        optional_fields: {
-          email: { type: 'string' },
-          phone: { type: 'string' },
-          title: { type: 'string' },
-          notes: { type: 'string' },
-          tags: { type: 'string[]', default: '[]' },
-          idempotency_key: { type: 'string', description: 'Max 128 chars' },
-          emails: { type: 'array', description: 'Array of {label, value} objects for multiple emails' },
-          phones: { type: 'array', description: 'Array of {label, value} objects for multiple phones' },
-          linkedin: { type: 'string', description: 'LinkedIn URL' },
-          twitter: { type: 'string', description: 'Twitter/X handle or URL' },
-          instagram: { type: 'string', description: 'Instagram handle or URL' },
-          source: { type: 'string', description: 'How you met (e.g. referral, cold outreach, event)' },
-        },
-      },
-      {
-        method: 'POST',
-        path: '/api/commands/create-company',
-        description: 'Create a new company',
-        required_fields: {
-          name: { type: 'string', description: 'Company name (1-500 chars)' },
-        },
-        optional_fields: {
-          domain: { type: 'string' },
-          industry: { type: 'string' },
-          notes: { type: 'string' },
-          tags: { type: 'string[]', default: '[]' },
-          idempotency_key: { type: 'string', description: 'Max 128 chars' },
-          website: { type: 'string', description: 'Company website URL' },
-          linkedin: { type: 'string', description: 'LinkedIn URL' },
-          twitter: { type: 'string', description: 'Twitter/X handle or URL' },
-          instagram: { type: 'string', description: 'Instagram handle or URL' },
-          location: { type: 'string', description: 'City/region/HQ location' },
-          source: { type: 'string', description: 'Lead source' },
-        },
-      },
-      {
-        method: 'POST',
-        path: '/api/commands/create-deal',
-        description: 'Create a new deal',
-        required_fields: {
-          title: { type: 'string', description: 'Deal title (1-500 chars)' },
-        },
-        optional_fields: {
-          status: { type: 'string', enum: ['prospect', 'active', 'won', 'lost'], default: 'prospect' },
-          value: { type: 'number | null' },
-          notes: { type: 'string' },
-          tags: { type: 'string[]', default: '[]' },
-          idempotency_key: { type: 'string', description: 'Max 128 chars' },
-          follow_up_date: { type: 'string | null', description: 'ISO date for next follow-up' },
-          source: { type: 'string', description: 'Deal source (referral, cold, event, inbound)' },
-          primary_contact_id: { type: 'string | null', description: 'UUID of primary contact (person)' },
-          expected_close_date: { type: 'string | null', description: 'ISO date for expected close' },
-        },
-      },
-      {
         method: 'PATCH',
         path: '/api/commands/update',
         description: 'Update fields on any entity. Send { table, id, fields } where table is the entity type, id is the UUID, and fields is a key-value map. See updatable_fields for allowed keys per table.',
@@ -212,36 +109,6 @@ const API_SCHEMA = {
       },
       {
         method: 'POST',
-        path: '/api/commands/update-company',
-        description: 'Alias for PATCH /api/commands/update with table pre-set to "companies". Send { id, fields }.',
-        required_fields: {
-          id: { type: 'string', description: 'UUID of the company to update' },
-          fields: { type: 'object', description: 'Key-value map of fields to update. See updatable_fields.companies for valid keys.' },
-        },
-        optional_fields: {},
-      },
-      {
-        method: 'POST',
-        path: '/api/commands/update-person',
-        description: 'Alias for PATCH /api/commands/update with table pre-set to "people". Send { id, fields }.',
-        required_fields: {
-          id: { type: 'string', description: 'UUID of the person to update' },
-          fields: { type: 'object', description: 'Key-value map of fields to update. See updatable_fields.people for valid keys.' },
-        },
-        optional_fields: {},
-      },
-      {
-        method: 'POST',
-        path: '/api/commands/update-deal',
-        description: 'Alias for PATCH /api/commands/update with table pre-set to "deals". Send { id, fields }.',
-        required_fields: {
-          id: { type: 'string', description: 'UUID of the deal to update' },
-          fields: { type: 'object', description: 'Key-value map of fields to update. See updatable_fields.deals for valid keys.' },
-        },
-        optional_fields: {},
-      },
-      {
-        method: 'POST',
         path: '/api/commands/batch-update',
         description: 'Batch update fields on multiple entities of the same type',
         required_fields: {
@@ -254,7 +121,7 @@ const API_SCHEMA = {
       {
         method: 'POST',
         path: '/api/commands/delete-entity',
-        description: 'Delete an entity. Soft delete for companies, people, deals, library_items (sets deleted_at). Hard delete for tasks. Agents can delete CRM + library entities but receive 403 for tasks.',
+        description: 'Delete an entity. Soft delete for library_items (sets deleted_at). Hard delete for tasks. Agents cannot delete tasks (403).',
         required_fields: {
           table: { type: 'string', enum: [...ENTITY_TYPES] },
           id: { type: 'string', description: 'UUID of the entity to delete' },
@@ -267,33 +134,6 @@ const API_SCHEMA = {
         description: 'Alias for POST /api/commands/delete-entity with table pre-set to "tasks". Hard delete. Agents receive 403.',
         required_fields: {
           id: { type: 'string', description: 'UUID of the task to delete' },
-        },
-        optional_fields: {},
-      },
-      {
-        method: 'POST',
-        path: '/api/commands/delete-company',
-        description: 'Alias for POST /api/commands/delete-entity with table pre-set to "companies". Soft delete (sets deleted_at).',
-        required_fields: {
-          id: { type: 'string', description: 'UUID of the company to delete' },
-        },
-        optional_fields: {},
-      },
-      {
-        method: 'POST',
-        path: '/api/commands/delete-person',
-        description: 'Alias for POST /api/commands/delete-entity with table pre-set to "people". Soft delete (sets deleted_at).',
-        required_fields: {
-          id: { type: 'string', description: 'UUID of the person to delete' },
-        },
-        optional_fields: {},
-      },
-      {
-        method: 'POST',
-        path: '/api/commands/delete-deal',
-        description: 'Alias for POST /api/commands/delete-entity with table pre-set to "deals". Soft delete (sets deleted_at).',
-        required_fields: {
-          id: { type: 'string', description: 'UUID of the deal to delete' },
         },
         optional_fields: {},
       },
@@ -387,72 +227,6 @@ const API_SCHEMA = {
       },
       {
         method: 'GET',
-        path: '/api/crm/companies',
-        description: 'List companies with optional search and pagination',
-        required_fields: {},
-        optional_fields: {
-          page: { type: 'number', default: '1', description: '1-based page number' },
-          limit: { type: 'number', default: '50', description: 'Items per page (max 200)' },
-          q: { type: 'string', description: 'Search query (searches name, website, notes)' },
-          tag: { type: 'string', description: 'Filter by tag (exact match)' },
-          include: { type: 'string', description: 'Comma-separated includes. "activity" embeds activity array (only when ≤ 20 results)' },
-        },
-      },
-      {
-        method: 'GET',
-        path: '/api/crm/companies/:id',
-        description: 'Get a single company by UUID or seq_id',
-        required_fields: {
-          id: { type: 'string', description: 'UUID or sequential ID (path param)' },
-        },
-        optional_fields: {},
-      },
-      {
-        method: 'GET',
-        path: '/api/crm/people',
-        description: 'List people with optional search and pagination',
-        required_fields: {},
-        optional_fields: {
-          page: { type: 'number', default: '1', description: '1-based page number' },
-          limit: { type: 'number', default: '50', description: 'Items per page (max 200)' },
-          q: { type: 'string', description: 'Search query (searches name, email, title, notes)' },
-          tag: { type: 'string', description: 'Filter by tag (exact match)' },
-          include: { type: 'string', description: 'Comma-separated includes. "activity" embeds activity array (only when ≤ 20 results)' },
-        },
-      },
-      {
-        method: 'GET',
-        path: '/api/crm/people/:id',
-        description: 'Get a single person by UUID or seq_id',
-        required_fields: {
-          id: { type: 'string', description: 'UUID or sequential ID (path param)' },
-        },
-        optional_fields: {},
-      },
-      {
-        method: 'GET',
-        path: '/api/crm/deals',
-        description: 'List deals with optional search and pagination',
-        required_fields: {},
-        optional_fields: {
-          page: { type: 'number', default: '1', description: '1-based page number' },
-          limit: { type: 'number', default: '50', description: 'Items per page (max 200)' },
-          q: { type: 'string', description: 'Search query (searches title, notes)' },
-          tag: { type: 'string', description: 'Filter by tag (exact match)' },
-          include: { type: 'string', description: 'Comma-separated includes. "activity" embeds activity array (only when ≤ 20 results)' },
-        },
-      },
-      {
-        method: 'GET',
-        path: '/api/crm/deals/:id',
-        description: 'Get a single deal by UUID or seq_id',
-        required_fields: {
-          id: { type: 'string', description: 'UUID or sequential ID (path param)' },
-        },
-        optional_fields: {},
-      },
-      {
-        method: 'GET',
         path: '/api/activity',
         description: 'Get activity log for a specific entity',
         required_fields: {
@@ -484,7 +258,7 @@ const API_SCHEMA = {
         },
         optional_fields: {
           limit: { type: 'number', default: '10', description: 'Max results per entity type (max 200)' },
-          types: { type: 'string', description: 'Comma-separated entity types to search', enum: ['tasks', 'people', 'companies', 'deals', 'library'] },
+          types: { type: 'string', description: 'Comma-separated entity types to search', enum: ['tasks', 'library'] },
         },
       },
       {

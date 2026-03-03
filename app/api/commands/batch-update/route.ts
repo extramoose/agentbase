@@ -5,7 +5,6 @@ import { broadcastMutation } from '@/lib/api/broadcast'
 
 const ALLOWED_TABLES = [
   'tasks', 'library_items',
-  'companies', 'people', 'deals',
 ] as const
 
 const schema = z.object({

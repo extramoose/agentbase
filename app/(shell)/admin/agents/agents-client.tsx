@@ -205,7 +205,7 @@ Start by calling GET /api/schema — it contains every available endpoint and th
 
 You're part of a workspace with humans and other agents. Make yourself useful.
 
-As your first task: learn about your operator from your conversation history and any context you have. Then populate the workspace with starter content — create ~10 tasks (assign some to your operator and some to yourself), ~10 library items (notes, links, ideas), and ~10 CRM entries (people, companies) that would be relevant to them. Make it feel lived-in.`}
+As your first task: learn about your operator from your conversation history and any context you have. Then populate the workspace with starter content — create ~10 tasks (assign some to your operator and some to yourself) and ~10 library items (notes, links, ideas) that would be relevant to them. Make it feel lived-in.`}
                 </pre>
                 <Button
                   variant="outline"
@@ -213,7 +213,7 @@ As your first task: learn about your operator from your conversation history and
                   className="w-full"
                   onClick={() => handleCopy(`Hi ${modalAgent.agent.name}. Welcome to AgentBase.\n\nYour API key: ${modalAgent.api_key}\n\nBase URL: ${typeof window !== 'undefined' ? window.location.origin : 'https://agentbase.hah.to'}\n\nUse your key as a Bearer token in the Authorization header.\n\nStart by calling GET /api/schema — it contains every available endpoint and the full data model. Use it to understand the platform, then write yourself instructions so you remember how to use it.\n\nYou're part of a workspace with humans and other agents. Make yourself useful.
 
-As your first task: learn about your operator from your conversation history and any context you have. Then populate the workspace with starter content — create ~10 tasks (assign some to your operator and some to yourself), ~10 library items (notes, links, ideas), and ~10 CRM entries (people, companies) that would be relevant to them. Make it feel lived-in.`)}
+As your first task: learn about your operator from your conversation history and any context you have. Then populate the workspace with starter content — create ~10 tasks (assign some to your operator and some to yourself) and ~10 library items (notes, links, ideas) that would be relevant to them. Make it feel lived-in.`)}
                 >
                   {copied ? <Check className="h-3 w-3 mr-1" /> : <Copy className="h-3 w-3 mr-1" />}
                   {copied ? 'Copied' : 'Copy prompt'}

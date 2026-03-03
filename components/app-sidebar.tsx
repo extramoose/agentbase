@@ -5,7 +5,6 @@ import { usePathname, useRouter } from 'next/navigation'
 import {
   CheckSquare,
   BookOpen,
-  Users,
   Clock,
   UserCog,
   Bot,
@@ -58,7 +57,6 @@ export type Workspace = {
 const navItems = [
   { label: 'Tasks', href: '/tools/tasks', icon: CheckSquare },
   { label: 'Library', href: '/tools/library', icon: BookOpen },
-  { label: 'CRM', href: '/tools/crm', icon: Users },
   { label: 'History', href: '/history', icon: Clock },
 ]
 

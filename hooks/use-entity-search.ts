@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 
 export type EntitySearchResult = {
   id: string
-  type: 'tasks' | 'people' | 'companies' | 'deals' | 'library_items'
+  type: 'tasks' | 'library_items'
   name: string
   subtitle?: string
   seq_id?: number
@@ -12,9 +12,6 @@ export type EntitySearchResult = {
 
 const SEARCH_TYPE_TO_TABLE: Record<string, string> = {
   tasks: 'tasks',
-  people: 'people',
-  companies: 'companies',
-  deals: 'deals',
   library: 'library_items',
 }
 

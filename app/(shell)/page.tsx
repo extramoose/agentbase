@@ -2,13 +2,12 @@ import { requireAuth } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import {
-  CheckSquare, BookOpen, Users, Clock, UserCircle
+  CheckSquare, BookOpen, Clock
 } from 'lucide-react'
 
 const TOOLS = [
   { href: '/tools/tasks',    label: 'Tasks',    icon: CheckSquare, desc: 'Manage your work queue' },
   { href: '/tools/library',  label: 'Library',  icon: BookOpen,    desc: 'Save links, notes & ideas' },
-  { href: '/tools/crm',      label: 'CRM',      icon: Users,       desc: 'Companies, people & deals' },
   { href: '/history',        label: 'History',  icon: Clock,       desc: 'All recent activity' },
 ]
 
@@ -19,12 +18,10 @@ export default async function HomePage() {
   const [
     { count: taskCount },
     { count: libraryCount },
-    { count: crmCount },
     { count: doneToday },
   ] = await Promise.all([
     supabase.from('tasks').select('*', { count: 'exact', head: true }).eq('status', 'in_progress'),
     supabase.from('library_items').select('*', { count: 'exact', head: true }),
-    supabase.from('people').select('*', { count: 'exact', head: true }),
     supabase.from('tasks').select('*', { count: 'exact', head: true })
       .eq('status', 'done')
       .gte('updated_at', new Date(new Date().setHours(0, 0, 0, 0)).toISOString()),
@@ -46,16 +43,15 @@ export default async function HomePage() {
         <p className="text-muted-foreground mt-1 text-sm">Here&apos;s your workspace at a glance.</p>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-8">
         <StatCard label="In progress" value={taskCount ?? 0} href="/tools/tasks?status=in_progress" icon={CheckSquare} />
         <StatCard label="Done today" value={doneToday ?? 0} href="/tools/tasks?status=done" icon={CheckSquare} />
-        <StatCard label="Contacts" value={crmCount ?? 0} href="/tools/crm" icon={UserCircle} />
         <StatCard label="Library" value={libraryCount ?? 0} href="/tools/library" icon={BookOpen} />
       </div>
 
       <div className="border-t border-border my-2" />
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         {TOOLS.map(tool => {
           const Icon = tool.icon
           return (

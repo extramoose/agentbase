@@ -3,15 +3,12 @@ import { apiError } from '@/lib/api/errors'
 import { broadcastMutation } from '@/lib/api/broadcast'
 import { z } from 'zod'
 
-const ALLOWED_TABLES = ['tasks', 'library_items', 'companies', 'people', 'deals'] as const
+const ALLOWED_TABLES = ['tasks', 'library_items'] as const
 
-// Accept both table names ("companies") and singular entity types ("company")
+// Accept both table names and singular entity types
 const ENTITY_TYPE_TO_TABLE: Record<string, typeof ALLOWED_TABLES[number]> = {
   task: 'tasks',
   library_item: 'library_items',
-  company: 'companies',
-  person: 'people',
-  deal: 'deals',
 }
 
 const schema = z.object({
@@ -27,7 +24,7 @@ const schema = z.object({
   id: z.string().uuid(),
 })
 
-const NAME_TABLES: ReadonlySet<string> = new Set(['companies', 'people'])
+const NAME_TABLES: ReadonlySet<string> = new Set<string>()
 
 export async function POST(request: Request) {
   try {
@@ -45,7 +42,7 @@ export async function POST(request: Request) {
     const { data: entity } = await supabase.from(table).select(`id, ${labelCol}`).eq('id', id).single()
     const label = entity ? (entity as Record<string, string>)[labelCol] ?? id : id
 
-    // Hard delete for tasks; soft delete for CRM + library via RPC (bypasses RLS for agents)
+    // Hard delete for tasks; soft delete for library via RPC (bypasses RLS for agents)
     if (table === 'tasks') {
       const { error } = await supabase.from(table).delete().eq('id', id).eq('tenant_id', tenantId)
       if (error) return apiError(error)

@@ -2,30 +2,21 @@ import { resolveActorUnified } from '@/lib/api/resolve-actor'
 import { apiError } from '@/lib/api/errors'
 import { filterInMemory, paginateInMemory } from '@/lib/api/list-query'
 
-const ALL_TYPES = ['tasks', 'people', 'companies', 'deals', 'library'] as const
+const ALL_TYPES = ['tasks', 'library'] as const
 type SearchType = (typeof ALL_TYPES)[number]
 
 const SEARCH_COLUMNS: Record<SearchType, string[]> = {
   tasks: ['title', 'body'],
-  people: ['name', 'email', 'title', 'notes'],
-  companies: ['name', 'website', 'notes'],
-  deals: ['name', 'notes'],
   library: ['title', 'url', 'excerpt', 'body'],
 }
 
 const TABLE_NAMES: Record<SearchType, string> = {
   tasks: 'tasks',
-  people: 'people',
-  companies: 'companies',
-  deals: 'deals',
   library: 'library_items',
 }
 
 const RPC_NAMES: Record<SearchType, string> = {
   tasks: 'rpc_list_tasks',
-  people: 'rpc_list_people',
-  companies: 'rpc_list_companies',
-  deals: 'rpc_list_deals',
   library: 'rpc_list_library_items',
 }
 
