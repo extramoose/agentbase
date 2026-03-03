@@ -34,8 +34,18 @@ export function ActorChip({ actorId, actorType, compact = false, nameOnly = fals
   const [imgError, setImgError] = useState(false)
   const supabase = createClient()
 
+  // Reset state when actorId changes so we don't show a stale name from a
+  // previously-rendered actor (the useState initializer only runs on mount).
+  useEffect(() => {
+    const cached = actorCache.get(actorId) ?? null
+    setActor(cached)
+    setImgError(false)
+  }, [actorId])
+
   useEffect(() => {
     if (actor) return
+
+    let cancelled = false
 
     async function resolve() {
       // If explicitly an agent (or profiles lookup fails), check agents table
@@ -48,7 +58,7 @@ export function ActorChip({ actorId, actorType, compact = false, nameOnly = fals
         if (data) {
           const resolved = { id: data.id, displayName: data.name, avatar_url: data.revoked_at ? null : data.avatar_url, revoked: !!data.revoked_at }
           actorCache.set(actorId, resolved)
-          setActor(resolved)
+          if (!cancelled) setActor(resolved)
           return
         }
       }
@@ -67,7 +77,7 @@ export function ActorChip({ actorId, actorType, compact = false, nameOnly = fals
           avatar_url: profile.avatar_url,
         }
         actorCache.set(actorId, resolved)
-        setActor(resolved)
+        if (!cancelled) setActor(resolved)
         return
       }
 
@@ -81,7 +91,7 @@ export function ActorChip({ actorId, actorType, compact = false, nameOnly = fals
       if (agent) {
         const resolved = { id: agent.id, displayName: agent.name, avatar_url: agent.revoked_at ? null : agent.avatar_url, revoked: !!agent.revoked_at }
         actorCache.set(actorId, resolved)
-        setActor(resolved)
+        if (!cancelled) setActor(resolved)
         return
       }
 
@@ -92,11 +102,12 @@ export function ActorChip({ actorId, actorType, compact = false, nameOnly = fals
         avatar_url: null,
       }
       actorCache.set(actorId, fallback)
-      setActor(fallback)
+      if (!cancelled) setActor(fallback)
     }
 
     resolve()
-  }, [actorId, actorType, actor])
+    return () => { cancelled = true }
+  }, [actorId, actorType, actor, supabase])
 
   const displayName = actor?.displayName ?? '…'
   const initials = displayName === '…' ? '?' : displayName.slice(0, 2).toUpperCase()

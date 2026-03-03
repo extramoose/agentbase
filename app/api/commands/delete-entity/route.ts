@@ -5,10 +5,29 @@ import { z } from 'zod'
 
 const ALLOWED_TABLES = ['tasks', 'library_items', 'companies', 'people', 'deals'] as const
 
+// Accept both table names ("companies") and singular entity types ("company")
+const ENTITY_TYPE_TO_TABLE: Record<string, typeof ALLOWED_TABLES[number]> = {
+  task: 'tasks',
+  library_item: 'library_items',
+  company: 'companies',
+  person: 'people',
+  deal: 'deals',
+}
+
 const schema = z.object({
-  table: z.enum(ALLOWED_TABLES),
+  table: z.string().transform((val) => {
+    const mapped = ENTITY_TYPE_TO_TABLE[val]
+    if (mapped) return mapped
+    if ((ALLOWED_TABLES as readonly string[]).includes(val)) return val as typeof ALLOWED_TABLES[number]
+    return val // let the refinement below reject it
+  }).refine((val): val is typeof ALLOWED_TABLES[number] =>
+    (ALLOWED_TABLES as readonly string[]).includes(val),
+    { message: `table must be one of: ${ALLOWED_TABLES.join(', ')}` },
+  ),
   id: z.string().uuid(),
 })
+
+const NAME_TABLES: ReadonlySet<string> = new Set(['companies', 'people'])
 
 export async function POST(request: Request) {
   try {
@@ -22,7 +41,7 @@ export async function POST(request: Request) {
     }
 
     // Capture label before delete (best effort)
-    const labelCol = [, 'companies', 'people'].includes(table) ? 'name' : 'title'
+    const labelCol = NAME_TABLES.has(table) ? 'name' : 'title'
     const { data: entity } = await supabase.from(table).select(`id, ${labelCol}`).eq('id', id).single()
     const label = entity ? (entity as Record<string, string>)[labelCol] ?? id : id
 
@@ -34,6 +53,7 @@ export async function POST(request: Request) {
       await supabase.from('activity_log').insert({
         entity_type: table,
         entity_id: id,
+        entity_label: typeof label === 'string' ? label : null,
         tenant_id: tenantId,
         actor_id: actorId,
         actor_type: actorType,
@@ -42,7 +62,6 @@ export async function POST(request: Request) {
       })
     } else {
       // RPC is SECURITY DEFINER — works even when agent has no JWT / auth.uid()
-      // It also logs field-level activity automatically
       const { error } = await supabase.rpc('rpc_update_entity', {
         p_table: table,
         p_entity_id: id,
@@ -51,6 +70,19 @@ export async function POST(request: Request) {
         p_tenant_id: tenantId,
       })
       if (error) return apiError(error)
+
+      // Log a proper "deleted" event so the history feed shows the correct verb.
+      // The RPC above only logs field_updated for deleted_at.
+      await supabase.from('activity_log').insert({
+        entity_type: table,
+        entity_id: id,
+        entity_label: typeof label === 'string' ? label : null,
+        tenant_id: tenantId,
+        actor_id: actorId,
+        actor_type: actorType,
+        event_type: 'deleted',
+        payload: { label },
+      })
     }
 
     if (actorType === 'agent') {
