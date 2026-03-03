@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useRef, useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
@@ -24,7 +25,7 @@ interface StickyTask {
 
 interface StickiesViewProps {
   tasks: StickyTask[]
-  onTaskClick: (task: StickyTask) => void
+  taskHref: (task: StickyTask) => string
   mode?: 'timeframe' | 'status'
   recentlyChanged?: Set<string>
 }
@@ -231,12 +232,12 @@ const SIZE_CONFIG = {
 function StickyCard({
   task,
   size,
-  onClick,
+  href,
   highlight,
 }: {
   task: StickyTask
   size: 'large' | 'medium' | 'small'
-  onClick: () => void
+  href: string
   highlight?: boolean
 }) {
   const config = SIZE_CONFIG[size]
@@ -244,16 +245,15 @@ function StickyCard({
   const extraTagCount = (task.tags ?? []).length - visibleTags.length
 
   return (
-    <button
-      onClick={onClick}
+    <Link
+      href={href}
       className={cn(
-        'flex flex-col justify-between rounded-xl border-2 shadow-md p-4 text-left transition-shadow hover:shadow-lg hover:border-foreground/30 shrink-0 cursor-pointer',
+        'flex flex-col justify-between rounded-xl border-2 shadow-md p-4 text-left transition-shadow hover:shadow-lg hover:border-foreground/30 shrink-0 cursor-pointer no-underline',
         config.card,
         size === 'small'
           ? 'bg-gray-50 border-gray-200 opacity-80 dark:bg-gray-900/40 dark:border-gray-700'
           : PRIORITY_STYLES[task.priority],
         highlight && 'animate-sticky-pulse',
-
       )}
     >
       <div className="flex-1 min-h-0">
@@ -293,17 +293,17 @@ function StickyCard({
           </span>
         )}
       </div>
-    </button>
+    </Link>
   )
 }
 
 function SwimLane({
   lane,
-  onTaskClick,
+  taskHref,
   recentlyChanged,
 }: {
   lane: Lane
-  onTaskClick: (task: StickyTask) => void
+  taskHref: (task: StickyTask) => string
   recentlyChanged?: Set<string>
 }) {
   const router = useRouter()
@@ -369,7 +369,7 @@ function SwimLane({
               key={task.id}
               task={task}
               size={lane.size}
-              onClick={() => onTaskClick(task)}
+              href={taskHref(task)}
               highlight={recentlyChanged?.has(task.id)}
             />
           ))}
@@ -390,7 +390,7 @@ function SwimLane({
   )
 }
 
-export function StickiesView({ tasks, onTaskClick, mode = 'timeframe', recentlyChanged }: StickiesViewProps) {
+export function StickiesView({ tasks, taskHref, mode = 'timeframe', recentlyChanged }: StickiesViewProps) {
   const lanes = useMemo(
     () => mode === 'status' ? categorizeByStatus(tasks) : categorizeTasks(tasks),
     [tasks, mode],
@@ -402,7 +402,7 @@ export function StickiesView({ tasks, onTaskClick, mode = 'timeframe', recentlyC
         <SwimLane
           key={lane.key}
           lane={lane}
-          onTaskClick={onTaskClick}
+          taskHref={taskHref}
           recentlyChanged={recentlyChanged}
         />
       ))}

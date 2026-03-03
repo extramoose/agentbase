@@ -75,6 +75,11 @@ export function AppSidebar({ profile, workspaces, onNavigate }: { profile: UserP
   const [profileSaving, setProfileSaving] = useState(false)
 
   function isActive(href: string) {
+    // Shelf URLs like /tasks/123 or /tasks/<uuid> should not highlight any nav
+    // item — the shelf is an overlay and the underlying page owns the highlight.
+    const isShelfUrl = /^\/tasks\/[\w-]+$/.test(pathname)
+    if (isShelfUrl) return false
+
     return pathname === href || pathname.startsWith(href + '/')
   }
 

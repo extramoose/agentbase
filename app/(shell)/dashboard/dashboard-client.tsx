@@ -358,11 +358,10 @@ export function DashboardClient({
   // --- Apply filters ---
   const filteredTasks = useMemo(() => applyFilters(tasks), [tasks, applyFilters])
 
-  const handleTaskClick = useCallback((task: Task | { id: string }) => {
-    // Find full task to get ticket_id for the URL
+  const taskHref = useCallback((task: { id: string; ticket_id?: number }) => {
     const full = tasks.find((t) => t.id === task.id)
-    if (full) router.push(`/tasks/${full.ticket_id}`)
-  }, [tasks, router])
+    return `/tasks/${full?.ticket_id ?? task.ticket_id}`
+  }, [tasks])
 
   return (
     <div className="flex flex-col h-full">
@@ -383,7 +382,7 @@ export function DashboardClient({
 
       <StickiesView
         tasks={filteredTasks}
-        onTaskClick={handleTaskClick}
+        taskHref={taskHref}
         mode={dashboardView}
         recentlyChanged={recentlyChanged}
       />
