@@ -120,9 +120,14 @@ export function useTaskFilters(workspaceId: string, currentUserId?: string) {
   )
 
   // --- Dashboard view (status | timeframe) ---
-  const [dashboardView, setDashboardViewRaw] = useState<DashboardView>(() =>
-    lsGet<DashboardView>(dashboardViewKey, 'timeframe')
-  )
+  // Initialize with fixed default to avoid SSR/client hydration mismatch.
+  // Read from localStorage only after mount via useEffect.
+  const [dashboardView, setDashboardViewRaw] = useState<DashboardView>('timeframe')
+  useEffect(() => {
+    const stored = lsGet<DashboardView>(dashboardViewKey, 'timeframe')
+    setDashboardViewRaw(stored)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dashboardViewKey])
 
   const setDashboardView = useCallback(
     (v: DashboardView) => {
