@@ -28,10 +28,10 @@ export function TagCombobox({ selected, onChange, className }: TagComboboxProps)
   const inputRef = useRef<HTMLInputElement>(null)
   const supabase = createClient()
 
-  // Load all workspace tags once
+  // Load all workspace tags once (aggregated from entity tables via RPC)
   useEffect(() => {
-    supabase.from('tags').select('name').order('name')
-      .then(({ data }) => setAllTags((data ?? []).map(t => t.name)))
+    supabase.rpc('rpc_get_all_tags')
+      .then(({ data }) => setAllTags((data ?? []).map((t: { tag: string }) => t.tag).sort()))
   }, [])
 
   // Filter suggestions as user types
