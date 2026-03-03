@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
   Plus,
   Filter,
@@ -12,8 +12,13 @@ import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { TagCombobox } from '@/components/tag-combobox'
-import { AssigneePicker } from '@/components/assignee-picker'
 import { cn } from '@/lib/utils'
 import type {
   DashboardView,
@@ -43,6 +48,24 @@ const PRIORITY_OPTIONS: { value: Priority; label: string }[] = [
   { value: 'low', label: 'Low' },
   { value: 'none', label: 'None' },
 ]
+
+// ---------------------------------------------------------------------------
+// useIsMobile hook (inline, no extra file needed)
+// ---------------------------------------------------------------------------
+
+function useIsMobile(breakpoint = 768) {
+  const [isMobile, setIsMobile] = useState(false)
+
+  useEffect(() => {
+    const mql = window.matchMedia(`(max-width: ${breakpoint - 1}px)`)
+    const onChange = () => setIsMobile(mql.matches)
+    onChange()
+    mql.addEventListener('change', onChange)
+    return () => mql.removeEventListener('change', onChange)
+  }, [breakpoint])
+
+  return isMobile
+}
 
 // ---------------------------------------------------------------------------
 // Props
@@ -93,6 +116,7 @@ export function PageHeader({
   onNewTask,
 }: PageHeaderProps) {
   const [filterOpen, setFilterOpen] = useState(false)
+  const isMobile = useIsMobile()
 
   // --- Pill helpers ---
   const pills: { key: string; label: string; onRemove: () => void }[] = []
@@ -135,27 +159,30 @@ export function PageHeader({
     })
   }
 
-  if (filters.assignee) {
-    const member = workspaceMembers.find((m) => m.id === filters.assignee)
-    pills.push({
-      key: 'assignee',
-      label: `Assignee: ${member?.name ?? 'Unknown'}`,
-      onRemove: () => onFiltersChange({ ...filters, assignee: null }),
-    })
-  }
+  // --- Shared filter content (reused by popover and dialog) ---
+  const filterContent = (
+    <FilterPopoverContent
+      filters={filters}
+      onFiltersChange={onFiltersChange}
+      onClearFilters={onClearFilters}
+      workspaceMembers={isMobile ? workspaceMembers : []}
+      facePile={isMobile ? facePile : []}
+      onToggleFacePile={isMobile ? onToggleFacePile : undefined}
+    />
+  )
 
   return (
     <div className="mb-4 space-y-2">
       {/* Row 1 */}
-      <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-4">
+      <div className="flex items-center justify-between gap-2">
         {/* Left: title */}
         <h1 className="text-xl sm:text-2xl font-bold shrink-0">{title}</h1>
 
         {/* Right: face pile + view toggle + filter + new task */}
-        <div className="flex items-center gap-2 flex-wrap">
-          {/* Face pile */}
+        <div className="flex items-center gap-2">
+          {/* Face pile — hidden on mobile (moved into filter panel) */}
           {workspaceMembers.length > 0 && (
-            <div className="flex -space-x-1">
+            <div className="hidden md:flex -space-x-1">
               {workspaceMembers.map((m) => {
                 const selected = facePile.includes(m.id)
                 return (
@@ -184,9 +211,9 @@ export function PageHeader({
             </div>
           )}
 
-          {/* View toggle (Dashboard only) */}
+          {/* View toggle (Dashboard only) — hidden on mobile */}
           {showViewToggle && dashboardView != null && onDashboardViewChange && (
-            <>
+            <div className="hidden md:flex items-center gap-2">
               <div className="w-px h-5 bg-border" />
               <div className="flex rounded-md border border-border overflow-hidden">
                 <button
@@ -214,29 +241,49 @@ export function PageHeader({
                   <BarChart3 className="h-4 w-4" />
                 </button>
               </div>
-            </>
+            </div>
           )}
 
-          {/* Filter button */}
-          <Popover open={filterOpen} onOpenChange={setFilterOpen}>
-            <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className="relative">
+          {/* Filter button — desktop: popover, mobile: dialog */}
+          {isMobile ? (
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                className="relative"
+                onClick={() => setFilterOpen(true)}
+              >
                 <Filter className="h-4 w-4 mr-1" />
                 Filter
                 {hasActiveFilters && (
                   <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-primary" />
                 )}
               </Button>
-            </PopoverTrigger>
-            <PopoverContent align="end" className="w-80 p-0">
-              <FilterPopoverContent
-                filters={filters}
-                onFiltersChange={onFiltersChange}
-                onClearFilters={onClearFilters}
-                workspaceMembers={workspaceMembers}
-              />
-            </PopoverContent>
-          </Popover>
+              <Dialog open={filterOpen} onOpenChange={setFilterOpen}>
+                <DialogContent className="sm:max-w-md fixed bottom-0 left-0 right-0 top-auto translate-x-0 translate-y-0 rounded-t-xl rounded-b-none max-h-[85vh] p-0 gap-0">
+                  <DialogHeader className="px-4 pt-4 pb-2 border-b border-border">
+                    <DialogTitle className="text-sm font-semibold">Filters</DialogTitle>
+                  </DialogHeader>
+                  {filterContent}
+                </DialogContent>
+              </Dialog>
+            </>
+          ) : (
+            <Popover open={filterOpen} onOpenChange={setFilterOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="relative">
+                  <Filter className="h-4 w-4 mr-1" />
+                  Filter
+                  {hasActiveFilters && (
+                    <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-primary" />
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-80 p-0">
+                {filterContent}
+              </PopoverContent>
+            </Popover>
+          )}
 
           {/* New Task */}
           <Button size="sm" onClick={onNewTask}>
@@ -249,9 +296,7 @@ export function PageHeader({
 
       {/* Row 2: active filter pills (conditional) */}
       {pills.length > 0 && (
-        <div
-          className="flex items-center gap-1.5 flex-wrap animate-in fade-in slide-in-from-top-1 duration-200"
-        >
+        <div className="flex items-center gap-1.5 flex-wrap animate-in fade-in slide-in-from-top-1 duration-200">
           {pills.map((pill) => (
             <Badge
               key={pill.key}
@@ -288,11 +333,15 @@ function FilterPopoverContent({
   onFiltersChange,
   onClearFilters,
   workspaceMembers,
+  facePile,
+  onToggleFacePile,
 }: {
   filters: TaskFilters
   onFiltersChange: (f: TaskFilters) => void
   onClearFilters: () => void
   workspaceMembers: WorkspaceMember[]
+  facePile: string[]
+  onToggleFacePile?: (id: string) => void
 }) {
   const toggleStatus = useCallback(
     (s: Status) => {
@@ -315,10 +364,44 @@ function FilterPopoverContent({
   )
 
   return (
-    <div className="p-4 space-y-4 max-h-[70vh] overflow-y-auto">
+    <div className="p-4 space-y-5 max-h-[70vh] overflow-y-auto">
+      {/* Assignee face pile — mobile only */}
+      {workspaceMembers.length > 0 && onToggleFacePile && (
+        <section>
+          <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2 block">
+            Members
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {workspaceMembers.map((m) => {
+              const selected = facePile.includes(m.id)
+              return (
+                <button
+                  key={m.id}
+                  onClick={() => onToggleFacePile(m.id)}
+                  className={cn(
+                    'flex items-center gap-1.5 rounded-full border px-2 py-1 text-xs transition-colors',
+                    selected
+                      ? 'border-primary bg-primary/10 text-foreground'
+                      : 'border-border text-muted-foreground hover:border-foreground/30',
+                  )}
+                >
+                  <Avatar className="h-5 w-5">
+                    <AvatarImage src={m.avatarUrl ?? undefined} alt={m.name ?? '?'} />
+                    <AvatarFallback className="text-[8px]">
+                      {(m.name ?? '?').slice(0, 2).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="max-w-[80px] truncate">{m.name ?? '?'}</span>
+                </button>
+              )
+            })}
+          </div>
+        </section>
+      )}
+
       {/* Status (multi-select) */}
-      <div>
-        <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
+      <section>
+        <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2 block">
           Status
         </label>
         <div className="flex flex-wrap gap-1.5">
@@ -337,11 +420,14 @@ function FilterPopoverContent({
             </button>
           ))}
         </div>
-      </div>
+      </section>
+
+      {/* Divider */}
+      <div className="border-t border-border" />
 
       {/* Priority (multi-select) */}
-      <div>
-        <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
+      <section>
+        <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2 block">
           Priority
         </label>
         <div className="flex flex-wrap gap-1.5">
@@ -360,46 +446,28 @@ function FilterPopoverContent({
             </button>
           ))}
         </div>
-      </div>
+      </section>
 
-      {/* Tags (existing component) */}
-      <div>
-        <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
+      {/* Divider */}
+      <div className="border-t border-border" />
+
+      {/* Tags — filter only (no create) */}
+      <section>
+        <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2 block">
           Tags
         </label>
         <TagCombobox
           selected={filters.tags}
           onChange={(tags) => onFiltersChange({ ...filters, tags })}
+          allowCreate={false}
         />
-      </div>
-
-      {/* Assignee (existing component) */}
-      <div>
-        <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
-          Assignee
-        </label>
-        <AssigneePicker
-          value={
-            filters.assignee
-              ? {
-                  id: filters.assignee,
-                  type:
-                    (workspaceMembers.find((m) => m.id === filters.assignee)
-                      ?.role as 'human' | 'agent') ?? 'human',
-                }
-              : null
-          }
-          onChange={(actor) =>
-            onFiltersChange({ ...filters, assignee: actor?.id ?? null })
-          }
-        />
-      </div>
+      </section>
 
       {/* Clear all */}
       <div className="border-t border-border pt-3">
         <button
           onClick={onClearFilters}
-          className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+          className="text-xs text-muted-foreground hover:text-foreground transition-colors w-full text-center py-1"
         >
           Clear all filters
         </button>

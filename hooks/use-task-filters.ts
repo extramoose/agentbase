@@ -23,7 +23,6 @@ export type TaskFilters = {
   status: Status[]
   priority: Priority[]
   tags: string[]
-  assignee: string | null
 }
 
 // ---------------------------------------------------------------------------
@@ -84,7 +83,7 @@ export function useTaskFilters(workspaceId: string, currentUserId?: string) {
 
   // --- Filters ---
   const [filters, setFiltersRaw] = useState<TaskFilters>(() =>
-    lsGet<TaskFilters>(filtersKey, { status: [], priority: [], tags: [], assignee: null })
+    lsGet<TaskFilters>(filtersKey, { status: [], priority: [], tags: [] })
   )
 
   const setFilters = useCallback(
@@ -107,7 +106,7 @@ export function useTaskFilters(workspaceId: string, currentUserId?: string) {
   )
 
   const clearFilters = useCallback(() => {
-    const empty: TaskFilters = { status: [], priority: [], tags: [], assignee: null }
+    const empty: TaskFilters = { status: [], priority: [], tags: [] }
     setFiltersRaw(empty)
     lsSet(filtersKey, empty)
   }, [filtersKey])
@@ -116,8 +115,7 @@ export function useTaskFilters(workspaceId: string, currentUserId?: string) {
     () =>
       filters.status.length > 0 ||
       filters.priority.length > 0 ||
-      filters.tags.length > 0 ||
-      filters.assignee !== null,
+      filters.tags.length > 0,
     [filters],
   )
 
@@ -229,11 +227,6 @@ export function useTaskFilters(workspaceId: string, currentUserId?: string) {
         result = result.filter((t) =>
           filters.tags.some((tag) => (t.tags ?? []).includes(tag))
         )
-      }
-
-      // Assignee filter (from popover, separate from face pile)
-      if (filters.assignee) {
-        result = result.filter((t) => t.assignee_id === filters.assignee)
       }
 
       return result

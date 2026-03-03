@@ -17,9 +17,11 @@ interface TagComboboxProps {
   selected: string[]
   onChange: (tags: string[]) => void
   className?: string
+  /** When false, hides the "Create new tag" option (useful for filter-only contexts). Defaults to true. */
+  allowCreate?: boolean
 }
 
-export function TagCombobox({ selected, onChange, className }: TagComboboxProps) {
+export function TagCombobox({ selected, onChange, className, allowCreate = true }: TagComboboxProps) {
   const [inputValue, setInputValue] = useState('')
   const [suggestions, setSuggestions] = useState<string[]>([])
   const [allTags, setAllTags] = useState<string[]>([])
@@ -69,7 +71,7 @@ export function TagCombobox({ selected, onChange, className }: TagComboboxProps)
       e.preventDefault()
       if (activeIndex >= 0 && suggestions[activeIndex]) {
         addTag(suggestions[activeIndex])
-      } else if (inputValue.trim()) {
+      } else if (inputValue.trim() && (allowCreate || allTags.includes(inputValue.trim()))) {
         addTag(inputValue)
       }
     } else if (e.key === 'Backspace' && !inputValue && selected.length > 0) {
@@ -150,7 +152,7 @@ export function TagCombobox({ selected, onChange, className }: TagComboboxProps)
                 {tag}
               </li>
             ))}
-            {inputValue.trim() && !allTags.includes(inputValue.trim()) && (
+            {allowCreate && inputValue.trim() && !allTags.includes(inputValue.trim()) && (
               <li
                 className={cn(
                   'px-3 py-1.5 text-sm cursor-pointer text-muted-foreground hover:bg-muted/50',
