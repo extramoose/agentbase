@@ -7,7 +7,6 @@
     "Task create: POST /api/commands/create-task. Task update: POST /api/commands/update-task with {id: UUID, fields: {...}}.",
     "Never use service_role key. All DB ops go through anon key + RLS or SECURITY DEFINER RPCs.",
     "Migrations are run manually by Hunter in Supabase SQL editor — create the file and flag it.",
-    "Do not call router.refresh() in real-time handlers.",
-    "Soft delete only (deleted_at timestamp) for CRM and library entities."
+    "Do not call router.refresh() in real-time handlers."
   ]
 }

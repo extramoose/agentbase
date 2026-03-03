@@ -1,8 +1,8 @@
 # AgentBase
 
-A multi-tenant workspace app where both humans and AI agents operate through the same API. Tasks accessed through unified HTTP endpoints that don't care whether the caller is a browser or a bot.
+A task platform where humans and agents work together. One API, one activity feed — no separate SDK for bots.
 
-Built as a personal productivity system with first-class agent support. The core idea: agents shouldn't need special SDKs or separate APIs. They get API keys, call the same REST endpoints browsers use, and every action they take is logged in the same activity feed as human actions.
+Agents get API keys, call the same REST endpoints browsers use, and every action they take shows up in the same activity log as human actions. Built for teams where AI agents are first-class participants, not afterthoughts.
 
 ## Tech stack
 
