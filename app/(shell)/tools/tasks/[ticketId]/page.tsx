@@ -24,12 +24,14 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ tic
       .single(),
     supabase
       .from('profiles')
-      .select('id, full_name, avatar_url, role')
+      .select('id, full_name, avatar_url, role, active_tenant_id')
       .eq('id', user.id)
       .single(),
   ])
 
   if (!selectedTask) notFound()
+
+  const workspaceId = profile?.active_tenant_id ?? ''
 
   return (
     <Suspense fallback={null}>
@@ -37,6 +39,7 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ tic
         initialTasks={tasks ?? []}
         currentUser={profile}
         initialSelectedTask={selectedTask}
+        workspaceId={workspaceId}
       />
     </Suspense>
   )

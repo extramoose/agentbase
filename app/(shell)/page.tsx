@@ -2,10 +2,11 @@ import { requireAuth } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import {
-  CheckSquare, Clock
+  LayoutDashboard, CheckSquare, Clock
 } from 'lucide-react'
 
 const TOOLS = [
+  { href: '/dashboard',      label: 'Dashboard', icon: LayoutDashboard, desc: 'Visual task board' },
   { href: '/tools/tasks',    label: 'Tasks',    icon: CheckSquare, desc: 'Manage your work queue' },
   { href: '/history',        label: 'History',  icon: Clock,       desc: 'All recent activity' },
 ]

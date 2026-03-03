@@ -1,9 +1,9 @@
 import { Suspense } from 'react'
 import { requireAuth } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
-import { TasksClient } from './tasks-client'
+import { DashboardClient } from './dashboard-client'
 
-export default async function TasksPage() {
+export default async function DashboardPage() {
   const user = await requireAuth()
   const supabase = await createClient()
 
@@ -23,7 +23,11 @@ export default async function TasksPage() {
 
   return (
     <Suspense fallback={null}>
-      <TasksClient initialTasks={tasks ?? []} currentUser={profile} workspaceId={workspaceId} />
+      <DashboardClient
+        initialTasks={tasks ?? []}
+        currentUser={profile}
+        workspaceId={workspaceId}
+      />
     </Suspense>
   )
 }

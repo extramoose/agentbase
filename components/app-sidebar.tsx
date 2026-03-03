@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
+  LayoutDashboard,
   CheckSquare,
   Clock,
   UserCog,
@@ -54,6 +55,7 @@ export type Workspace = {
 }
 
 const navItems = [
+  { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { label: 'Tasks', href: '/tools/tasks', icon: CheckSquare },
   { label: 'History', href: '/history', icon: Clock },
 ]
@@ -91,7 +93,7 @@ export function AppSidebar({ profile, workspaces, onNavigate }: { profile: UserP
         body: JSON.stringify({ tenant_id: tenantId }),
       })
       if (!res.ok) throw new Error('Failed to switch workspace')
-      window.location.href = '/tools/tasks'
+      window.location.href = '/dashboard'
     } finally {
       setSwitching(false)
     }
@@ -139,7 +141,7 @@ export function AppSidebar({ profile, workspaces, onNavigate }: { profile: UserP
         throw new Error(body.error || 'Failed to create workspace')
       }
       closeDialog()
-      window.location.href = "/tools/tasks"
+      window.location.href = "/dashboard"
     } catch (err) {
       setDialogError(err instanceof Error ? err.message : 'Something went wrong')
     } finally {
