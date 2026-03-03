@@ -7,7 +7,7 @@ import {
 
 const TOOLS = [
   { href: '/dashboard',      label: 'Dashboard', icon: LayoutDashboard, desc: 'Visual task board' },
-  { href: '/tools/tasks',    label: 'Tasks',    icon: CheckSquare, desc: 'Manage your work queue' },
+  { href: '/tasks',           label: 'Tasks',    icon: CheckSquare, desc: 'Manage your work queue' },
   { href: '/history',        label: 'History',  icon: Clock,       desc: 'All recent activity' },
 ]
 
@@ -42,8 +42,8 @@ export default async function HomePage() {
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-8">
-        <StatCard label="In progress" value={taskCount ?? 0} href="/tools/tasks?status=in_progress" icon={CheckSquare} />
-        <StatCard label="Done today" value={doneToday ?? 0} href="/tools/tasks?status=done" icon={CheckSquare} />
+        <StatCard label="In progress" value={taskCount ?? 0} href="/tasks?status=in_progress" icon={CheckSquare} />
+        <StatCard label="Done today" value={doneToday ?? 0} href="/tasks?status=done" icon={CheckSquare} />
       </div>
 
       <div className="border-t border-border my-2" />

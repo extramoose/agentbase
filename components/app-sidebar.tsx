@@ -56,7 +56,7 @@ export type Workspace = {
 
 const navItems = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { label: 'Tasks', href: '/tools/tasks', icon: CheckSquare },
+  { label: 'Tasks', href: '/tasks', icon: CheckSquare },
   { label: 'History', href: '/history', icon: Clock },
 ]
 

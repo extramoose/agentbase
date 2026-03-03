@@ -197,6 +197,7 @@ export function OnboardingClient({ skipWorkspace, skipProfile }: { skipWorkspace
         {step === 'intro-you' && (
           <div className="rounded-xl border border-border bg-card overflow-hidden">
             <div className="p-2">
+              {/* eslint-disable-next-line @next/next/no-img-element -- onboarding images are externally hosted */}
               <img
                 src="/onboarding/onboarding1.png"
                 alt="You, doing everything alone"
@@ -217,6 +218,7 @@ export function OnboardingClient({ skipWorkspace, skipProfile }: { skipWorkspace
         {step === 'intro-agents' && (
           <div className="rounded-xl border border-border bg-card overflow-hidden">
             <div className="p-2">
+              {/* eslint-disable-next-line @next/next/no-img-element -- onboarding images are externally hosted */}
               <img
                 src="/onboarding/onboarding2.png"
                 alt="Now you have help"
@@ -239,7 +241,7 @@ export function OnboardingClient({ skipWorkspace, skipProfile }: { skipWorkspace
                   variant="outline"
                   className="w-full"
                   size="lg"
-                  onClick={() => router.push('/tools/tasks')}
+                  onClick={() => router.push('/tasks')}
                 >
                   Take me to My Tasks
                 </Button>

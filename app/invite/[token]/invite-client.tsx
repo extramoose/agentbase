@@ -27,7 +27,7 @@ export function InviteClient({ token }: { token: string }) {
           message: `Joined ${workspace_name ?? 'workspace'}`,
         })
 
-        window.location.href = '/tools/tasks'
+        window.location.href = '/tasks'
       } catch {
         setError('Something went wrong. Please try again.')
       }

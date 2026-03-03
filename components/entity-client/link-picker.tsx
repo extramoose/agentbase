@@ -32,7 +32,7 @@ const TABLE_LABELS: Record<string, string> = {
 }
 
 const ENTITY_PATH: Record<string, string> = {
-  tasks:         '/tools/tasks',
+  tasks:         '/tasks',
 }
 
 function getChipHref(entityType: string, seqId?: number): string | null {

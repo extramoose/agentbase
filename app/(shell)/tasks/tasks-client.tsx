@@ -881,7 +881,7 @@ function NewTaskShelf({
 // Main client component
 // ---------------------------------------------------------------------------
 
-const BASE_PATH = '/tools/tasks'
+const BASE_PATH = '/tasks'
 
 export function TasksClient({
   initialTasks,
@@ -1257,6 +1257,7 @@ export function TasksClient({
         })
       }
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- _currentUser is read at call time, not a reactive dep
     [statusFilter]
   )
 

@@ -15,12 +15,12 @@ import {
 } from '@/lib/format-activity'
 import { MarkdownRenderer } from '@/components/markdown-renderer'
 import { type BaseEntity, type EntityType } from '@/types/entities'
-import { TaskShelfContent, type Task } from '@/app/(shell)/tools/tasks/tasks-client'
+import { TaskShelfContent, type Task } from '@/app/(shell)/tasks/tasks-client'
 
 /** Maps entity_type (table name) to the front-end path prefix */
 function getEntityPath(entityType: string): string {
   switch (normalizeEntityType(entityType)) {
-    case 'tasks':         return '/tools/tasks'
+    case 'tasks':         return '/tasks'
     default:              return ''
   }
 }

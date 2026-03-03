@@ -19,7 +19,7 @@ type SearchResult = {
 }
 
 const NAV_ITEMS = [
-  { id: 'tasks',    label: 'Tasks',    icon: CheckSquare, href: '/tools/tasks' },
+  { id: 'tasks',    label: 'Tasks',    icon: CheckSquare, href: '/tasks' },
   { id: 'history',  label: 'History',  icon: Clock,       href: '/history' },
 ]
 
@@ -35,7 +35,7 @@ function entityRoute(entity: EntitySearchResult): string {
   switch (entity.type) {
     case 'tasks': {
       const ticketId = entity.subtitle?.match(/^Task #(\d+)$/)?.[1]
-      return `/tools/tasks/${ticketId ?? entity.id}`
+      return `/tasks/${ticketId ?? entity.id}`
     }
     default: return '/'
   }

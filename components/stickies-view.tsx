@@ -24,7 +24,7 @@ interface StickyTask {
 
 interface StickiesViewProps {
   tasks: StickyTask[]
-  onTaskClick: (task: any) => void
+  onTaskClick: (task: StickyTask) => void
   mode?: 'timeframe' | 'status'
   recentlyChanged?: Set<string>
 }
@@ -303,7 +303,7 @@ function SwimLane({
   recentlyChanged,
 }: {
   lane: Lane
-  onTaskClick: (task: any) => void
+  onTaskClick: (task: StickyTask) => void
   recentlyChanged?: Set<string>
 }) {
   const router = useRouter()
@@ -375,7 +375,7 @@ function SwimLane({
           ))}
           {lane.overflow != null && lane.overflow > 0 && (
             <button
-              onClick={() => router.push(`/tools/tasks?status=${lane.key}&view=table`)}
+              onClick={() => router.push(`/tasks?status=${lane.key}&view=table`)}
               className={cn(
                 'flex items-center justify-center rounded-xl border-2 border-dashed border-muted-foreground/30 text-muted-foreground text-sm text-center p-4 shrink-0 cursor-pointer hover:border-muted-foreground/50 transition-colors',
                 SIZE_CONFIG[lane.size].card,

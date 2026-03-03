@@ -27,6 +27,20 @@ const nextConfig: NextConfig = {
       },
     ]
   },
+  async redirects() {
+    return [
+      {
+        source: '/tools/tasks',
+        destination: '/tasks',
+        permanent: true,
+      },
+      {
+        source: '/tools/tasks/:path*',
+        destination: '/tasks/:path*',
+        permanent: true,
+      },
+    ]
+  },
 }
 
 export default nextConfig
