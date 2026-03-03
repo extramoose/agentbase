@@ -58,9 +58,13 @@ export function useTaskFilters(workspaceId: string, currentUserId?: string) {
   const dashboardViewKey = `ab:${workspaceId}:dashboardView`
 
   // --- Face pile (selected member IDs) ---
-  const [facePile, setFacePileRaw] = useState<string[]>(() =>
-    lsGet<string[]>(facePileKey, currentUserId ? [currentUserId] : [])
+  const [facePile, setFacePileRaw] = useState<string[]>(
+    currentUserId ? [currentUserId] : []
   )
+  useEffect(() => {
+    setFacePileRaw(lsGet<string[]>(facePileKey, currentUserId ? [currentUserId] : []))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [facePileKey])
 
   const setFacePile = useCallback(
     (ids: string[]) => {
@@ -82,9 +86,11 @@ export function useTaskFilters(workspaceId: string, currentUserId?: string) {
   )
 
   // --- Filters ---
-  const [filters, setFiltersRaw] = useState<TaskFilters>(() =>
-    lsGet<TaskFilters>(filtersKey, { status: [], priority: [], tags: [] })
-  )
+  const [filters, setFiltersRaw] = useState<TaskFilters>({ status: [], priority: [], tags: [] })
+  useEffect(() => {
+    setFiltersRaw(lsGet<TaskFilters>(filtersKey, { status: [], priority: [], tags: [] }))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtersKey])
 
   const setFilters = useCallback(
     (next: TaskFilters) => {
