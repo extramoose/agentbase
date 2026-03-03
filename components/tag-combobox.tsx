@@ -34,6 +34,7 @@ export function TagCombobox({ selected, onChange, className, allowCreate = true 
   useEffect(() => {
     supabase.rpc('rpc_get_all_tags')
       .then(({ data }) => setAllTags((data ?? []).map((t: { tag: string }) => t.tag).sort()))
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- supabase client is stable
   }, [])
 
   // Filter suggestions as user types

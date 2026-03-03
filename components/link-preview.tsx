@@ -25,7 +25,7 @@ export function LinkPreview({ url, onDismiss, className }: LinkPreviewProps) {
 
   useEffect(() => {
     abortRef.current?.abort()
-    setData(null)
+    setData(null) // eslint-disable-line react-hooks/set-state-in-effect -- reset before async fetch
     setLoading(true)
 
     const controller = new AbortController()
@@ -73,6 +73,7 @@ export function LinkPreview({ url, onDismiss, className }: LinkPreviewProps) {
       {/* Favicon + domain */}
       <div className="flex flex-col items-center gap-1 shrink-0 pt-0.5">
         {data.favicon && (
+          // eslint-disable-next-line @next/next/no-img-element -- dynamic external favicon URL
           <img
             src={data.favicon}
             alt=""
@@ -99,6 +100,7 @@ export function LinkPreview({ url, onDismiss, className }: LinkPreviewProps) {
 
       {/* Thumbnail image */}
       {hasImage && (
+        // eslint-disable-next-line @next/next/no-img-element -- dynamic external image URL
         <img
           src={data.image!}
           alt=""

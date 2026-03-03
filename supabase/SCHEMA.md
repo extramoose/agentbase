@@ -131,43 +131,11 @@ Workspace-scoped tag registry.
 | created_at | timestamptz | NO | `now()` | |
 | updated_at | timestamptz | NO | `now()` | |
 
-### `meetings_people`
-| Column | Type |
-|--------|------|
-| meeting_id | uuid (FK → meetings) |
-| person_id | uuid (FK → people) |
+### ~~`meetings_people`~~ (UI removed — #350)
 
-PK: `(meeting_id, person_id)`
+### ~~`meetings_companies`~~ (UI removed — #350)
 
-### `meetings_companies`
-| Column | Type |
-|--------|------|
-| meeting_id | uuid (FK → meetings) |
-| company_id | uuid (FK → companies) |
-
-PK: `(meeting_id, company_id)`
-
----
-
-### `library_items`
-
-| Column | Type | Nullable | Default | Notes |
-|--------|------|----------|---------|-------|
-| id | uuid | NO | `gen_random_uuid()` | |
-| tenant_id | uuid | NO | — | |
-| type | text | NO | — | CHECK: `favorite \| flag \| restaurant \| note \| idea \| article` |
-| title | text | NO | — | |
-| body | text | YES | — | Markdown notes |
-| url | text | YES | — | |
-| source | text | YES | — | Source site name |
-| excerpt | text | YES | — | |
-| location_name | text | YES | — | Human-readable location |
-| latitude | numeric | YES | — | |
-| longitude | numeric | YES | — | |
-| is_public | boolean | NO | `false` | |
-| tags | text[] | YES | `'{}'` | |
-| created_at | timestamptz | NO | `now()` | |
-| updated_at | timestamptz | NO | `now()` | |
+### ~~`library_items`~~ (UI removed — #351)
 
 ---
 
@@ -218,72 +186,17 @@ Timeless living documents. No phases, no dates — a single document per essay t
 
 ---
 
-### `companies`
+### ~~`companies`~~ (UI removed — #350)
 
-| Column | Type | Nullable | Default |
-|--------|------|----------|---------|
-| id | uuid | NO | `gen_random_uuid()` |
-| tenant_id | uuid | NO | — |
-| name | text | NO | — |
-| domain | text | YES | — |
-| industry | text | YES | — |
-| notes | text | YES | — |
-| tags | text[] | YES | `'{}'` |
-| created_at | timestamptz | NO | `now()` |
-| updated_at | timestamptz | NO | `now()` |
+### ~~`people`~~ (UI removed — #350)
 
----
+### ~~`people_companies`~~ (UI removed — #350)
 
-### `people`
+### ~~`deals`~~ (UI removed — #350)
 
-| Column | Type | Nullable | Default | Notes |
-|--------|------|----------|---------|-------|
-| id | uuid | NO | `gen_random_uuid()` | |
-| tenant_id | uuid | NO | — | |
-| name | text | NO | — | |
-| email | text | YES | — | |
-| phone | text | YES | — | |
-| title | text | YES | — | Job title |
-| notes | text | YES | — | |
-| tags | text[] | YES | `'{}'` | |
-| created_at | timestamptz | NO | `now()` | |
-| updated_at | timestamptz | NO | `now()` | |
+### ~~`deals_companies`~~ (UI removed — #350)
 
-### `people_companies`
-| Column | Type |
-|--------|------|
-| person_id | uuid (FK → people) |
-| company_id | uuid (FK → companies) |
-
-PK: `(person_id, company_id)`
-
----
-
-### `deals`
-
-| Column | Type | Nullable | Default | Notes |
-|--------|------|----------|---------|-------|
-| id | uuid | NO | `gen_random_uuid()` | |
-| tenant_id | uuid | NO | — | |
-| title | text | NO | — | |
-| status | text | NO | `'prospect'` | CHECK: `prospect \| active \| won \| lost` |
-| value | numeric | YES | — | |
-| notes | text | YES | — | |
-| tags | text[] | YES | `'{}'` | |
-| created_at | timestamptz | NO | `now()` | |
-| updated_at | timestamptz | NO | `now()` | |
-
-### `deals_companies`
-| Column | Type |
-|--------|------|
-| deal_id | uuid (FK → deals) |
-| company_id | uuid (FK → companies) |
-
-### `deals_people`
-| Column | Type |
-|--------|------|
-| deal_id | uuid (FK → deals) |
-| person_id | uuid (FK → people) |
+### ~~`deals_people`~~ (UI removed — #350)
 
 ---
 
@@ -399,12 +312,12 @@ All mutations go through these functions. They atomically write to the entity ta
 |----------|-----------|---------|
 | `rpc_create_task` | tenant_id, actor_id, actor_type, title, priority, status, body, assignee_id, assignee_type, type | jsonb (task row) |
 | `rpc_create_meeting` | tenant_id, actor_id, actor_type, title, date, meeting_time, tags | jsonb (meeting row) |
-| `rpc_create_library_item` | tenant_id, actor_id, actor_type, type, title, url, body, source, excerpt, location_name, latitude, longitude, tags, is_public | jsonb |
+| ~~`rpc_create_library_item`~~ | _(UI removed — #351)_ | — |
 | `rpc_upsert_diary_entry` | tenant_id, actor_id, actor_type, date, content | jsonb — logs `created` or `updated` |
 | `rpc_create_grocery_item` | tenant_id, actor_id, actor_type, name, category, quantity | jsonb |
-| `rpc_create_company` | tenant_id, actor_id, actor_type, name, domain, industry, notes, tags | jsonb |
-| `rpc_create_person` | tenant_id, actor_id, actor_type, name, email, phone, title, notes, tags | jsonb |
-| `rpc_create_deal` | tenant_id, actor_id, actor_type, title, status, value, notes, tags | jsonb |
+| ~~`rpc_create_company`~~ | _(UI removed — #350)_ | — |
+| ~~`rpc_create_person`~~ | _(UI removed — #350)_ | — |
+| ~~`rpc_create_deal`~~ | _(UI removed — #350)_ | — |
 | `rpc_create_essay` | tenant_id, title, actor_id, actor_type | essays row |
 | `rpc_list_essays` | tenant_id | `SETOF essays` — ordered by updated_at DESC |
 
@@ -442,7 +355,7 @@ All mutations go through these functions. They atomically write to the entity ta
 | `001_initial_schema.sql` | All 21 tables, RLS policies, triggers, indexes |
 | `002_command_bus_rpcs.sql` | `rpc_update_entity`, `rpc_add_comment`, `get_my_profile`, `get_my_tenant_id` |
 | `003_activity_log_mutations.sql` | All `rpc_create_*` (8 entities) + `rpc_delete_entity` |
-| `004_schema_fixes.sql` | Schema corrections: people (phone+title), deals status, companies (notes+industry), library_items (body, latitude, longitude, location_name) |
+| `004_schema_fixes.sql` | Schema corrections (CRM + library tables — UI removed in #350/#351) |
 | `005_agents_table.sql` | Custom `agents` table, `resolve_agent_by_key` + `admin_update_profile` RPCs, DROP `agent_owners` |
 | `006_rpc_fixes.sql` | `is_admin()`, `is_owner()` SECURITY DEFINER helpers; profiles RLS fix |
 | `007_workspace_settings.sql` | `tenants`: add `updated_at`, `openrouter_api_key`, `default_model`; `get_workspace_settings` + `update_workspace_settings` RPCs |

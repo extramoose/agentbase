@@ -52,6 +52,7 @@ export function AssigneePicker({ value, onChange, className }: AssigneePickerPro
       setActors([...humans, ...agents])
     }
     load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- supabase client is stable
   }, [])
 
   useEffect(() => {

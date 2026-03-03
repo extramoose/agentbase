@@ -2,7 +2,7 @@
 
 import posthog from 'posthog-js'
 import { PostHogProvider as PHProvider, usePostHog } from 'posthog-js/react'
-import { useEffect, useRef } from 'react'
+import React, { useEffect, useRef } from 'react'
 import { usePathname, useSearchParams } from 'next/navigation'
 
 // ---------------------------------------------------------------------------
@@ -68,7 +68,6 @@ function PostHogPageviewWrapper() {
 }
 
 function PostHogSuspense({ children }: { children: React.ReactNode }) {
-  // Dynamic import of Suspense to keep this file simpler
-  const { Suspense } = require('react') as typeof import('react')
-  return <Suspense fallback={null}>{children}</Suspense>
+  // React.Suspense is available directly — no need for dynamic require
+  return <React.Suspense fallback={null}>{children}</React.Suspense>
 }

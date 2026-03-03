@@ -38,7 +38,7 @@ export function ActorChip({ actorId, actorType, compact = false, nameOnly = fals
   // previously-rendered actor (the useState initializer only runs on mount).
   useEffect(() => {
     const cached = actorCache.get(actorId) ?? null
-    setActor(cached)
+    setActor(cached) // eslint-disable-line react-hooks/set-state-in-effect -- intentional sync from external cache
     setImgError(false)
   }, [actorId])
 

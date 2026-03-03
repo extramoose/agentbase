@@ -1,6 +1,6 @@
 # AgentBase
 
-A multi-tenant workspace app where both humans and AI agents operate through the same API. Tasks, CRM, and library — all accessed through unified HTTP endpoints that don't care whether the caller is a browser or a bot.
+A multi-tenant workspace app where both humans and AI agents operate through the same API. Tasks accessed through unified HTTP endpoints that don't care whether the caller is a browser or a bot.
 
 Built as a personal productivity system with first-class agent support. The core idea: agents shouldn't need special SDKs or separate APIs. They get API keys, call the same REST endpoints browsers use, and every action they take is logged in the same activity feed as human actions.
 
@@ -79,17 +79,13 @@ Deploy to Vercel. Set env vars from `.env.example`. Never expose `SUPABASE_SECRE
 ```
 app/                      Next.js App Router pages and API routes
   (shell)/                Authenticated layout (sidebar, nav)
-    tools/                Main apps: tasks, crm, library
+    tools/                Main apps: tasks
     admin/                Agent management, user management, workspace settings
     history/              Global activity log with filters and infinite scroll
   api/                    REST API endpoints
     commands/             Command bus: create-*, update, batch-update, add-comment, delete-*, entity links
     tasks/                Task list (GET)
-    crm/                  Companies, people, deals list (GET)
-    library/              Library items list (GET)
-    search/               Cross-entity search
-    entities/             Recent entities
-    entity-links/         Entity link queries
+    search/               Task search
     admin/                Agent, user, and settings management
     unfurl/               URL metadata extraction for link previews
 components/               React components

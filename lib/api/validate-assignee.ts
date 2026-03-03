@@ -27,11 +27,12 @@ export async function validateAssignee(
   )
   if (membersError) throw membersError
 
-  const humans: ValidAssignee[] = ((members as any)?.humans ?? []).map(
-    (h: any) => ({ id: h.id, name: h.name, type: 'human' as const }),
+  const membersObj = members as { humans?: { id: string; name: string }[]; agents?: { id: string; name: string }[] } | null
+  const humans: ValidAssignee[] = (membersObj?.humans ?? []).map(
+    (h) => ({ id: h.id, name: h.name, type: 'human' as const }),
   )
-  const agents: ValidAssignee[] = ((members as any)?.agents ?? []).map(
-    (a: any) => ({ id: a.id, name: a.name, type: 'agent' as const }),
+  const agents: ValidAssignee[] = (membersObj?.agents ?? []).map(
+    (a) => ({ id: a.id, name: a.name, type: 'agent' as const }),
   )
   const allMembers = [...humans, ...agents]
 

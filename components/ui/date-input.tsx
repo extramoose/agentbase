@@ -4,7 +4,7 @@ import * as React from 'react'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 
-interface DateInputProps extends Omit<React.ComponentProps<typeof Input>, 'type'> {}
+type DateInputProps = Omit<React.ComponentProps<typeof Input>, 'type'>
 
 function DateInput({ className, onChange, ...props }: DateInputProps) {
   const todayStr = new Date().toISOString().split('T')[0]

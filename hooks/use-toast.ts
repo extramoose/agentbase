@@ -27,6 +27,7 @@ export function useToastState() {
   }, [])
 
   // Register global handler
+  // eslint-disable-next-line react-hooks/globals -- singleton pattern: one global toast handler
   toastFn = addToast
 
   return { toasts, dismiss: (id: string) => setToasts(prev => prev.filter(x => x.id !== id)) }

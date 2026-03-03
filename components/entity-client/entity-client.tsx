@@ -32,6 +32,7 @@ export function EntityClient<T extends BaseEntity>({
   initialEntities,
   initialSelectedId,
   entityType,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   entityLabel: _entityLabel,
   entityLabelPlural,
   renderGridCard,

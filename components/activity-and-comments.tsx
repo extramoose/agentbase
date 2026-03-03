@@ -72,6 +72,7 @@ export function ActivityAndComments({ entityType, entityId, currentUserId, noCol
       setLoading(false)
     }
     load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- supabase client is stable
   }, [entityType, entityId])
 
   // Realtime subscription
@@ -93,6 +94,7 @@ export function ActivityAndComments({ entityType, entityId, currentUserId, noCol
       .subscribe()
 
     return () => { supabase.removeChannel(channel) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- supabase client is stable
   }, [entityType, entityId])
 
   async function submitComment() {

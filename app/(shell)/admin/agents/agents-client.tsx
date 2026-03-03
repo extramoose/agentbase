@@ -84,7 +84,7 @@ export function AgentsClient({ agents: initialAgents, currentUserName, currentUs
     } finally {
       setCreating(false)
     }
-  }, [name, currentUserName, currentUserId])
+  }, [name, currentUserName, currentUserId, createAvatarUrl])
 
   const handleRevoke = useCallback(async (agent: Agent) => {
     const confirmed = confirm(`Permanently revoke ${agent.name}? This CANNOT be undone. The agent will lose all API access immediately.`)

@@ -18,6 +18,29 @@ import {
   List, ListOrdered, Code, Minus,
 } from 'lucide-react'
 
+function ToolBtn({
+  onClick, active, title, children,
+}: {
+  onClick: () => void
+  active?: boolean
+  title: string
+  children: React.ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      onMouseDown={e => { e.preventDefault(); onClick() }}
+      title={title}
+      className={cn(
+        'p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors',
+        active && 'bg-accent text-foreground',
+      )}
+    >
+      {children}
+    </button>
+  )
+}
+
 interface RichTextEditorProps {
   value: string
   onChange?: (md: string) => void
@@ -39,8 +62,8 @@ export function RichTextEditor({
 }: RichTextEditorProps) {
   const onChangeRef = useRef(onChange)
   const onBlurRef = useRef(onBlur)
-  onChangeRef.current = onChange
-  onBlurRef.current = onBlur
+  useEffect(() => { onChangeRef.current = onChange }, [onChange])
+  useEffect(() => { onBlurRef.current = onBlur }, [onBlur])
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -82,27 +105,6 @@ export function RichTextEditor({
   }, [readOnly, editor])
 
   if (!editor) return null
-
-  const ToolBtn = ({
-    onClick, active, title, children,
-  }: {
-    onClick: () => void
-    active?: boolean
-    title: string
-    children: React.ReactNode
-  }) => (
-    <button
-      type="button"
-      onMouseDown={e => { e.preventDefault(); onClick() }}
-      title={title}
-      className={cn(
-        'p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors',
-        active && 'bg-accent text-foreground',
-      )}
-    >
-      {children}
-    </button>
-  )
 
   return (
     <div className={cn('rounded-md border border-input bg-transparent', className)}>

@@ -27,7 +27,7 @@ export function UnfurlInput({ value, onChange, onBlur, placeholder, className, l
   useEffect(() => {
     // If the value changed after a dismiss, re-show preview
     if (dismissed && value !== lastValueRef.current) {
-      setDismissed(false)
+      setDismissed(false) // eslint-disable-line react-hooks/set-state-in-effect -- re-show preview on new value
     }
     lastValueRef.current = value
 

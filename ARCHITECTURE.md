@@ -15,7 +15,6 @@ All mutations go through HTTP API routes. There are no server actions. This is i
 **Entity-specific routes** handle creates and deletes:
 
 - `POST /api/commands/create-task` — create a task (calls `rpc_create_task`)
-- `POST /api/commands/create-company`, `create-person`, `create-deal` — CRM entity creation
 - `POST /api/commands/delete-entity` — delete any entity (calls `rpc_delete_entity`)
 
 The split is practical: creates need entity-specific validation (different required fields per type), while updates are generic enough to share a single endpoint.
@@ -113,7 +112,7 @@ The `activity_log` table is the system's audit trail:
 CREATE TABLE activity_log (
   id           uuid PRIMARY KEY,
   tenant_id    uuid NOT NULL,
-  entity_type  text NOT NULL,       -- 'tasks', 'companies', 'people', 'deals'
+  entity_type  text NOT NULL,       -- 'tasks'
   entity_id    uuid NOT NULL,
   entity_label text,                -- human-readable: task title, person name, etc.
   event_type   text NOT NULL,       -- 'created', 'updated', 'status_changed', 'commented', etc.

@@ -18,7 +18,7 @@ export function MobileShell({ profile, workspaces, children }: MobileShellProps)
 
   // Close sidebar on navigation
   useEffect(() => {
-    setSidebarOpen(false)
+    setSidebarOpen(false) // eslint-disable-line react-hooks/set-state-in-effect -- intentional: close on route change
   }, [pathname])
 
   // Close on Escape

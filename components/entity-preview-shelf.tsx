@@ -35,6 +35,7 @@ export function EntityPreviewShelf({ entityType, entityId, entityLabel, onClose 
         setEntity(data as Record<string, unknown> | null)
         setLoading(false)
       })
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- supabase client is stable
   }, [entityId, table])
 
   useEffect(() => {
