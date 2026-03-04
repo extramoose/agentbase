@@ -557,7 +557,7 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
   return (
     <div className="space-y-4">
       {/* Title row */}
-      <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-4 mb-4 pt-4 px-4">
+      <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-4 mb-4 pt-4">
         <div className="flex items-center gap-2 shrink-0">
           <Clock className="h-4 w-4 text-muted-foreground shrink-0" />
           <h1 className="text-xl sm:text-2xl font-bold">History</h1>
@@ -597,7 +597,7 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
 
 
       {/* Daily stats */}
-      <div className="flex items-center gap-4 text-xs text-muted-foreground px-4">
+      <div className="flex items-center gap-4 text-xs text-muted-foreground">
         <span>{formatDateLabel(selectedDate)}:</span>
         {dailyStats.created > 0 && <span><span className="font-medium text-foreground">{dailyStats.created}</span> created</span>}
         {dailyStats.completed > 0 && <span><span className="font-medium text-green-500">{dailyStats.completed}</span> completed</span>}
@@ -607,7 +607,7 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
       </div>
 
       {/* Day navigation */}
-      <div className="flex items-center justify-between px-4 py-2 mb-4 bg-muted/50 rounded-lg">
+      <div className="flex items-center justify-between px-3 py-2 mb-4 bg-muted/50 rounded-lg">
         <button
           onClick={() => setSelectedDate(d => addDays(d, -1))}
           className="p-1 rounded hover:bg-muted transition-colors"
@@ -629,7 +629,7 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
       </div>
 
       {/* Activity list */}
-      <div ref={scrollContainerRef} className="space-y-1 pb-4 px-4">
+      <div ref={scrollContainerRef} className="space-y-1 pb-4">
         {loading ? (
           <div className="flex justify-center py-8">
             <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
