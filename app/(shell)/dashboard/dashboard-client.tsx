@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useTaskFilters } from '@/hooks/use-task-filters'
 import { PageHeader } from '@/components/page-header'
-import { StickiesView } from '@/components/stickies-view'
+import { ViewRenderer } from '@/components/views'
 import { type Task } from '@/app/(shell)/tasks/tasks-client'
 import { Button } from '@/components/ui/button'
 import { Loader2, X } from 'lucide-react'
@@ -370,9 +370,8 @@ export function DashboardClient({
         workspaceMembers={workspaceMembers}
         facePile={facePile}
         onToggleFacePile={toggleFacePile}
-        showViewToggle
-        dashboardView={dashboardView}
-        onDashboardViewChange={setDashboardView}
+        viewType={dashboardView}
+        onViewChange={setDashboardView}
         filters={filters}
         onFiltersChange={setFilters}
         hasActiveFilters={hasActiveFilters}
@@ -380,10 +379,10 @@ export function DashboardClient({
         onNewTask={() => setCreatingTask(true)}
       />
 
-      <StickiesView
+      <ViewRenderer
+        view={dashboardView}
         tasks={filteredTasks}
         taskHref={taskHref}
-        mode={dashboardView}
         recentlyChanged={recentlyChanged}
       />
 

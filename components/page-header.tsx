@@ -5,8 +5,6 @@ import {
   Plus,
   Filter,
   X,
-  Calendar,
-  BarChart3,
 } from 'lucide-react'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
@@ -18,10 +16,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { TagCombobox } from '@/components/tag-combobox'
 import { cn } from '@/lib/utils'
+import type { ViewType } from '@/components/views'
 import type {
-  DashboardView,
   Priority,
   Status,
   TaskFilters,
@@ -82,10 +87,9 @@ interface PageHeaderProps {
   /** Toggle a member in/out of the face pile */
   onToggleFacePile: (id: string) => void
 
-  /** Optional view toggle (Dashboard only) */
-  showViewToggle?: boolean
-  dashboardView?: DashboardView
-  onDashboardViewChange?: (view: DashboardView) => void
+  /** Optional view selector (Dashboard only) */
+  viewType?: ViewType
+  onViewChange?: (v: ViewType) => void
 
   /** Filter state */
   filters: TaskFilters
@@ -106,9 +110,8 @@ export function PageHeader({
   workspaceMembers,
   facePile,
   onToggleFacePile,
-  showViewToggle = false,
-  dashboardView,
-  onDashboardViewChange,
+  viewType,
+  onViewChange,
   filters,
   onFiltersChange,
   hasActiveFilters,
@@ -211,37 +214,19 @@ export function PageHeader({
             </div>
           )}
 
-          {/* View toggle (Dashboard only) — hidden on mobile */}
-          {showViewToggle && dashboardView != null && onDashboardViewChange && (
-            <div className="hidden md:flex items-center gap-2">
-              <div className="w-px h-5 bg-border" />
-              <div className="flex rounded-md border border-border overflow-hidden">
-                <button
-                  onClick={() => onDashboardViewChange('timeframe')}
-                  title="Timeframe"
-                  className={cn(
-                    'px-1.5 py-1 transition-colors',
-                    dashboardView === 'timeframe'
-                      ? 'bg-muted text-foreground'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-muted/50',
-                  )}
-                >
-                  <Calendar className="h-4 w-4" />
-                </button>
-                <button
-                  onClick={() => onDashboardViewChange('status')}
-                  title="Status"
-                  className={cn(
-                    'px-1.5 py-1 transition-colors',
-                    dashboardView === 'status'
-                      ? 'bg-muted text-foreground'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-muted/50',
-                  )}
-                >
-                  <BarChart3 className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
+          {/* View selector (Dashboard only) */}
+          {viewType != null && onViewChange && (
+            <Select value={viewType} onValueChange={(v) => onViewChange(v as ViewType)}>
+              <SelectTrigger size="sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="sticky-timeframe">Sticky - Timeframe</SelectItem>
+                <SelectItem value="sticky-status">Sticky - Status</SelectItem>
+                <SelectItem value="experiment-a">Experiment A</SelectItem>
+                <SelectItem value="experiment-b">Experiment B</SelectItem>
+              </SelectContent>
+            </Select>
           )}
 
           {/* Filter button — desktop: popover, mobile: dialog */}

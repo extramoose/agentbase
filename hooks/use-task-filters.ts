@@ -10,7 +10,7 @@ import { createClient } from '@/lib/supabase/client'
 export type Priority = 'urgent' | 'high' | 'medium' | 'low' | 'none'
 export type Status = 'backlog' | 'todo' | 'in_progress' | 'blocked' | 'done' | 'cancelled'
 export type TaskType = 'bug' | 'improvement' | 'feature'
-export type DashboardView = 'status' | 'timeframe'
+export type DashboardView = 'sticky-timeframe' | 'sticky-status' | 'experiment-a' | 'experiment-b'
 
 export type WorkspaceMember = {
   id: string
@@ -128,9 +128,9 @@ export function useTaskFilters(workspaceId: string, currentUserId?: string) {
   // --- Dashboard view (status | timeframe) ---
   // Initialize with fixed default to avoid SSR/client hydration mismatch.
   // Read from localStorage only after mount via useEffect.
-  const [dashboardView, setDashboardViewRaw] = useState<DashboardView>('timeframe')
+  const [dashboardView, setDashboardViewRaw] = useState<DashboardView>('sticky-timeframe')
   useEffect(() => {
-    const stored = lsGet<DashboardView>(dashboardViewKey, 'timeframe')
+    const stored = lsGet<DashboardView>(dashboardViewKey, 'sticky-timeframe')
     setDashboardViewRaw(stored)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dashboardViewKey])
