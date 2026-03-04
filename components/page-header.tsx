@@ -183,7 +183,7 @@ export function PageHeader({
       {/* Row 1 */}
       <div className="flex items-center justify-between gap-2">
         {/* Left: title */}
-        <h1 className="text-sm font-normal text-muted-foreground shrink-0">{title}</h1>
+        <h1 className="text-sm font-normal text-muted-foreground/60 shrink-0" aria-label={title}>{new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}</h1>
 
         {/* Right: face pile + view toggle + filter + new task */}
         <div className="flex items-center gap-2">
