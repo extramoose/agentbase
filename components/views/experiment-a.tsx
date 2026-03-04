@@ -407,7 +407,7 @@ function AssigneeColumn({
   )
 
   return (
-    <div className="flex-1 min-w-0 flex flex-col">
+    <div className="flex flex-col shrink-0" style={{ width: '440px' }}>
       {/* Header */}
       <div className="flex items-center gap-2 px-3 py-2 border-b shrink-0">
         <Avatar size="sm">
@@ -512,7 +512,7 @@ export function ExperimentA({ tasks, taskHref, recentlyChanged }: ExperimentAPro
   const actorMap = useResolvedActors(allIds, assigneeTypes)
 
   return (
-    <div className="flex w-full gap-0 divide-x" style={{ height: 'calc(100vh - 120px)' }}>
+    <div className="flex gap-0 divide-x overflow-x-auto" style={{ height: 'calc(100vh - 120px)' }}>
       {/* Set 1 — Mantra */}
       <div
         className="shrink-0 overflow-y-auto px-6 py-6 flex flex-col"
