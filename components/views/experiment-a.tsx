@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { MoreHorizontal } from 'lucide-react'
@@ -16,6 +16,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { createClient } from '@/lib/supabase/client'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -37,7 +38,7 @@ interface Task {
   assignee_type: string | null
 }
 
-interface ExperimentAProps {
+export interface ExperimentAProps {
   tasks: Task[]
   taskHref: (task: Task) => string
   recentlyChanged?: Set<string>
@@ -66,35 +67,141 @@ const PRIORITY_DOT: Record<Priority, string> = {
   none: 'bg-muted-foreground/40',
 }
 
-const COLUMN_DEFS: {
-  assigneeId: string
-  name: string
+// ---------------------------------------------------------------------------
+// Actor resolution hook
+// ---------------------------------------------------------------------------
+
+interface ResolvedActor {
+  id: string
+  fullName: string
   initials: string
-  defaultDensity: Density
-  defaultGroupBy: GroupBy
-}[] = [
-  {
-    assigneeId: 'c8656fe5-6494-4255-a1b8-5485edef487a',
-    name: 'Hunter',
-    initials: 'HH',
-    defaultDensity: 'card',
-    defaultGroupBy: 'timeframe',
-  },
-  {
-    assigneeId: '036b5f4a-a865-4b02-b54c-5d0628677d29',
-    name: 'Frank',
-    initials: 'FK',
-    defaultDensity: 'thin',
-    defaultGroupBy: 'status',
-  },
-  {
-    assigneeId: '67046d50-74d3-42d7-8602-82c2044fb5d5',
-    name: 'Lucy',
-    initials: 'LW',
-    defaultDensity: 'thin',
-    defaultGroupBy: 'status',
-  },
-]
+}
+
+const actorNameCache = new Map<string, ResolvedActor>()
+
+function useResolvedActors(
+  assigneeIds: string[],
+  assigneeTypes: Map<string, string | null>,
+): Map<string, ResolvedActor> {
+  const [resolved, setResolved] = useState<Map<string, ResolvedActor>>(() => {
+    const initial = new Map<string, ResolvedActor>()
+    for (const id of assigneeIds) {
+      const cached = actorNameCache.get(id)
+      if (cached) initial.set(id, cached)
+    }
+    return initial
+  })
+
+  const idsKey = assigneeIds.join(',')
+
+  useEffect(() => {
+    const missing = assigneeIds.filter((id) => !actorNameCache.has(id))
+    if (missing.length === 0) return
+
+    let cancelled = false
+    const supabase = createClient()
+
+    async function resolve() {
+      const humanIds = missing.filter((id) => assigneeTypes.get(id) !== 'agent')
+      const agentIds = missing.filter((id) => assigneeTypes.get(id) === 'agent')
+
+      const results = new Map<string, ResolvedActor>()
+
+      if (humanIds.length > 0) {
+        const { data } = await supabase
+          .from('profiles')
+          .select('id, full_name, email')
+          .in('id', humanIds)
+        if (data) {
+          for (const p of data) {
+            const fullName = p.full_name ?? p.email?.split('@')[0] ?? 'Unknown'
+            const initials = fullName
+              .split(/\s+/)
+              .map((w: string) => w[0])
+              .join('')
+              .slice(0, 2)
+              .toUpperCase()
+            const actor: ResolvedActor = { id: p.id, fullName, initials }
+            results.set(p.id, actor)
+            actorNameCache.set(p.id, actor)
+          }
+        }
+        // Any humanIds not found in profiles — try agents table as fallback
+        const unresolvedHumans = humanIds.filter((id) => !results.has(id))
+        if (unresolvedHumans.length > 0) {
+          const { data: agents } = await supabase
+            .from('agents')
+            .select('id, name')
+            .in('id', unresolvedHumans)
+          if (agents) {
+            for (const a of agents) {
+              const fullName = a.name ?? 'Unknown'
+              const initials = fullName
+                .split(/\s+/)
+                .map((w: string) => w[0])
+                .join('')
+                .slice(0, 2)
+                .toUpperCase()
+              const actor: ResolvedActor = { id: a.id, fullName, initials }
+              results.set(a.id, actor)
+              actorNameCache.set(a.id, actor)
+            }
+          }
+        }
+      }
+
+      if (agentIds.length > 0) {
+        const { data } = await supabase
+          .from('agents')
+          .select('id, name')
+          .in('id', agentIds)
+        if (data) {
+          for (const a of data) {
+            const fullName = a.name ?? 'Agent'
+            const initials = fullName
+              .split(/\s+/)
+              .map((w: string) => w[0])
+              .join('')
+              .slice(0, 2)
+              .toUpperCase()
+            const actor: ResolvedActor = { id: a.id, fullName, initials }
+            results.set(a.id, actor)
+            actorNameCache.set(a.id, actor)
+          }
+        }
+      }
+
+      // Fallback for any still-unresolved
+      for (const id of missing) {
+        if (!results.has(id)) {
+          const fallback: ResolvedActor = {
+            id,
+            fullName: assigneeTypes.get(id) === 'agent' ? 'Agent' : 'Unknown',
+            initials: '??',
+          }
+          actorNameCache.set(id, fallback)
+          results.set(id, fallback)
+        }
+      }
+
+      if (!cancelled) {
+        setResolved((prev) => {
+          const next = new Map(prev)
+          for (const [k, v] of results) next.set(k, v)
+          return next
+        })
+      }
+    }
+
+    resolve()
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [idsKey])
+
+  return resolved
+}
 
 // ---------------------------------------------------------------------------
 // Date helpers
@@ -277,16 +384,14 @@ function TaskThinRow({
 // ---------------------------------------------------------------------------
 
 function AssigneeColumn({
-  name,
-  initials,
+  actor,
   tasks,
   taskHref,
   recentlyChanged,
   defaultDensity,
   defaultGroupBy,
 }: {
-  name: string
-  initials: string
+  actor: ResolvedActor
   tasks: Task[]
   taskHref: (task: Task) => string
   recentlyChanged?: Set<string>
@@ -306,9 +411,9 @@ function AssigneeColumn({
       {/* Header */}
       <div className="flex items-center gap-2 px-3 py-2 border-b shrink-0">
         <Avatar size="sm">
-          <AvatarFallback className="text-[10px]">{initials}</AvatarFallback>
+          <AvatarFallback className="text-[10px]">{actor.initials}</AvatarFallback>
         </Avatar>
-        <span className="text-sm font-medium truncate">{name}</span>
+        <span className="text-sm font-medium truncate">{actor.fullName}</span>
         <span className="text-xs text-muted-foreground">({tasks.length})</span>
         <div className="ml-auto">
           <DropdownMenu>
@@ -374,10 +479,41 @@ function AssigneeColumn({
 // ExperimentA
 // ---------------------------------------------------------------------------
 
+interface DerivedAssignee {
+  id: string
+  type: 'human' | 'agent'
+}
+
 export function ExperimentA({ tasks, taskHref, recentlyChanged }: ExperimentAProps) {
+  // Derive unique assignees from tasks, split by role
+  const { humans, agents, assigneeTypes } = useMemo(() => {
+    const seen = new Map<string, DerivedAssignee>()
+    const typeMap = new Map<string, string | null>()
+    for (const t of tasks) {
+      if (t.assignee_id && !seen.has(t.assignee_id)) {
+        const role = t.assignee_type === 'agent' ? 'agent' as const : 'human' as const
+        seen.set(t.assignee_id, { id: t.assignee_id, type: role })
+        typeMap.set(t.assignee_id, t.assignee_type)
+      }
+    }
+    const all = Array.from(seen.values())
+    return {
+      humans: all.filter((a) => a.type === 'human'),
+      agents: all.filter((a) => a.type === 'agent'),
+      assigneeTypes: typeMap,
+    }
+  }, [tasks])
+
+  const allIds = useMemo(
+    () => [...humans, ...agents].map((a) => a.id),
+    [humans, agents],
+  )
+
+  const actorMap = useResolvedActors(allIds, assigneeTypes)
+
   return (
     <div className="flex w-full gap-0 divide-x" style={{ height: 'calc(100vh - 120px)' }}>
-      {/* Col 1 — Mantra */}
+      {/* Set 1 — Mantra */}
       <div
         className="shrink-0 overflow-y-auto px-6 py-6 flex flex-col"
         style={{ width: 220 }}
@@ -391,17 +527,29 @@ export function ExperimentA({ tasks, taskHref, recentlyChanged }: ExperimentAPro
         </p>
       </div>
 
-      {/* Cols 2-4 — Assignee columns */}
-      {COLUMN_DEFS.map((col) => (
+      {/* Set 2 — Human columns */}
+      {humans.map((h) => (
         <AssigneeColumn
-          key={col.assigneeId}
-          name={col.name}
-          initials={col.initials}
-          tasks={tasks.filter((t) => t.assignee_id === col.assigneeId)}
+          key={h.id}
+          actor={actorMap.get(h.id) ?? { id: h.id, fullName: '...', initials: '??' }}
+          tasks={tasks.filter((t) => t.assignee_id === h.id)}
           taskHref={taskHref}
           recentlyChanged={recentlyChanged}
-          defaultDensity={col.defaultDensity}
-          defaultGroupBy={col.defaultGroupBy}
+          defaultDensity="card"
+          defaultGroupBy="timeframe"
+        />
+      ))}
+
+      {/* Set 3 — Agent columns */}
+      {agents.map((a) => (
+        <AssigneeColumn
+          key={a.id}
+          actor={actorMap.get(a.id) ?? { id: a.id, fullName: '...', initials: '??' }}
+          tasks={tasks.filter((t) => t.assignee_id === a.id)}
+          taskHref={taskHref}
+          recentlyChanged={recentlyChanged}
+          defaultDensity="thin"
+          defaultGroupBy="status"
         />
       ))}
     </div>
