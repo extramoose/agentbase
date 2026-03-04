@@ -457,11 +457,13 @@ function GroupSection({
   density,
   taskHref,
   recentlyChanged,
+  poofingIds,
 }: {
   group: Group
   density: Density
   taskHref: (task: Task) => string
   recentlyChanged?: Set<string>
+  poofingIds?: Set<string>
 }) {
   const isDone = group.key === 'done'
   const displayTasks = isDone ? group.tasks.slice(0, DONE_LIMIT) : group.tasks
@@ -477,7 +479,7 @@ function GroupSection({
           const fadeIndex = isDone ? i - DONE_FADE_START : -1
           const opacity = fadeIndex > 0 ? Math.max(0, 1 - fadeIndex / (DONE_LIMIT - DONE_FADE_START)) : 1
           return (
-            <div key={task.id} style={{ opacity }}>
+            <div key={task.id} style={{ opacity }} className={poofingIds?.has(task.id) ? "animate-task-poof" : undefined}>
               {density === 'big' ? (
                 <TaskBigCard task={task} taskHref={taskHref} highlight={!isDone && (recentlyChanged?.has(task.id) ?? false)} forcedStyle={isDone ? 'gray' : undefined} />
               ) : density === 'card' ? (
@@ -502,6 +504,7 @@ function AssigneeColumn({
   tasks,
   taskHref,
   recentlyChanged,
+  poofingIds,
   defaultDensity,
   defaultGroupBy,
   defaultWidth = COL_DEFAULT_TASK,
@@ -510,6 +513,7 @@ function AssigneeColumn({
   tasks: Task[]
   taskHref: (task: Task) => string
   recentlyChanged?: Set<string>
+  poofingIds?: Set<string>
   defaultDensity: Density
   defaultGroupBy: GroupBy
   defaultWidth?: number
@@ -581,7 +585,7 @@ function AssigneeColumn({
       {/* Scrollable task list */}
       <div className="flex-1 overflow-y-auto pb-8">
         {groups.map((group) => (
-          <GroupSection key={group.key} group={group} density={density} taskHref={taskHref} recentlyChanged={recentlyChanged} />
+          <GroupSection key={group.key} group={group} density={density} taskHref={taskHref} recentlyChanged={recentlyChanged} poofingIds={poofingIds} />
         ))}
         {/* Empty state: keep column shape, show nothing */}
       </div>
@@ -638,6 +642,23 @@ interface DerivedAssignee {
 }
 
 export function ExperimentA({ tasks, taskHref, recentlyChanged }: ExperimentAProps) {
+  const [poofingIds, setPoofingIds] = useState<Set<string>>(new Set())
+  const prevTasksRef = useRef<Map<string, string>>(new Map())
+
+  useEffect(() => {
+    const prev = prevTasksRef.current
+    const next = new Map<string, string>()
+    for (const t of tasks) {
+      next.set(t.id, t.status)
+      const prevStatus = prev.get(t.id)
+      if (prevStatus && prevStatus !== 'done' && prevStatus !== 'cancelled' && (t.status === 'done' || t.status === 'cancelled')) {
+        setPoofingIds((s) => new Set([...s, t.id]))
+        setTimeout(() => setPoofingIds((s) => { const n = new Set(s); n.delete(t.id); return n }), 400)
+      }
+    }
+    prevTasksRef.current = next
+  }, [tasks])
+
   useEffect(() => {
     const main = document.querySelector('main')
     if (!main) return
@@ -680,6 +701,7 @@ main.classList.remove('p-3', 'pt-15', 'sm:p-6', 'sm:pt-6', 'p-6')
           recentlyChanged={recentlyChanged}
           defaultDensity="card"
           defaultGroupBy="timeframe"
+          poofingIds={poofingIds}
         />
       ))}
 
@@ -693,6 +715,7 @@ main.classList.remove('p-3', 'pt-15', 'sm:p-6', 'sm:pt-6', 'p-6')
           recentlyChanged={recentlyChanged}
           defaultDensity="thin"
           defaultGroupBy="status"
+          poofingIds={poofingIds}
         />
       ))}
     </div>
