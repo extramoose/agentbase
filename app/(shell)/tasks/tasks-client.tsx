@@ -1404,7 +1404,7 @@ export function TasksClient({
       />
 
       {/* Search + type + tag filters */}
-      <div className="flex items-center gap-1 mb-4 flex-wrap">
+      <div className="flex items-center gap-1 mb-4 flex-wrap px-4">
         <SearchFilterBar
           search={search}
           onSearchChange={setSearch}
@@ -1433,7 +1433,7 @@ export function TasksClient({
       </div>
 
       {/* Status filter tabs */}
-      <div className="flex gap-1 mb-4 border-b border-border pb-2 overflow-x-auto">
+      <div className="flex gap-1 mb-4 border-b border-border pb-2 overflow-x-auto px-4">
         {STATUS_TABS.map((tab) => (
           <button
             key={tab.value}

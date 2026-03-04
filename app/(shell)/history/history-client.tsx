@@ -635,7 +635,7 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
       </div>
 
       {/* Activity list */}
-      <div ref={scrollContainerRef} className="space-y-1 p-4">
+      <div ref={scrollContainerRef} className="space-y-1 px-4 pb-4">
         {loading ? (
           <div className="flex justify-center py-8">
             <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />

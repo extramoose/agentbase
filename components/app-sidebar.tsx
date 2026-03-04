@@ -227,16 +227,15 @@ export function AppSidebar({ profile, workspaces, onNavigate, collapsed = false,
 
   return (
     <aside className={cn("flex h-full flex-col border-r border-border bg-card transition-all duration-200", collapsed ? "w-14" : "w-60")}>
-      <div className="flex h-14 items-center px-4 gap-2">
+      <div className="flex h-14 items-center px-3 gap-2">
         {!collapsed && (
-          <Link href="/" className="text-lg font-bold text-foreground flex-1 truncate">
+          <Link href="/" className="text-base font-semibold text-foreground flex-1 truncate">
             AgentBase
           </Link>
         )}
-        {collapsed && <div className="flex-1" />}
         <button
           onClick={onToggleCollapse}
-          className="flex h-8 w-8 items-center justify-center rounded-md hover:bg-accent transition-colors text-muted-foreground shrink-0"
+          className={cn("flex h-8 w-8 items-center justify-center rounded-md hover:bg-accent transition-colors text-muted-foreground shrink-0", collapsed && "mx-auto")}
           aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         >
           {collapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
