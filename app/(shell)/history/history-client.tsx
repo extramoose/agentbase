@@ -412,7 +412,7 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
     if (seqId != null) router.push(`/tasks/${seqId}`)
   }
 
-  function renderSingleEntry(entry: ActivityLogEntry) {
+  function renderSingleEntry(entry: ActivityLogEntry, idx = 0) {
     const isDeleted = entry.event_type === 'deleted'
     const normalized = normalizeEntityType(entry.entity_type)
     const path = getEntityPath(normalized)
@@ -420,7 +420,7 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
     const isClickable = !!path && !isDeleted && seqId != null
     return (
       <div
-        key={entry.id}
+        key={entry.id + "-" + idx}
         className={`flex items-start gap-3 rounded-lg px-3 py-3 ml-7 hover:bg-muted/40 transition-colors${isClickable ? ' cursor-pointer' : ''}`}
         onClick={isClickable ? () => handleEntityClick(entry) : undefined}
       >
@@ -489,7 +489,7 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
         </div>
         {isExpanded && (
           <div className="space-y-1 ml-4 border-l border-border pl-2">
-            {group.entries.map(entry => renderSingleEntry(entry))}
+            {group.entries.map((entry, i) => renderSingleEntry(entry, i))}
           </div>
         )}
       </div>
@@ -544,21 +544,16 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
   }
 
   // Daily stats from selected day's entries
-  const dailyStats = useMemo(() => {
-    const dayStart = new Date(selectedDate)
-    dayStart.setHours(0, 0, 0, 0)
-    const dayEnd = new Date(selectedDate)
-    dayEnd.setHours(23, 59, 59, 999)
-    const dayEntries = entries.filter(e => {
-      const t = new Date(e.created_at)
-      return t >= dayStart && t <= dayEnd
-    })
-    const created = dayEntries.filter(e => e.event_type === 'created').length
-    const completed = dayEntries.filter(e => e.event_type === 'field_updated' && e.new_value === 'done').length
-    const comments = dayEntries.filter(e => e.event_type === 'commented').length
-    const updates = dayEntries.filter(e => e.event_type === 'field_updated').length
-    return { created, completed, comments, updates, total: dayEntries.length }
-  }, [entries, selectedDate])
+  const [dailyStats, setDailyStats] = useState({ created: 0, completed: 0, comments: 0, updates: 0, total: 0 })
+
+  useEffect(() => {
+    const dateStr = localDateStr(selectedDate)
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
+    fetch(`/api/history/stats?date=${dateStr}&tz=${encodeURIComponent(tz)}`)
+      .then(r => r.json())
+      .then(data => { if (!data.error) setDailyStats(data) })
+      .catch(() => {})
+  }, [selectedDate])
 
   return (
     <div className="space-y-4 px-4">
