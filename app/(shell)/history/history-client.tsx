@@ -560,7 +560,7 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
       <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-4 mb-4 pt-4">
         <div className="flex items-center gap-2 shrink-0">
           <Clock className="h-4 w-4 text-muted-foreground shrink-0" />
-          <h1 className="text-xl sm:text-2xl font-bold">History</h1>
+          <h1 className="text-sm font-medium text-muted-foreground">History</h1>
         </div>
         <div className="flex items-center gap-2">
           <SearchFilterBar
