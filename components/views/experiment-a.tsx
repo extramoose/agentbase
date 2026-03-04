@@ -378,9 +378,9 @@ function TaskCard({ task, taskHref, highlight, forcedStyle }: { task: Task; task
       )}
     >
       <div className="flex items-start gap-2">
-        <span className={cn('mt-1.5 h-2 w-2 rounded-full shrink-0', PRIORITY_DOT[task.priority])} title={task.priority} />
+        <span className={cn('mt-1.5 h-2 w-2 rounded-full shrink-0', forcedStyle === "gray" ? "bg-muted-foreground/30" : PRIORITY_DOT[task.priority])} title={task.priority} />
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium leading-snug line-clamp-2">{task.title}</p>
+          <p className={cn("text-sm leading-snug line-clamp-2", forcedStyle === "gray" ? "font-normal text-muted-foreground" : "font-medium")}>{task.title}</p>
           <div className="mt-1.5 flex items-center gap-2 flex-wrap">
             <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
               #{task.seq_id ?? task.ticket_id}
@@ -422,8 +422,8 @@ function TaskBigCard({ task, taskHref, highlight, forcedStyle }: { task: Task; t
       style={{ height: '240px' }}
     >
       <div className="flex items-start gap-3">
-        <span className={cn('mt-1 h-2.5 w-2.5 rounded-full shrink-0', PRIORITY_DOT[task.priority])} title={task.priority} />
-        <p className="text-xl font-medium leading-snug line-clamp-4">{task.title}</p>
+        <span className={cn('mt-1 h-2.5 w-2.5 rounded-full shrink-0', forcedStyle === "gray" ? "bg-muted-foreground/30" : PRIORITY_DOT[task.priority])} title={task.priority} />
+        <p className={cn("text-xl leading-snug line-clamp-4", forcedStyle === "gray" ? "font-normal text-muted-foreground" : "font-medium")}>{task.title}</p>
       </div>
       <div className="flex items-center gap-3 flex-wrap">
         <Badge variant="secondary" className="text-xs px-2 py-0.5">
