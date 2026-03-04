@@ -103,19 +103,28 @@ const PRIORITY_ORDER: Record<Priority, number> = {
 
 const PRIORITY_DOT: Record<Priority, string> = {
   urgent: 'bg-red-500',
-  high: 'bg-orange-400',
-  medium: 'bg-yellow-400',
+  high: 'bg-purple-500',
+  medium: 'bg-blue-500',
   low: 'bg-slate-400',
-  none: 'bg-muted-foreground/40',
+  none: 'bg-muted-foreground/30',
+}
+
+// Card border + bg styles (outlined, subtle fill)
+const PRIORITY_CARD: Record<Priority, string> = {
+  urgent: 'border-red-400 bg-red-500/5 dark:border-red-500/60 dark:bg-red-500/5',
+  high:   'border-purple-400 bg-purple-500/5 dark:border-purple-500/60 dark:bg-purple-500/5',
+  medium: 'border-blue-400 bg-blue-500/5 dark:border-blue-500/60 dark:bg-blue-500/5',
+  low:    'border-slate-300 bg-slate-500/5 dark:border-slate-600 dark:bg-slate-500/5',
+  none:   'border-border bg-transparent',
 }
 
 // Ticket number color in thin mode
 const PRIORITY_TICKET_COLOR: Record<Priority, string> = {
   urgent: 'text-red-500',
-  high: 'text-orange-400',
-  medium: 'text-foreground',
-  low: 'text-muted-foreground',
-  none: 'text-muted-foreground/60',
+  high:   'text-purple-500',
+  medium: 'text-blue-500',
+  low:    'text-slate-400',
+  none:   'text-muted-foreground/60',
 }
 
 const DONE_LIMIT = 50
@@ -347,7 +356,8 @@ function TaskCard({ task, taskHref, highlight }: { task: Task; taskHref: (task: 
     <Link
       href={taskHref(task)}
       className={cn(
-        'block rounded-lg border p-3 hover:bg-accent/40 transition-colors cursor-pointer no-underline',
+        'block rounded-lg border p-3 transition-colors cursor-pointer no-underline hover:brightness-95 dark:hover:brightness-110',
+        PRIORITY_CARD[task.priority],
         highlight && 'animate-sticky-pulse',
       )}
     >
@@ -389,14 +399,15 @@ function TaskBigCard({ task, taskHref, highlight }: { task: Task; taskHref: (tas
     <Link
       href={taskHref(task)}
       className={cn(
-        'flex flex-col justify-between rounded-xl border p-5 hover:bg-accent/40 transition-colors cursor-pointer no-underline',
+        'flex flex-col justify-between rounded-xl border p-6 transition-colors cursor-pointer no-underline hover:brightness-95 dark:hover:brightness-110',
+        PRIORITY_CARD[task.priority],
         highlight && 'animate-sticky-pulse',
       )}
       style={{ height: '240px' }}
     >
       <div className="flex items-start gap-3">
         <span className={cn('mt-1 h-2.5 w-2.5 rounded-full shrink-0', PRIORITY_DOT[task.priority])} title={task.priority} />
-        <p className="text-lg font-medium leading-snug line-clamp-4">{task.title}</p>
+        <p className="text-xl font-medium leading-snug line-clamp-4">{task.title}</p>
       </div>
       <div className="flex items-center gap-3 flex-wrap">
         <Badge variant="secondary" className="text-xs px-2 py-0.5">
