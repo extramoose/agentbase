@@ -412,7 +412,7 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
     if (seqId != null) router.push(`/tasks/${seqId}`)
   }
 
-  function renderSingleEntry(entry: ActivityLogEntry, idx = 0) {
+  function renderSingleEntry(entry: ActivityLogEntry) {
     const isDeleted = entry.event_type === 'deleted'
     const normalized = normalizeEntityType(entry.entity_type)
     const path = getEntityPath(normalized)
@@ -420,7 +420,6 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
     const isClickable = !!path && !isDeleted && seqId != null
     return (
       <div
-        key={entry.id + "-" + idx}
         className={`flex items-start gap-3 rounded-lg px-3 py-3 ml-7 hover:bg-muted/40 transition-colors${isClickable ? ' cursor-pointer' : ''}`}
         onClick={isClickable ? () => handleEntityClick(entry) : undefined}
       >
@@ -458,7 +457,7 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
 
   function renderLevel1Group(group: ConsecutiveEventGroup) {
     if (group.entries.length === 1) {
-      return renderSingleEntry(group.entries[0])
+      return <div key={group.entries[0].id + "-s"}>{renderSingleEntry(group.entries[0])}</div>
     }
     const isExpanded = expandedGroups.has(group.id)
     const entityLabel = group.entityType.replace(/_/g, ' ')
@@ -489,7 +488,7 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
         </div>
         {isExpanded && (
           <div className="space-y-1 ml-4 border-l border-border pl-2">
-            {group.entries.map((entry, i) => renderSingleEntry(entry, i))}
+            {group.entries.map((entry, i) => <div key={entry.id + "-" + i}>{renderSingleEntry(entry)}</div>)}
           </div>
         )}
       </div>
@@ -536,7 +535,7 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
         </div>
         {isBurstExpanded && (
           <div className="space-y-1 ml-4 border-l border-border pl-2">
-            {burst.groups.map(group => renderLevel1Group(group))}
+            {burst.groups.map(group => <div key={group.id}>{renderLevel1Group(group)}</div>)}
           </div>
         )}
       </div>
@@ -643,8 +642,8 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
           <>
             {displayItems.map(item =>
               item.type === 'flat'
-                ? renderLevel1Group(item.group)
-                : renderBurst(item)
+                ? <div key={item.group.id}>{renderLevel1Group(item.group)}</div>
+                : <div key={item.id}>{renderBurst(item)}</div>
             )}
             <div ref={sentinelRef} />
           </>
