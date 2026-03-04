@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { MoreHorizontal } from 'lucide-react'
@@ -49,6 +49,53 @@ export interface ExperimentAProps {
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
+
+const COL_MIN = 240
+const COL_MAX = 800
+const COL_DEFAULT_MANTRA = 480
+const COL_DEFAULT_TASK = 440
+
+function colWidthKey(actorId: string) { return `exp-a-width-${actorId}` }
+function loadColWidth(actorId: string, def: number): number {
+  if (typeof window === 'undefined') return def
+  const v = localStorage.getItem(colWidthKey(actorId))
+  return v ? Math.min(COL_MAX, Math.max(COL_MIN, Number(v))) : def
+}
+function saveColWidth(actorId: string, w: number) {
+  try { localStorage.setItem(colWidthKey(actorId), String(w)) } catch {}
+}
+
+// ---------------------------------------------------------------------------
+// DragHandle
+// ---------------------------------------------------------------------------
+
+function DragHandle({ onResize }: { onResize: (dx: number) => void }) {
+  const startX = useRef<number | null>(null)
+
+  const onMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    startX.current = e.clientX
+    const onMove = (ev: MouseEvent) => {
+      if (startX.current === null) return
+      onResize(ev.clientX - startX.current)
+      startX.current = ev.clientX
+    }
+    const onUp = () => {
+      startX.current = null
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+  }, [onResize])
+
+  return (
+    <div
+      onMouseDown={onMouseDown}
+      className="absolute top-0 right-0 w-1.5 h-full cursor-col-resize z-10 hover:bg-border/60 transition-colors select-none hidden sm:block"
+    />
+  )
+}
 
 const PRIORITY_ORDER: Record<Priority, number> = {
   urgent: 0, high: 1, medium: 2, low: 3, none: 4,
@@ -389,6 +436,7 @@ function AssigneeColumn({
   recentlyChanged,
   defaultDensity,
   defaultGroupBy,
+  defaultWidth = COL_DEFAULT_TASK,
 }: {
   actor: ResolvedActor
   tasks: Task[]
@@ -396,7 +444,17 @@ function AssigneeColumn({
   recentlyChanged?: Set<string>
   defaultDensity: Density
   defaultGroupBy: GroupBy
+  defaultWidth?: number
 }) {
+  const [width, setWidth] = useState(() => loadColWidth(actor.id, defaultWidth))
+  const handleResize = useCallback((dx: number) => {
+    setWidth((w) => {
+      const next = Math.min(COL_MAX, Math.max(COL_MIN, w + dx))
+      saveColWidth(actor.id, next)
+      return next
+    })
+  }, [actor.id])
+
   const saved = useMemo(() => loadColSettings(actor.id, { density: defaultDensity, groupBy: defaultGroupBy }), [actor.id, defaultDensity, defaultGroupBy])
   const [density, setDensityState] = useState<Density>(saved.density)
   const [groupBy, setGroupByState] = useState<GroupBy>(saved.groupBy)
@@ -416,7 +474,8 @@ function AssigneeColumn({
   )
 
   return (
-    <div className="flex flex-col shrink-0 border-r last:border-r-0" style={{ width: '440px' }}>
+    <div className="relative flex flex-col shrink-0 border-r last:border-r-0 sm:w-auto w-[80vw] scroll-snap-align-start" style={{ width: `${width}px` }}>
+      <DragHandle onResize={handleResize} />
       {/* Header */}
       <div className="flex items-center gap-2 px-4 py-3 border-b shrink-0">
         <Avatar className="h-7 w-7">
@@ -460,6 +519,44 @@ function AssigneeColumn({
 }
 
 // ---------------------------------------------------------------------------
+// MantraColumn (resizable)
+// ---------------------------------------------------------------------------
+
+function MantraColumn() {
+  const [width, setWidth] = useState(() => {
+    if (typeof window === 'undefined') return COL_DEFAULT_MANTRA
+    // On mobile default to 80vw; on desktop use saved or 50%
+    if (window.innerWidth < 640) return window.innerWidth * 0.8
+    const saved = localStorage.getItem('exp-a-width-mantra')
+    return saved ? Math.min(COL_MAX, Math.max(COL_MIN, Number(saved))) : Math.round(window.innerWidth * 0.5)
+  })
+
+  const handleResize = useCallback((dx: number) => {
+    setWidth((w) => {
+      const next = Math.min(COL_MAX, Math.max(COL_MIN, w + dx))
+      try { localStorage.setItem('exp-a-width-mantra', String(next)) } catch {}
+      return next
+    })
+  }, [])
+
+  return (
+    <div
+      className="relative shrink-0 overflow-y-auto border-r flex flex-col scroll-snap-align-start w-[80vw] sm:w-auto"
+      style={{ width, scrollSnapAlign: 'start' }}
+    >
+      <DragHandle onResize={handleResize} />
+      <div className="px-10 py-12 flex flex-col gap-8">
+        <span className="text-xs uppercase tracking-widest text-muted-foreground/60">Mantra</span>
+        <p className="text-3xl font-light text-muted-foreground/50 leading-[1.6]">
+          Focus on what matters.<br />Ship small. Iterate fast.<br /><br />
+          Every line of code is a liability — keep it lean, keep it clear, keep it moving.
+        </p>
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // ExperimentA
 // ---------------------------------------------------------------------------
 
@@ -487,17 +584,9 @@ export function ExperimentA({ tasks, taskHref, recentlyChanged }: ExperimentAPro
   const actorMap = useResolvedActors(allIds, assigneeTypes)
 
   return (
-    <div className="flex gap-0 overflow-x-auto border-t" style={{ height: 'calc(100vh - 120px)' }}>
+    <div className="flex gap-0 overflow-x-auto border-t" style={{ height: 'calc(100vh - 120px)', scrollSnapType: 'x mandatory' }}>
       {/* Set 1 — Mantra */}
-      <div className="shrink-0 overflow-y-auto border-r flex flex-col" style={{ width: '50%', minWidth: '280px', maxWidth: '600px' }}>
-        <div className="px-10 py-12 flex flex-col gap-8">
-          <span className="text-xs uppercase tracking-widest text-muted-foreground/60">Mantra</span>
-          <p className="text-3xl font-light text-muted-foreground/50 leading-[1.6]">
-            Focus on what matters.<br />Ship small. Iterate fast.<br /><br />
-            Every line of code is a liability — keep it lean, keep it clear, keep it moving.
-          </p>
-        </div>
-      </div>
+      <MantraColumn />
 
       {/* Set 2 — Human columns */}
       {humans.map((h) => (
