@@ -10,7 +10,6 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { X } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 
 interface TagComboboxProps {
@@ -28,22 +27,12 @@ export function TagCombobox({ selected, onChange, className, allowCreate = true 
   const [open, setOpen] = useState(false)
   const [activeIndex, setActiveIndex] = useState(-1)
   const inputRef = useRef<HTMLInputElement>(null)
-  const supabase = createClient()
-
-  // Load all workspace tags once (aggregated from entity tables via RPC)
+  // Load all workspace tags once, sorted by frequency
   useEffect(() => {
-    async function load() {
-      const { data: tenantId } = await supabase.rpc('get_my_tenant_id')
-      if (!tenantId) return
-      const { data } = await supabase.rpc('rpc_get_all_tags', { p_tenant_id: tenantId })
-      // Sort by usage frequency — RPC returns { tag, count }
-      const sorted = (data ?? [])
-        .sort((a: { tag: string; count: number }, b: { tag: string; count: number }) => b.count - a.count)
-        .map((t: { tag: string }) => t.tag)
-      setAllTags(sorted)
-    }
-    load()
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- supabase client is stable
+    fetch('/api/tags')
+      .then(r => r.json())
+      .then(({ tags }) => setAllTags(tags ?? []))
+      .catch(() => {})
   }, [])
 
   // Filter suggestions as user types
