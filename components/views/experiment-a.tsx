@@ -459,8 +459,8 @@ function GroupSection({
   const displayTasks = isDone ? group.tasks.slice(0, DONE_LIMIT) : group.tasks
 
   return (
-    <div className={cn(isDone && 'opacity-30 hover:opacity-100 transition-opacity duration-300')}>
-      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm flex items-center gap-2 py-2.5 mb-2 border-b border-border/50 px-4">
+    <div className={cn("overflow-hidden", isDone && "opacity-30 hover:opacity-100 transition-opacity duration-300")}>
+      <div className="sticky top-0 left-0 right-0 z-10 bg-background/95 backdrop-blur-sm flex items-center gap-2 py-2.5 mb-2 border-b border-border/50 px-4 w-full">
         <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{group.label}</span>
         <span className="text-xs text-muted-foreground/70">{group.tasks.length}{isDone && group.tasks.length > DONE_LIMIT ? ` (showing ${DONE_LIMIT})` : ''}</span>
       </div>
