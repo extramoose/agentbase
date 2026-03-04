@@ -329,9 +329,9 @@ function sortByPriority(tasks: Task[]): Task[] {
   return [...tasks].sort((a, b) => PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority])
 }
 
-function groupByTimeframe(tasks: Task[]): Group[] {
-  // Exclude done/cancelled — they belong in history, not a timeframe view
-  tasks = tasks.filter((t) => t.status !== 'done' && t.status !== 'cancelled')
+function groupByTimeframe(tasks: Task[], poofingIds?: Set<string>): Group[] {
+  // Exclude done/cancelled — except ones currently poofing (keep them visible during animation)
+  tasks = tasks.filter((t) => (t.status !== 'done' && t.status !== 'cancelled') || poofingIds?.has(t.id))
   const today = startOfToday()
   const todayStr = localDateStr(today)
   const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1)
@@ -361,7 +361,8 @@ function groupByTimeframe(tasks: Task[]): Group[] {
     .map((g) => ({ ...g, tasks: sortByPriority(buckets[g.key]) }))
 }
 
-function groupByStatus(tasks: Task[]): Group[] {
+function groupByStatus(tasks: Task[], poofingIds?: Set<string>): Group[] {
+  tasks = tasks.filter((t) => t.status !== 'cancelled' || poofingIds?.has(t.id))
   return [
     { key: 'in_progress', label: 'In Progress' },
     { key: 'todo', label: 'Todo' },
@@ -542,8 +543,8 @@ function AssigneeColumn({
   }
 
   const groups = useMemo(
-    () => (groupBy === 'timeframe' ? groupByTimeframe(tasks) : groupByStatus(tasks)),
-    [tasks, groupBy],
+    () => (groupBy === 'timeframe' ? groupByTimeframe(tasks, poofingIds) : groupByStatus(tasks, poofingIds)),
+    [tasks, groupBy, poofingIds],
   )
 
   return (
