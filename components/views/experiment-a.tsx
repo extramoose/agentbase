@@ -126,6 +126,15 @@ const PRIORITY_CARD: Record<Priority, string> = {
   none:   'border-border bg-transparent',
 }
 
+// Plain colored text for ticket number in regular card mode
+const PRIORITY_TEXT: Record<Priority, string> = {
+  urgent: 'text-red-500 dark:text-red-400',
+  high:   'text-purple-500 dark:text-purple-400',
+  medium: 'text-blue-500 dark:text-blue-400',
+  low:    'text-slate-400',
+  none:   'text-muted-foreground/60',
+}
+
 // Colored pill for ticket number in card/big mode
 const PRIORITY_PILL: Record<Priority, string> = {
   urgent: 'text-red-600 border-red-400 bg-red-500/10 dark:text-red-400',
@@ -382,7 +391,7 @@ function TaskCard({ task, taskHref, highlight, forcedStyle }: { task: Task; task
         <div className="flex-1 min-w-0">
           <p className={cn("text-sm leading-snug line-clamp-2", forcedStyle === "gray" ? "font-normal text-muted-foreground" : "font-medium")}>{task.title}</p>
           <div className="mt-1.5 flex items-center gap-2 flex-wrap">
-            <span className={cn('text-[10px] font-semibold px-1.5 py-0.5 rounded-full border', forcedStyle === "gray" ? "text-muted-foreground/50 border-muted-foreground/20" : PRIORITY_PILL[task.priority])}>
+            <span className={cn('text-[10px] font-semibold', forcedStyle === "gray" ? "text-muted-foreground/50" : PRIORITY_TEXT[task.priority])}>
               #{task.seq_id ?? task.ticket_id}
             </span>
             {task.due_date && (
@@ -422,7 +431,7 @@ function TaskBigCard({ task, taskHref, highlight, forcedStyle }: { task: Task; t
       style={{ height: '240px' }}
     >
       <div className="flex items-start gap-3">
-        <p className={cn("text-xl leading-snug line-clamp-4", forcedStyle === "gray" ? "font-normal text-muted-foreground" : "font-medium")}>{task.title}</p>
+        <p className={cn("text-2xl leading-snug line-clamp-4", forcedStyle === "gray" ? "font-normal text-muted-foreground" : "font-medium")}>{task.title}</p>
       </div>
       <div className="flex items-center gap-3 flex-wrap">
         <span className={cn('text-xs font-semibold px-2 py-0.5 rounded-full border', forcedStyle === "gray" ? "text-muted-foreground/50 border-muted-foreground/20" : PRIORITY_PILL[task.priority])}>
