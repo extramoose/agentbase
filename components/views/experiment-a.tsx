@@ -24,7 +24,7 @@ import { createClient } from '@/lib/supabase/client'
 
 type Priority = 'urgent' | 'high' | 'medium' | 'low' | 'none'
 type Status = 'backlog' | 'todo' | 'in_progress' | 'blocked' | 'done' | 'cancelled'
-type Density = 'card' | 'thin'
+type Density = 'big' | 'card' | 'thin'
 type GroupBy = 'timeframe' | 'status'
 
 interface Task {
@@ -382,6 +382,36 @@ function TaskThinRow({ task, taskHref }: { task: Task; taskHref: (task: Task) =>
   )
 }
 
+
+function TaskBigCard({ task, taskHref, highlight }: { task: Task; taskHref: (task: Task) => string; highlight?: boolean }) {
+  return (
+    <Link
+      href={taskHref(task)}
+      className={cn(
+        'flex flex-col justify-between rounded-xl border p-5 hover:bg-accent/40 transition-colors cursor-pointer no-underline',
+        highlight && 'animate-sticky-pulse',
+      )}
+      style={{ height: '240px' }}
+    >
+      <div className="flex items-start gap-3">
+        <span className={cn('mt-1 h-2.5 w-2.5 rounded-full shrink-0', PRIORITY_DOT[task.priority])} title={task.priority} />
+        <p className="text-lg font-medium leading-snug line-clamp-4">{task.title}</p>
+      </div>
+      <div className="flex items-center gap-3 flex-wrap">
+        <Badge variant="secondary" className="text-xs px-2 py-0.5">
+          #{task.seq_id ?? task.ticket_id}
+        </Badge>
+        {task.due_date && (
+          <span className="text-xs text-muted-foreground">{formatDueDate(task.due_date)}</span>
+        )}
+        {task.tags?.slice(0, 2).map((tag) => (
+          <Badge key={tag} variant="outline" className="text-xs px-2 py-0.5">{tag}</Badge>
+        ))}
+      </div>
+    </Link>
+  )
+}
+
 // ---------------------------------------------------------------------------
 // Group renderer with Done fade + limit
 // ---------------------------------------------------------------------------
@@ -406,13 +436,15 @@ function GroupSection({
         <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{group.label}</span>
         <span className="text-xs text-muted-foreground">{group.tasks.length}{isDone && group.tasks.length > DONE_LIMIT ? `+ (showing ${DONE_LIMIT})` : ''}</span>
       </div>
-      <div className={cn(density === 'card' ? 'space-y-2' : 'space-y-0.5')}>
+      <div className={cn(density === 'big' ? 'space-y-4' : density === 'card' ? 'space-y-2' : 'space-y-0.5')}>
         {displayTasks.map((task, i) => {
           const fadeIndex = isDone ? i - DONE_FADE_START : -1
           const opacity = fadeIndex > 0 ? Math.max(0, 1 - fadeIndex / (DONE_LIMIT - DONE_FADE_START)) : 1
           return (
             <div key={task.id} style={{ opacity }}>
-              {density === 'card' ? (
+              {density === 'big' ? (
+                <TaskBigCard task={task} taskHref={taskHref} highlight={recentlyChanged?.has(task.id)} />
+              ) : density === 'card' ? (
                 <TaskCard task={task} taskHref={taskHref} highlight={recentlyChanged?.has(task.id)} />
               ) : (
                 <TaskThinRow task={task} taskHref={taskHref} />
@@ -493,6 +525,7 @@ function AssigneeColumn({
             <DropdownMenuContent align="end" className="w-44">
               <DropdownMenuLabel>Density</DropdownMenuLabel>
               <DropdownMenuRadioGroup value={density} onValueChange={(v) => setDensity(v as Density)}>
+                <DropdownMenuRadioItem value="big">Big</DropdownMenuRadioItem>
                 <DropdownMenuRadioItem value="card">Card</DropdownMenuRadioItem>
                 <DropdownMenuRadioItem value="thin">Thin</DropdownMenuRadioItem>
               </DropdownMenuRadioGroup>
