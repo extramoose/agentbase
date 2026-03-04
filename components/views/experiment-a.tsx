@@ -544,6 +544,7 @@ main.classList.remove('p-3', 'pt-15', 'sm:p-6', 'sm:pt-6', 'p-6')
     main.style.padding = '0'
     return () => {
       main.style.padding = ''
+      main.classList.add('p-3', 'pt-15', 'sm:p-6', 'sm:pt-6')
     }
   }, [])
 
