@@ -12,11 +12,13 @@ interface TimeframeViewProps {
 
 export function TimeframeView({ tasks, taskHref, recentlyChanged }: TimeframeViewProps) {
   return (
-    <StickiesView
-      tasks={tasks}
-      taskHref={taskHref}
-      mode="timeframe"
-      recentlyChanged={recentlyChanged}
-    />
+    <div className="p-4">
+      <StickiesView
+        tasks={tasks}
+        taskHref={taskHref}
+        mode="timeframe"
+        recentlyChanged={recentlyChanged}
+      />
+    </div>
   )
 }

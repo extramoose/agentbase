@@ -80,6 +80,9 @@ interface PageHeaderProps {
   /** Page title shown top-left */
   title: string
 
+  /** Optional icon rendered before the title */
+  icon?: React.ComponentType<{ className?: string }>
+
   /** Face pile members */
   workspaceMembers: WorkspaceMember[]
   /** Currently selected member IDs for face pile */
@@ -110,6 +113,7 @@ interface PageHeaderProps {
 
 export function PageHeader({
   title,
+  icon: Icon,
   workspaceMembers,
   facePile,
   onToggleFacePile,
@@ -182,8 +186,15 @@ export function PageHeader({
     <div className="m-4 space-y-2">
       {/* Row 1 */}
       <div className="flex items-center justify-between gap-2">
-        {/* Left: title */}
-        <h1 className="text-sm font-normal text-muted-foreground/60 shrink-0" aria-label={title}>{new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}</h1>
+        {/* Left: icon + title */}
+        <div className="flex items-center gap-2 shrink-0">
+          {Icon && <Icon className="h-4 w-4 text-muted-foreground shrink-0" />}
+          <h1 className="text-base font-normal text-muted-foreground" aria-label={title}>
+            {viewType !== undefined
+              ? new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })
+              : title}
+          </h1>
+        </div>
 
         {/* Right: face pile + view toggle + filter + new task */}
         <div className="flex items-center gap-2">

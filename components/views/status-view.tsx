@@ -12,11 +12,13 @@ interface StatusViewProps {
 
 export function StatusView({ tasks, taskHref, recentlyChanged }: StatusViewProps) {
   return (
-    <StickiesView
-      tasks={tasks}
-      taskHref={taskHref}
-      mode="status"
-      recentlyChanged={recentlyChanged}
-    />
+    <div className="p-4">
+      <StickiesView
+        tasks={tasks}
+        taskHref={taskHref}
+        mode="status"
+        recentlyChanged={recentlyChanged}
+      />
+    </div>
   )
 }

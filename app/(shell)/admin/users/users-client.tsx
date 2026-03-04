@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from '@/hooks/use-toast'
 import { formatDistanceToNow } from 'date-fns'
-import { Check, ChevronDown, Copy, Link, Loader2, Shield, ShieldAlert, Trash2, User } from 'lucide-react'
+import { Check, ChevronDown, Copy, Link, Loader2, Shield, ShieldAlert, Trash2, User, UserCog } from 'lucide-react'
 
 type Invite = {
   id: string
@@ -150,8 +150,11 @@ export function UsersClient({ currentUserId }: UsersClientProps) {
 
   if (loading) {
     return (
-      <div className="space-y-6">
-        <h1 className="text-2xl font-bold">Users</h1>
+      <div className="space-y-6 p-4">
+        <div className="flex items-center gap-2">
+          <UserCog className="h-4 w-4 text-muted-foreground shrink-0" />
+          <h1 className="text-2xl font-bold">Users</h1>
+        </div>
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
@@ -160,8 +163,11 @@ export function UsersClient({ currentUserId }: UsersClientProps) {
   }
 
   return (
-    <div className="space-y-4 sm:space-y-6">
-      <h1 className="text-xl sm:text-2xl font-bold">Users</h1>
+    <div className="space-y-4 sm:space-y-6 p-4">
+      <div className="flex items-center gap-2">
+        <UserCog className="h-4 w-4 text-muted-foreground shrink-0" />
+        <h1 className="text-xl sm:text-2xl font-bold">Users</h1>
+      </div>
 
       <div className="rounded-lg border border-border overflow-x-auto">
         <table className="w-full min-w-[600px]">

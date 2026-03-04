@@ -1392,6 +1392,7 @@ export function TasksClient({
       {/* Unified PageHeader */}
       <PageHeader
         title="Tasks"
+        icon={CheckSquare}
         workspaceMembers={workspaceMembers}
         facePile={facePile}
         onToggleFacePile={toggleFacePile}
@@ -1502,7 +1503,7 @@ export function TasksClient({
         )}
 
         {/* Priority groups */}
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto p-4">
           {mounted ? (
             <DndContext
               sensors={sensors}

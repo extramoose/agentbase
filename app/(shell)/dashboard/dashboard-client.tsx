@@ -8,7 +8,7 @@ import { PageHeader } from '@/components/page-header'
 import { ViewRenderer } from '@/components/views'
 import { type Task } from '@/app/(shell)/tasks/tasks-client'
 import { Button } from '@/components/ui/button'
-import { Loader2, X } from 'lucide-react'
+import { LayoutDashboard, Loader2, X } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { DateInput } from '@/components/ui/date-input'
 import { AssigneePicker } from '@/components/assignee-picker'
@@ -368,6 +368,7 @@ export function DashboardClient({
     <div className="flex flex-col h-full">
       <PageHeader
         title="Dashboard"
+        icon={LayoutDashboard}
         workspaceMembers={workspaceMembers}
         hideFacePile={isExperimentA}
         facePile={isExperimentA ? workspaceMembers.map(m => m.id) : facePile}

@@ -127,7 +127,7 @@ export function SettingsClient({ settings }: SettingsClientProps) {
   const currentModelName = models.find(m => m.id === model)?.name ?? model
 
   return (
-    <div className="space-y-4 sm:space-y-6">
+    <div className="space-y-4 sm:space-y-6 p-4">
       <div className="flex items-center gap-3">
         <Settings className="h-6 w-6 text-muted-foreground" />
         <h1 className="text-xl sm:text-2xl font-bold">Settings</h1>

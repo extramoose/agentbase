@@ -10,7 +10,7 @@ import { AvatarPicker, AGENT_AVATAR_PRESETS } from '@/components/avatar-picker'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from '@/hooks/use-toast'
-import { Check, Copy, KeyRound, Loader2, Plus, Trash2 } from 'lucide-react'
+import { Bot, Check, Copy, KeyRound, Loader2, Plus, Trash2 } from 'lucide-react'
 
 type Agent = {
   id: string
@@ -127,9 +127,12 @@ export function AgentsClient({ agents: initialAgents, currentUserName, currentUs
   }, [])
 
   return (
-    <div className="space-y-4 sm:space-y-6">
+    <div className="space-y-4 sm:space-y-6 p-4">
       <div className="flex items-center justify-between gap-2">
-        <h1 className="text-xl sm:text-2xl font-bold">Agents</h1>
+        <div className="flex items-center gap-2">
+          <Bot className="h-4 w-4 text-muted-foreground shrink-0" />
+          <h1 className="text-xl sm:text-2xl font-bold">Agents</h1>
+        </div>
         <Button size="sm" onClick={() => setShowCreate(true)}>
           <Plus className="h-4 w-4" />
           Create Agent

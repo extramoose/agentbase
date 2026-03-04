@@ -8,7 +8,7 @@ import { SearchFilterBar } from '@/components/search-filter-bar'
 
 import { Badge } from '@/components/ui/badge'
 import { formatDistanceToNow, isToday, isYesterday, format, addDays } from 'date-fns'
-import { ChevronLeft, ChevronRight, Loader2, Plus, Minus } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Clock, Loader2, Plus, Minus } from 'lucide-react'
 import {
   formatActivityEvent,
   filterActivityItems,
@@ -563,8 +563,11 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
   return (
     <div className="space-y-4">
       {/* Title row */}
-      <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-4 mb-4">
-        <h1 className="text-xl sm:text-2xl font-bold shrink-0">History</h1>
+      <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-4 mb-4 p-4">
+        <div className="flex items-center gap-2 shrink-0">
+          <Clock className="h-4 w-4 text-muted-foreground shrink-0" />
+          <h1 className="text-xl sm:text-2xl font-bold">History</h1>
+        </div>
         <div className="flex items-center gap-2">
           <SearchFilterBar
             search={search}
@@ -632,7 +635,7 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
       </div>
 
       {/* Activity list */}
-      <div ref={scrollContainerRef} className="space-y-1">
+      <div ref={scrollContainerRef} className="space-y-1 p-4">
         {loading ? (
           <div className="flex justify-center py-8">
             <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
