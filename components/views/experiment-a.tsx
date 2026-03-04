@@ -395,16 +395,16 @@ function TaskCard({ task, taskHref, highlight, forcedStyle }: { task: Task; task
   )
 }
 
-function TaskThinRow({ task, taskHref }: { task: Task; taskHref: (task: Task) => string }) {
+function TaskThinRow({ task, taskHref, forcedStyle }: { task: Task; taskHref: (task: Task) => string; forcedStyle?: "gray" }) {
   return (
     <Link
       href={taskHref(task)}
       className="flex items-center gap-2 py-1 px-1 rounded hover:bg-accent/40 transition-colors cursor-pointer no-underline"
     >
-      <span className={cn('text-xs w-10 shrink-0 text-right font-mono', PRIORITY_TICKET_COLOR[task.priority])}>
+      <span className={cn('text-xs w-10 shrink-0 text-right font-mono', forcedStyle === "gray" ? "text-muted-foreground/50" : PRIORITY_TICKET_COLOR[task.priority])}>
         #{task.seq_id ?? task.ticket_id}
       </span>
-      <span className="text-sm truncate">{task.title}</span>
+      <span className={cn("text-sm truncate", forcedStyle === "gray" && "text-muted-foreground font-normal")}>{task.title}</span>
     </Link>
   )
 }
@@ -475,7 +475,7 @@ function GroupSection({
               ) : density === 'card' ? (
                 <TaskCard task={task} taskHref={taskHref} highlight={!isDone && (recentlyChanged?.has(task.id) ?? false)} forcedStyle={isDone ? 'gray' : undefined} />
               ) : (
-                <TaskThinRow task={task} taskHref={taskHref} />
+                <TaskThinRow task={task} taskHref={taskHref} forcedStyle={isDone ? "gray" : undefined} />
               )}
             </div>
           )
