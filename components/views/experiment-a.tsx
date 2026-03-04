@@ -24,6 +24,8 @@ import { createClient } from '@/lib/supabase/client'
 
 type Priority = 'urgent' | 'high' | 'medium' | 'low' | 'none'
 type Status = 'backlog' | 'todo' | 'in_progress' | 'blocked' | 'done' | 'cancelled'
+type Density = 'card' | 'thin'
+type GroupBy = 'timeframe' | 'status'
 
 interface Task {
   id: string
@@ -48,15 +50,8 @@ export interface ExperimentAProps {
 // Constants
 // ---------------------------------------------------------------------------
 
-type Density = 'card' | 'thin'
-type GroupBy = 'timeframe' | 'status'
-
 const PRIORITY_ORDER: Record<Priority, number> = {
-  urgent: 0,
-  high: 1,
-  medium: 2,
-  low: 3,
-  none: 4,
+  urgent: 0, high: 1, medium: 2, low: 3, none: 4,
 }
 
 const PRIORITY_DOT: Record<Priority, string> = {
@@ -65,6 +60,47 @@ const PRIORITY_DOT: Record<Priority, string> = {
   medium: 'bg-yellow-400',
   low: 'bg-slate-400',
   none: 'bg-muted-foreground/40',
+}
+
+// Ticket number color in thin mode
+const PRIORITY_TICKET_COLOR: Record<Priority, string> = {
+  urgent: 'text-red-500',
+  high: 'text-orange-400',
+  medium: 'text-foreground',
+  low: 'text-muted-foreground',
+  none: 'text-muted-foreground/60',
+}
+
+const DONE_LIMIT = 50
+const DONE_FADE_START = 40 // fade begins at this index
+
+// ---------------------------------------------------------------------------
+// localStorage helpers (per actor)
+// ---------------------------------------------------------------------------
+
+function storageKey(actorId: string) {
+  return `exp-a-col-${actorId}`
+}
+
+function loadColSettings(actorId: string, defaults: { density: Density; groupBy: GroupBy }) {
+  if (typeof window === 'undefined') return defaults
+  try {
+    const raw = localStorage.getItem(storageKey(actorId))
+    if (!raw) return defaults
+    const parsed = JSON.parse(raw)
+    return {
+      density: (parsed.density as Density) ?? defaults.density,
+      groupBy: (parsed.groupBy as GroupBy) ?? defaults.groupBy,
+    }
+  } catch {
+    return defaults
+  }
+}
+
+function saveColSettings(actorId: string, settings: { density: Density; groupBy: GroupBy }) {
+  try {
+    localStorage.setItem(storageKey(actorId), JSON.stringify(settings))
+  } catch {}
 }
 
 // ---------------------------------------------------------------------------
@@ -104,44 +140,26 @@ function useResolvedActors(
     async function resolve() {
       const humanIds = missing.filter((id) => assigneeTypes.get(id) !== 'agent')
       const agentIds = missing.filter((id) => assigneeTypes.get(id) === 'agent')
-
       const results = new Map<string, ResolvedActor>()
 
       if (humanIds.length > 0) {
-        const { data } = await supabase
-          .from('profiles')
-          .select('id, full_name, email')
-          .in('id', humanIds)
+        const { data } = await supabase.from('profiles').select('id, full_name, email').in('id', humanIds)
         if (data) {
           for (const p of data) {
             const fullName = p.full_name ?? p.email?.split('@')[0] ?? 'Unknown'
-            const initials = fullName
-              .split(/\s+/)
-              .map((w: string) => w[0])
-              .join('')
-              .slice(0, 2)
-              .toUpperCase()
+            const initials = fullName.split(/\s+/).map((w: string) => w[0]).join('').slice(0, 2).toUpperCase()
             const actor: ResolvedActor = { id: p.id, fullName, initials }
             results.set(p.id, actor)
             actorNameCache.set(p.id, actor)
           }
         }
-        // Any humanIds not found in profiles — try agents table as fallback
         const unresolvedHumans = humanIds.filter((id) => !results.has(id))
         if (unresolvedHumans.length > 0) {
-          const { data: agents } = await supabase
-            .from('agents')
-            .select('id, name')
-            .in('id', unresolvedHumans)
+          const { data: agents } = await supabase.from('agents').select('id, name').in('id', unresolvedHumans)
           if (agents) {
             for (const a of agents) {
               const fullName = a.name ?? 'Unknown'
-              const initials = fullName
-                .split(/\s+/)
-                .map((w: string) => w[0])
-                .join('')
-                .slice(0, 2)
-                .toUpperCase()
+              const initials = fullName.split(/\s+/).map((w: string) => w[0]).join('').slice(0, 2).toUpperCase()
               const actor: ResolvedActor = { id: a.id, fullName, initials }
               results.set(a.id, actor)
               actorNameCache.set(a.id, actor)
@@ -151,19 +169,11 @@ function useResolvedActors(
       }
 
       if (agentIds.length > 0) {
-        const { data } = await supabase
-          .from('agents')
-          .select('id, name')
-          .in('id', agentIds)
+        const { data } = await supabase.from('agents').select('id, name').in('id', agentIds)
         if (data) {
           for (const a of data) {
             const fullName = a.name ?? 'Agent'
-            const initials = fullName
-              .split(/\s+/)
-              .map((w: string) => w[0])
-              .join('')
-              .slice(0, 2)
-              .toUpperCase()
+            const initials = fullName.split(/\s+/).map((w: string) => w[0]).join('').slice(0, 2).toUpperCase()
             const actor: ResolvedActor = { id: a.id, fullName, initials }
             results.set(a.id, actor)
             actorNameCache.set(a.id, actor)
@@ -171,14 +181,9 @@ function useResolvedActors(
         }
       }
 
-      // Fallback for any still-unresolved
       for (const id of missing) {
         if (!results.has(id)) {
-          const fallback: ResolvedActor = {
-            id,
-            fullName: assigneeTypes.get(id) === 'agent' ? 'Agent' : 'Unknown',
-            initials: '??',
-          }
+          const fallback: ResolvedActor = { id, fullName: assigneeTypes.get(id) === 'agent' ? 'Agent' : 'Unknown', initials: '??' }
           actorNameCache.set(id, fallback)
           results.set(id, fallback)
         }
@@ -194,9 +199,7 @@ function useResolvedActors(
     }
 
     resolve()
-    return () => {
-      cancelled = true
-    }
+    return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [idsKey])
 
@@ -214,18 +217,13 @@ function startOfToday(): Date {
 }
 
 function localDateStr(d: Date): string {
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  return `${y}-${m}-${day}`
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
 function formatDueDate(dateStr: string): string {
   const date = new Date(dateStr.slice(0, 10) + 'T00:00:00')
   const today = startOfToday()
-  const diffMs = date.getTime() - today.getTime()
-  const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24))
-
+  const diffDays = Math.round((date.getTime() - today.getTime()) / 86400000)
   if (diffDays === 0) return 'Today'
   if (diffDays === 1) return 'Tomorrow'
   if (diffDays === -1) return 'Yesterday'
@@ -245,37 +243,20 @@ interface Group {
 }
 
 function sortByPriority(tasks: Task[]): Task[] {
-  return [...tasks].sort(
-    (a, b) => PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority],
-  )
+  return [...tasks].sort((a, b) => PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority])
 }
 
 function groupByTimeframe(tasks: Task[]): Group[] {
   const today = startOfToday()
   const todayStr = localDateStr(today)
-
-  const tomorrow = new Date(today)
-  tomorrow.setDate(tomorrow.getDate() + 1)
+  const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1)
   const tomorrowStr = localDateStr(tomorrow)
-
-  const daysUntilSunday = (7 - today.getDay()) % 7
-  const endOfWeek = new Date(today)
-  endOfWeek.setDate(endOfWeek.getDate() + daysUntilSunday)
+  const endOfWeek = new Date(today); endOfWeek.setDate(endOfWeek.getDate() + (7 - today.getDay()) % 7)
   const endOfWeekStr = localDateStr(endOfWeek)
 
-  const buckets: Record<string, Task[]> = {
-    past_due: [],
-    today: [],
-    tomorrow: [],
-    this_week: [],
-    later: [],
-  }
-
+  const buckets: Record<string, Task[]> = { past_due: [], today: [], tomorrow: [], this_week: [], later: [] }
   for (const task of tasks) {
-    if (!task.due_date) {
-      buckets.later.push(task)
-      continue
-    }
+    if (!task.due_date) { buckets.later.push(task); continue }
     const d = task.due_date.slice(0, 10)
     if (d < todayStr) buckets.past_due.push(task)
     else if (d === todayStr) buckets.today.push(task)
@@ -284,34 +265,26 @@ function groupByTimeframe(tasks: Task[]): Group[] {
     else buckets.later.push(task)
   }
 
-  const order: { key: string; label: string }[] = [
+  return [
     { key: 'past_due', label: 'Past Due' },
     { key: 'today', label: 'Today' },
     { key: 'tomorrow', label: 'Tomorrow' },
     { key: 'this_week', label: 'This Week' },
     { key: 'later', label: 'Later' },
   ]
-
-  return order
     .filter((g) => buckets[g.key].length > 0)
-    .map((g) => ({ key: g.key, label: g.label, tasks: sortByPriority(buckets[g.key]) }))
+    .map((g) => ({ ...g, tasks: sortByPriority(buckets[g.key]) }))
 }
 
 function groupByStatus(tasks: Task[]): Group[] {
-  const order: { key: Status; label: string }[] = [
+  return [
     { key: 'in_progress', label: 'In Progress' },
     { key: 'todo', label: 'Todo' },
     { key: 'backlog', label: 'Backlog' },
     { key: 'blocked', label: 'Blocked' },
     { key: 'done', label: 'Done' },
   ]
-
-  return order
-    .map((g) => ({
-      key: g.key,
-      label: g.label,
-      tasks: sortByPriority(tasks.filter((t) => t.status === g.key)),
-    }))
+    .map((g) => ({ ...g, tasks: sortByPriority(tasks.filter((t) => t.status === g.key)) }))
     .filter((g) => g.tasks.length > 0)
 }
 
@@ -319,15 +292,7 @@ function groupByStatus(tasks: Task[]): Group[] {
 // Task renderers
 // ---------------------------------------------------------------------------
 
-function TaskCard({
-  task,
-  taskHref,
-  highlight,
-}: {
-  task: Task
-  taskHref: (task: Task) => string
-  highlight?: boolean
-}) {
+function TaskCard({ task, taskHref, highlight }: { task: Task; taskHref: (task: Task) => string; highlight?: boolean }) {
   return (
     <Link
       href={taskHref(task)}
@@ -337,10 +302,7 @@ function TaskCard({
       )}
     >
       <div className="flex items-start gap-2">
-        <span
-          className={cn('mt-1.5 h-2 w-2 rounded-full shrink-0', PRIORITY_DOT[task.priority])}
-          title={task.priority}
-        />
+        <span className={cn('mt-1.5 h-2 w-2 rounded-full shrink-0', PRIORITY_DOT[task.priority])} title={task.priority} />
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium leading-snug line-clamp-2">{task.title}</p>
           <div className="mt-1.5 flex items-center gap-2 flex-wrap">
@@ -348,9 +310,7 @@ function TaskCard({
               #{task.seq_id ?? task.ticket_id}
             </Badge>
             {task.due_date && (
-              <span className="text-[10px] text-muted-foreground">
-                {formatDueDate(task.due_date)}
-              </span>
+              <span className="text-[10px] text-muted-foreground">{formatDueDate(task.due_date)}</span>
             )}
           </div>
         </div>
@@ -359,23 +319,60 @@ function TaskCard({
   )
 }
 
-function TaskThinRow({
-  task,
-  taskHref,
-}: {
-  task: Task
-  taskHref: (task: Task) => string
-}) {
+function TaskThinRow({ task, taskHref }: { task: Task; taskHref: (task: Task) => string }) {
   return (
     <Link
       href={taskHref(task)}
       className="flex items-center gap-2 py-1 px-1 rounded hover:bg-accent/40 transition-colors cursor-pointer no-underline"
     >
-      <span className="text-muted-foreground text-xs w-10 shrink-0 text-right">
+      <span className={cn('text-xs w-10 shrink-0 text-right font-mono', PRIORITY_TICKET_COLOR[task.priority])}>
         #{task.seq_id ?? task.ticket_id}
       </span>
       <span className="text-sm truncate">{task.title}</span>
     </Link>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Group renderer with Done fade + limit
+// ---------------------------------------------------------------------------
+
+function GroupSection({
+  group,
+  density,
+  taskHref,
+  recentlyChanged,
+}: {
+  group: Group
+  density: Density
+  taskHref: (task: Task) => string
+  recentlyChanged?: Set<string>
+}) {
+  const isDone = group.key === 'done'
+  const displayTasks = isDone ? group.tasks.slice(0, DONE_LIMIT) : group.tasks
+
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-1.5">
+        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{group.label}</span>
+        <span className="text-xs text-muted-foreground">{group.tasks.length}{isDone && group.tasks.length > DONE_LIMIT ? `+ (showing ${DONE_LIMIT})` : ''}</span>
+      </div>
+      <div className={cn(density === 'card' ? 'space-y-2' : 'space-y-0.5')}>
+        {displayTasks.map((task, i) => {
+          const fadeIndex = isDone ? i - DONE_FADE_START : -1
+          const opacity = fadeIndex > 0 ? Math.max(0, 1 - fadeIndex / (DONE_LIMIT - DONE_FADE_START)) : 1
+          return (
+            <div key={task.id} style={{ opacity }}>
+              {density === 'card' ? (
+                <TaskCard task={task} taskHref={taskHref} highlight={recentlyChanged?.has(task.id)} />
+              ) : (
+                <TaskThinRow task={task} taskHref={taskHref} />
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </div>
   )
 }
 
@@ -398,8 +395,18 @@ function AssigneeColumn({
   defaultDensity: Density
   defaultGroupBy: GroupBy
 }) {
-  const [density, setDensity] = useState<Density>(defaultDensity)
-  const [groupBy, setGroupBy] = useState<GroupBy>(defaultGroupBy)
+  const saved = useMemo(() => loadColSettings(actor.id, { density: defaultDensity, groupBy: defaultGroupBy }), [actor.id, defaultDensity, defaultGroupBy])
+  const [density, setDensityState] = useState<Density>(saved.density)
+  const [groupBy, setGroupByState] = useState<GroupBy>(saved.groupBy)
+
+  function setDensity(v: Density) {
+    setDensityState(v)
+    saveColSettings(actor.id, { density: v, groupBy })
+  }
+  function setGroupBy(v: GroupBy) {
+    setGroupByState(v)
+    saveColSettings(actor.id, { density, groupBy: v })
+  }
 
   const groups = useMemo(
     () => (groupBy === 'timeframe' ? groupByTimeframe(tasks) : groupByStatus(tasks)),
@@ -407,10 +414,10 @@ function AssigneeColumn({
   )
 
   return (
-    <div className="flex flex-col shrink-0" style={{ width: '440px' }}>
+    <div className="flex flex-col shrink-0 border-r last:border-r-0" style={{ width: '440px' }}>
       {/* Header */}
-      <div className="flex items-center gap-2 px-3 py-2 border-b shrink-0">
-        <Avatar size="sm">
+      <div className="flex items-center gap-2 px-4 py-3 border-b shrink-0">
+        <Avatar className="h-7 w-7">
           <AvatarFallback className="text-[10px]">{actor.initials}</AvatarFallback>
         </Avatar>
         <span className="text-sm font-medium truncate">{actor.fullName}</span>
@@ -440,36 +447,11 @@ function AssigneeColumn({
       </div>
 
       {/* Scrollable task list */}
-      <div className="flex-1 overflow-y-auto px-3 py-2 space-y-4">
+      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-5">
         {groups.map((group) => (
-          <div key={group.key}>
-            <div className="flex items-center gap-2 mb-1.5">
-              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                {group.label}
-              </span>
-              <span className="text-xs text-muted-foreground">
-                {group.tasks.length}
-              </span>
-            </div>
-            <div className={cn(density === 'card' ? 'space-y-2' : 'space-y-0.5')}>
-              {group.tasks.map((task) =>
-                density === 'card' ? (
-                  <TaskCard
-                    key={task.id}
-                    task={task}
-                    taskHref={taskHref}
-                    highlight={recentlyChanged?.has(task.id)}
-                  />
-                ) : (
-                  <TaskThinRow key={task.id} task={task} taskHref={taskHref} />
-                ),
-              )}
-            </div>
-          </div>
+          <GroupSection key={group.key} group={group} density={density} taskHref={taskHref} recentlyChanged={recentlyChanged} />
         ))}
-        {groups.length === 0 && (
-          <p className="text-sm text-muted-foreground py-4 text-center">No tasks</p>
-        )}
+        {/* Empty state: keep column shape, show nothing */}
       </div>
     </div>
   )
@@ -485,7 +467,6 @@ interface DerivedAssignee {
 }
 
 export function ExperimentA({ tasks, taskHref, recentlyChanged }: ExperimentAProps) {
-  // Derive unique assignees from tasks, split by role
   const { humans, agents, assigneeTypes } = useMemo(() => {
     const seen = new Map<string, DerivedAssignee>()
     const typeMap = new Map<string, string | null>()
@@ -497,34 +478,23 @@ export function ExperimentA({ tasks, taskHref, recentlyChanged }: ExperimentAPro
       }
     }
     const all = Array.from(seen.values())
-    return {
-      humans: all.filter((a) => a.type === 'human'),
-      agents: all.filter((a) => a.type === 'agent'),
-      assigneeTypes: typeMap,
-    }
+    return { humans: all.filter((a) => a.type === 'human'), agents: all.filter((a) => a.type === 'agent'), assigneeTypes: typeMap }
   }, [tasks])
 
-  const allIds = useMemo(
-    () => [...humans, ...agents].map((a) => a.id),
-    [humans, agents],
-  )
-
+  const allIds = useMemo(() => [...humans, ...agents].map((a) => a.id), [humans, agents])
   const actorMap = useResolvedActors(allIds, assigneeTypes)
 
   return (
-    <div className="flex gap-0 divide-x overflow-x-auto" style={{ height: 'calc(100vh - 120px)' }}>
+    <div className="flex gap-0 overflow-x-auto border-t" style={{ height: 'calc(100vh - 120px)' }}>
       {/* Set 1 — Mantra */}
-      <div
-        className="shrink-0 overflow-y-auto px-6 py-6 flex flex-col"
-        style={{ width: 220 }}
-      >
-        <span className="text-xs uppercase tracking-widest text-muted-foreground mb-4">
-          Mantra
-        </span>
-        <p className="text-2xl font-light text-muted-foreground/60 leading-relaxed">
-          Focus on what matters. Ship small. Iterate fast. Every line of code is a
-          liability — keep it lean, keep it clear, keep it moving.
-        </p>
+      <div className="shrink-0 overflow-y-auto border-r flex flex-col" style={{ width: '50%', minWidth: '280px', maxWidth: '600px' }}>
+        <div className="px-10 py-12 flex flex-col gap-8">
+          <span className="text-xs uppercase tracking-widest text-muted-foreground/60">Mantra</span>
+          <p className="text-3xl font-light text-muted-foreground/50 leading-[1.6]">
+            Focus on what matters.<br />Ship small. Iterate fast.<br /><br />
+            Every line of code is a liability — keep it lean, keep it clear, keep it moving.
+          </p>
+        </div>
       </div>
 
       {/* Set 2 — Human columns */}
