@@ -385,6 +385,7 @@ export function DashboardClient({
       <ViewRenderer
         view={dashboardView}
         tasks={filteredTasks}
+        workspaceMembers={workspaceMembers}
         taskHref={taskHref}
         recentlyChanged={recentlyChanged}
       />

@@ -16,7 +16,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { createClient } from '@/lib/supabase/client'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -44,6 +43,7 @@ export interface ExperimentAProps {
   tasks: Task[]
   taskHref: (task: Task) => string
   recentlyChanged?: Set<string>
+  workspaceMembers?: { id: string; name: string; avatarUrl: string | null; role: 'human' | 'agent' }[]
 }
 
 // ---------------------------------------------------------------------------
@@ -185,108 +185,12 @@ function saveColSettings(actorId: string, settings: { density: Density; groupBy:
   } catch {}
 }
 
-// ---------------------------------------------------------------------------
-// Actor resolution hook
-// ---------------------------------------------------------------------------
 
 interface ResolvedActor {
   id: string
   fullName: string
   initials: string
   avatarUrl?: string | null
-}
-
-const actorNameCache = new Map<string, ResolvedActor>()
-
-function useResolvedActors(
-  assigneeIds: string[],
-  assigneeTypes: Map<string, string | null>,
-): Map<string, ResolvedActor> {
-  const [resolved, setResolved] = useState<Map<string, ResolvedActor>>(() => {
-    const initial = new Map<string, ResolvedActor>()
-    for (const id of assigneeIds) {
-      const cached = actorNameCache.get(id)
-      if (cached) initial.set(id, cached)
-    }
-    return initial
-  })
-
-  const idsKey = assigneeIds.join(',')
-
-  useEffect(() => {
-    const missing = assigneeIds.filter((id) => !actorNameCache.has(id))
-    if (missing.length === 0) return
-
-    let cancelled = false
-    const supabase = createClient()
-
-    async function resolve() {
-      const humanIds = missing.filter((id) => assigneeTypes.get(id) !== 'agent')
-      const agentIds = missing.filter((id) => assigneeTypes.get(id) === 'agent')
-      const results = new Map<string, ResolvedActor>()
-
-      if (humanIds.length > 0) {
-        const { data } = await supabase.from('profiles').select('id, full_name, email, avatar_url').in('id', humanIds)
-        if (data) {
-          for (const p of data) {
-            const fullName = p.full_name ?? p.email?.split('@')[0] ?? 'Unknown'
-            const initials = fullName.split(/\s+/).map((w: string) => w[0]).join('').slice(0, 2).toUpperCase()
-            const actor: ResolvedActor = { id: p.id, fullName, initials, avatarUrl: p.avatar_url ?? null }
-            results.set(p.id, actor)
-            actorNameCache.set(p.id, actor)
-          }
-        }
-        const unresolvedHumans = humanIds.filter((id) => !results.has(id))
-        if (unresolvedHumans.length > 0) {
-          const { data: agents } = await supabase.from('agents').select('id, name, avatar_url').in('id', unresolvedHumans)
-          if (agents) {
-            for (const a of agents) {
-              const fullName = a.name ?? 'Unknown'
-              const initials = fullName.split(/\s+/).map((w: string) => w[0]).join('').slice(0, 2).toUpperCase()
-              const actor: ResolvedActor = { id: a.id, fullName, initials }
-              results.set(a.id, actor)
-              actorNameCache.set(a.id, actor)
-            }
-          }
-        }
-      }
-
-      if (agentIds.length > 0) {
-        const { data } = await supabase.from('agents').select('id, name, avatar_url').in('id', agentIds)
-        if (data) {
-          for (const a of data) {
-            const fullName = a.name ?? 'Agent'
-            const initials = fullName.split(/\s+/).map((w: string) => w[0]).join('').slice(0, 2).toUpperCase()
-            const actor: ResolvedActor = { id: a.id, fullName, initials, avatarUrl: (a as {avatar_url?: string | null}).avatar_url ?? null }
-            results.set(a.id, actor)
-            actorNameCache.set(a.id, actor)
-          }
-        }
-      }
-
-      for (const id of missing) {
-        if (!results.has(id)) {
-          const fallback: ResolvedActor = { id, fullName: assigneeTypes.get(id) === 'agent' ? 'Agent' : 'Unknown', initials: '??' }
-          actorNameCache.set(id, fallback)
-          results.set(id, fallback)
-        }
-      }
-
-      if (!cancelled) {
-        setResolved((prev) => {
-          const next = new Map(prev)
-          for (const [k, v] of results) next.set(k, v)
-          return next
-        })
-      }
-    }
-
-    resolve()
-    return () => { cancelled = true }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [idsKey])
-
-  return resolved
 }
 
 // ---------------------------------------------------------------------------
@@ -632,12 +536,7 @@ function MantraColumn() {
 // ExperimentA
 // ---------------------------------------------------------------------------
 
-interface DerivedAssignee {
-  id: string
-  type: 'human' | 'agent'
-}
-
-export function ExperimentA({ tasks, taskHref, recentlyChanged }: ExperimentAProps) {
+export function ExperimentA({ tasks, taskHref, recentlyChanged, workspaceMembers = [] }: ExperimentAProps) {
   useEffect(() => {
     const main = document.querySelector('main')
     if (!main) return
@@ -648,22 +547,18 @@ main.classList.remove('p-3', 'pt-15', 'sm:p-6', 'sm:pt-6', 'p-6')
     }
   }, [])
 
-  const { humans, agents, assigneeTypes } = useMemo(() => {
-    const seen = new Map<string, DerivedAssignee>()
-    const typeMap = new Map<string, string | null>()
-    for (const t of tasks) {
-      if (t.assignee_id && !seen.has(t.assignee_id)) {
-        const role = t.assignee_type === 'agent' ? 'agent' as const : 'human' as const
-        seen.set(t.assignee_id, { id: t.assignee_id, type: role })
-        typeMap.set(t.assignee_id, t.assignee_type)
-      }
-    }
-    const all = Array.from(seen.values())
-    return { humans: all.filter((a) => a.type === 'human'), agents: all.filter((a) => a.type === 'agent'), assigneeTypes: typeMap }
-  }, [tasks])
+  const humans = useMemo(() => workspaceMembers.filter(m => m.role === 'human'), [workspaceMembers])
+  const agents = useMemo(() => workspaceMembers.filter(m => m.role === 'agent'), [workspaceMembers])
 
-  const allIds = useMemo(() => [...humans, ...agents].map((a) => a.id), [humans, agents])
-  const actorMap = useResolvedActors(allIds, assigneeTypes)
+  // Build actorMap directly from workspaceMembers — no need to resolve separately
+  const actorMap = useMemo(() => {
+    const map = new Map<string, ResolvedActor>()
+    for (const m of workspaceMembers) {
+      const initials = (m.name ?? '?').split(/\s+/).map((w: string) => w[0]).join('').slice(0, 2).toUpperCase()
+      map.set(m.id, { id: m.id, fullName: m.name, initials, avatarUrl: m.avatarUrl })
+    }
+    return map
+  }, [workspaceMembers])
 
   return (
     <div className="flex gap-0 overflow-x-auto border-t [scroll-snap-type:x_mandatory] sm:[scroll-snap-type:none]" style={{ height: 'calc(100dvh - 56px)' }}>
