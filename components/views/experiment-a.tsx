@@ -630,6 +630,16 @@ interface DerivedAssignee {
 }
 
 export function ExperimentA({ tasks, taskHref, recentlyChanged }: ExperimentAProps) {
+  useEffect(() => {
+    const main = document.querySelector('main')
+    if (!main) return
+main.classList.remove('p-3', 'pt-15', 'sm:p-6', 'sm:pt-6', 'p-6')
+    main.style.padding = '0'
+    return () => {
+      main.style.padding = ''
+    }
+  }, [])
+
   const { humans, agents, assigneeTypes } = useMemo(() => {
     const seen = new Map<string, DerivedAssignee>()
     const typeMap = new Map<string, string | null>()
@@ -648,7 +658,7 @@ export function ExperimentA({ tasks, taskHref, recentlyChanged }: ExperimentAPro
   const actorMap = useResolvedActors(allIds, assigneeTypes)
 
   return (
-    <div className="flex gap-0 overflow-x-auto border-t [scroll-snap-type:x_mandatory] sm:[scroll-snap-type:none] -mx-3 sm:-mx-6" style={{ height: 'calc(100vh - 120px)' }}>
+    <div className="flex gap-0 overflow-x-auto border-t [scroll-snap-type:x_mandatory] sm:[scroll-snap-type:none]" style={{ height: 'calc(100vh - 120px)' }}>
       {/* Set 1 — Mantra */}
       <MantraColumn />
 
