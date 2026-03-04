@@ -653,8 +653,11 @@ export function ExperimentA({ tasks, taskHref, recentlyChanged }: ExperimentAPro
       next.set(t.id, t.status)
       const prevStatus = prev.get(t.id)
       if (prevStatus && prevStatus !== 'done' && prevStatus !== 'cancelled' && (t.status === 'done' || t.status === 'cancelled')) {
+        console.log('[poof] detected transition for', t.id, prevStatus, '->', t.status)
         setPoofingIds((s) => new Set([...s, t.id]))
         setTimeout(() => setPoofingIds((s) => { const n = new Set(s); n.delete(t.id); return n }), 400)
+      } else if (prevStatus && prevStatus !== t.status) {
+        console.log('[poof] status change (not to done):', t.id, prevStatus, '->', t.status)
       }
     }
     prevTasksRef.current = next
