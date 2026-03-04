@@ -247,6 +247,8 @@ function sortByPriority(tasks: Task[]): Task[] {
 }
 
 function groupByTimeframe(tasks: Task[]): Group[] {
+  // Exclude done/cancelled — they belong in history, not a timeframe view
+  tasks = tasks.filter((t) => t.status !== 'done' && t.status !== 'cancelled')
   const today = startOfToday()
   const todayStr = localDateStr(today)
   const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1)
