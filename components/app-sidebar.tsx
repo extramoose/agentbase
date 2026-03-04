@@ -5,6 +5,8 @@ import { usePathname, useRouter } from 'next/navigation'
 import {
   LayoutDashboard,
   CheckSquare,
+  PanelLeftClose,
+  PanelLeftOpen,
   Clock,
   UserCog,
   Bot,
@@ -66,7 +68,7 @@ const adminItems = [
   { label: 'Settings', href: '/admin/settings', icon: Settings },
 ]
 
-export function AppSidebar({ profile, workspaces, onNavigate }: { profile: UserProfile | null; workspaces: Workspace[]; onNavigate?: () => void }) {
+export function AppSidebar({ profile, workspaces, onNavigate, collapsed = false, onToggleCollapse }: { profile: UserProfile | null; workspaces: Workspace[]; onNavigate?: () => void; collapsed?: boolean; onToggleCollapse?: () => void }) {
   const pathname = usePathname()
   const router = useRouter()
   const [switching, setSwitching] = useState(false)
@@ -224,11 +226,21 @@ export function AppSidebar({ profile, workspaces, onNavigate }: { profile: UserP
   }
 
   return (
-    <aside className="flex h-full w-60 flex-col border-r border-border bg-card">
-      <div className="flex h-14 items-center px-4">
-        <Link href="/" className="text-lg font-bold text-foreground">
-          AgentBase
-        </Link>
+    <aside className={cn("flex h-full flex-col border-r border-border bg-card transition-all duration-200", collapsed ? "w-14" : "w-60")}>
+      <div className="flex h-14 items-center px-4 gap-2">
+        {!collapsed && (
+          <Link href="/" className="text-lg font-bold text-foreground flex-1 truncate">
+            AgentBase
+          </Link>
+        )}
+        {collapsed && <div className="flex-1" />}
+        <button
+          onClick={onToggleCollapse}
+          className="flex h-8 w-8 items-center justify-center rounded-md hover:bg-accent transition-colors text-muted-foreground shrink-0"
+          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        >
+          {collapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+        </button>
       </div>
 
       <Separator />
@@ -240,15 +252,17 @@ export function AppSidebar({ profile, workspaces, onNavigate }: { profile: UserP
               key={item.href}
               href={item.href}
               onClick={onNavigate}
+              title={collapsed ? item.label : undefined}
               className={cn(
                 'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                collapsed && 'justify-center px-0',
                 isActive(item.href)
                   ? 'bg-accent text-accent-foreground'
                   : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
               )}
             >
-              <item.icon className="h-4 w-4" />
-              {item.label}
+              <item.icon className="h-4 w-4 shrink-0" />
+              {!collapsed && item.label}
             </Link>
           ))}
         </nav>
@@ -257,26 +271,30 @@ export function AppSidebar({ profile, workspaces, onNavigate }: { profile: UserP
           <>
             <Separator className="my-3" />
 
-            <div className="px-3 py-1">
-              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Admin
-              </span>
-            </div>
+            {!collapsed && (
+              <div className="px-3 py-1">
+                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Admin
+                </span>
+              </div>
+            )}
             <nav className="flex flex-col gap-1">
               {adminItems.map((item) => (
                 <Link
                   key={item.href}
                   href={item.href}
                   onClick={onNavigate}
+                  title={collapsed ? item.label : undefined}
                   className={cn(
                     'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                    collapsed && 'justify-center px-0',
                     isActive(item.href)
                       ? 'bg-accent text-accent-foreground'
                       : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
                   )}
                 >
-                  <item.icon className="h-4 w-4" />
-                  {item.label}
+                  <item.icon className="h-4 w-4 shrink-0" />
+                  {!collapsed && item.label}
                 </Link>
               ))}
             </nav>
@@ -284,7 +302,7 @@ export function AppSidebar({ profile, workspaces, onNavigate }: { profile: UserP
         )}
       </ScrollArea>
 
-      {workspaces.length > 0 && (
+      {workspaces.length > 0 && !collapsed && (
         <>
           <Separator />
           <div className="px-3 py-2">
@@ -355,38 +373,37 @@ export function AppSidebar({ profile, workspaces, onNavigate }: { profile: UserP
 
       <Separator />
 
-      <div className="flex items-center gap-3 p-4">
+      <div className={cn("flex items-center gap-3 p-4", collapsed && "justify-center px-2")}>
         <Avatar className="h-8 w-8 shrink-0">
           <AvatarImage src={profile?.avatar_url ?? '/avatars/avatar_anonymous.jpg'} alt={profile?.full_name ?? 'User'} />
           <AvatarFallback className="text-xs">
             {(profile?.full_name ?? '?').split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)}
           </AvatarFallback>
         </Avatar>
-        <button
-          type="button"
-          className="flex-1 truncate text-left"
-          onClick={() => {
-            setProfileName(profile?.full_name ?? '')
-            setProfileDialogOpen(true)
-          }}
-        >
-          <p className="text-sm font-medium text-foreground truncate">
-            {profile?.full_name ?? profile?.email ?? 'User'}
-          </p>
-          {profile?.full_name && profile.email && (
-            <p className="text-xs text-muted-foreground truncate">
-              {profile.email}
-            </p>
-          )}
-        </button>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8"
-          onClick={handleSignOut}
-        >
-          <LogOut className="h-4 w-4" />
-        </Button>
+        {!collapsed && (
+          <>
+            <button
+              type="button"
+              className="flex-1 truncate text-left"
+              onClick={() => {
+                setProfileName(profile?.full_name ?? '')
+                setProfileDialogOpen(true)
+              }}
+            >
+              <p className="text-sm font-medium text-foreground truncate">
+                {profile?.full_name ?? profile?.email ?? 'User'}
+              </p>
+              {profile?.full_name && profile.email && (
+                <p className="text-xs text-muted-foreground truncate">
+                  {profile.email}
+                </p>
+              )}
+            </button>
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleSignOut}>
+              <LogOut className="h-4 w-4" />
+            </Button>
+          </>
+        )}
       </div>
 
       {/* Create workspace dialog */}

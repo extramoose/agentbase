@@ -14,6 +14,18 @@ interface MobileShellProps {
 
 export function MobileShell({ profile, workspaces, children }: MobileShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [collapsed, setCollapsed] = useState(() => {
+    if (typeof window === 'undefined') return false
+    return localStorage.getItem('sidebar-collapsed') === 'true'
+  })
+
+  function toggleCollapsed() {
+    setCollapsed((v) => {
+      const next = !v
+      localStorage.setItem('sidebar-collapsed', String(next))
+      return next
+    })
+  }
   const pathname = usePathname()
 
   // Close sidebar on navigation
@@ -68,12 +80,13 @@ export function MobileShell({ profile, workspaces, children }: MobileShellProps)
       {/* Sidebar */}
       <div
         className={`
-          fixed inset-y-0 left-0 z-50 w-60 transition-transform duration-200 ease-in-out
+          fixed inset-y-0 left-0 z-50 transition-all duration-200 ease-in-out
           sm:static sm:translate-x-0
+          ${collapsed ? 'w-14' : 'w-60'}
           ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
         `}
       >
-        <AppSidebar profile={profile} workspaces={workspaces} onNavigate={closeSidebar} />
+        <AppSidebar profile={profile} workspaces={workspaces} onNavigate={closeSidebar} collapsed={collapsed} onToggleCollapse={toggleCollapsed} />
       </div>
 
       {/* Main content */}

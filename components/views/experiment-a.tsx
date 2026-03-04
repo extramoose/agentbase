@@ -212,7 +212,7 @@ function useResolvedActors(
         }
         const unresolvedHumans = humanIds.filter((id) => !results.has(id))
         if (unresolvedHumans.length > 0) {
-          const { data: agents } = await supabase.from('agents').select('id, name').in('id', unresolvedHumans)
+          const { data: agents } = await supabase.from('agents').select('id, name, avatar_url').in('id', unresolvedHumans)
           if (agents) {
             for (const a of agents) {
               const fullName = a.name ?? 'Unknown'
@@ -226,12 +226,12 @@ function useResolvedActors(
       }
 
       if (agentIds.length > 0) {
-        const { data } = await supabase.from('agents').select('id, name').in('id', agentIds)
+        const { data } = await supabase.from('agents').select('id, name, avatar_url').in('id', agentIds)
         if (data) {
           for (const a of data) {
             const fullName = a.name ?? 'Agent'
             const initials = fullName.split(/\s+/).map((w: string) => w[0]).join('').slice(0, 2).toUpperCase()
-            const actor: ResolvedActor = { id: a.id, fullName, initials }
+            const actor: ResolvedActor = { id: a.id, fullName, initials, avatarUrl: (a as {avatar_url?: string | null}).avatar_url ?? null }
             results.set(a.id, actor)
             actorNameCache.set(a.id, actor)
           }
@@ -520,7 +520,7 @@ function AssigneeColumn({
   )
 
   return (
-    <div className="relative flex flex-col shrink-0 border-r last:border-r-0 sm:w-auto w-[80vw] scroll-snap-align-start" style={{ width: `${width}px` }}>
+    <div className="relative flex flex-col shrink-0 border-r last:border-r-0 sm:w-auto w-[80vw] [scroll-snap-align:start] sm:[scroll-snap-align:none]" style={{ width: `${width}px` }}>
       <DragHandle onResize={handleResize} />
       {/* Header */}
       <div className="flex items-center gap-2 px-4 py-3 border-b shrink-0">
@@ -589,7 +589,7 @@ function MantraColumn() {
 
   return (
     <div
-      className="relative shrink-0 overflow-y-auto border-r flex flex-col scroll-snap-align-start w-[80vw] sm:w-auto"
+      className="relative shrink-0 overflow-y-auto border-r flex flex-col w-[80vw] sm:w-auto [scroll-snap-align:start] sm:[scroll-snap-align:none]"
       style={{ width, scrollSnapAlign: 'start' }}
     >
       <DragHandle onResize={handleResize} />
@@ -632,7 +632,7 @@ export function ExperimentA({ tasks, taskHref, recentlyChanged }: ExperimentAPro
   const actorMap = useResolvedActors(allIds, assigneeTypes)
 
   return (
-    <div className="flex gap-0 overflow-x-auto border-t" style={{ height: 'calc(100vh - 120px)', scrollSnapType: 'x mandatory' }}>
+    <div className="flex gap-0 overflow-x-auto border-t [scroll-snap-type:x_mandatory] sm:[scroll-snap-type:none]" style={{ height: 'calc(100vh - 120px)' }}>
       {/* Set 1 — Mantra */}
       <MantraColumn />
 
