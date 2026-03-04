@@ -23,7 +23,7 @@ export function ViewRenderer({ view, tasks, taskHref, recentlyChanged }: ViewRen
     case 'sticky-status':
       return <StatusView tasks={tasks} taskHref={taskHref} recentlyChanged={recentlyChanged} />
     case 'experiment-a':
-      return <ExperimentA />
+      return <ExperimentA tasks={tasks} taskHref={taskHref} recentlyChanged={recentlyChanged} />
     case 'experiment-b':
       return <ExperimentB />
   }
