@@ -556,7 +556,7 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
   }, [selectedDate])
 
   return (
-    <div className="space-y-4 px-4">
+    <div className="space-y-4">
       {/* Title row */}
       <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-4 mb-4 pt-4">
         <div className="flex items-center gap-2 shrink-0">
