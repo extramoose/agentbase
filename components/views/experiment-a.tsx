@@ -127,8 +127,8 @@ const PRIORITY_TICKET_COLOR: Record<Priority, string> = {
   none:   'text-muted-foreground/60',
 }
 
-const DONE_LIMIT = 50
-const DONE_FADE_START = 40 // fade begins at this index
+const DONE_LIMIT = 20
+const DONE_FADE_START = 12 // fade begins at this index
 
 // ---------------------------------------------------------------------------
 // localStorage helpers (per actor)
@@ -351,13 +351,13 @@ function groupByStatus(tasks: Task[]): Group[] {
 // Task renderers
 // ---------------------------------------------------------------------------
 
-function TaskCard({ task, taskHref, highlight }: { task: Task; taskHref: (task: Task) => string; highlight?: boolean }) {
+function TaskCard({ task, taskHref, highlight, forcedStyle }: { task: Task; taskHref: (task: Task) => string; highlight?: boolean; forcedStyle?: "gray" }) {
   return (
     <Link
       href={taskHref(task)}
       className={cn(
         'block rounded-lg border p-3 transition-colors cursor-pointer no-underline hover:brightness-95 dark:hover:brightness-110',
-        PRIORITY_CARD[task.priority],
+        forcedStyle === 'gray' ? 'border-border bg-transparent' : PRIORITY_CARD[task.priority],
         highlight && 'animate-sticky-pulse',
       )}
     >
@@ -443,10 +443,10 @@ function GroupSection({
   const displayTasks = isDone ? group.tasks.slice(0, DONE_LIMIT) : group.tasks
 
   return (
-    <div>
-      <div className="sticky top-0 z-10 bg-background flex items-center gap-2 py-1.5 mb-1.5 -mx-4 px-4 border-b border-border/40">
-        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{group.label}</span>
-        <span className="text-xs text-muted-foreground">{group.tasks.length}{isDone && group.tasks.length > DONE_LIMIT ? `+ (showing ${DONE_LIMIT})` : ''}</span>
+    <div className={cn(isDone && 'opacity-30 hover:opacity-100 transition-opacity duration-300')}>
+      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm flex items-center gap-2 py-2 mb-2 border-b border-border/50">
+        <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest">{group.label}</span>
+        <span className="text-[10px] text-muted-foreground/70">{group.tasks.length}{isDone && group.tasks.length > DONE_LIMIT ? ` (showing ${DONE_LIMIT})` : ''}</span>
       </div>
       <div className={cn(density === 'big' ? 'space-y-4' : density === 'card' ? 'space-y-2' : 'space-y-0.5')}>
         {displayTasks.map((task, i) => {
@@ -454,7 +454,9 @@ function GroupSection({
           const opacity = fadeIndex > 0 ? Math.max(0, 1 - fadeIndex / (DONE_LIMIT - DONE_FADE_START)) : 1
           return (
             <div key={task.id} style={{ opacity }}>
-              {density === 'big' ? (
+              {isDone ? (
+                <TaskCard task={task} taskHref={taskHref} highlight={false} forcedStyle="gray" />
+              ) : density === 'big' ? (
                 <TaskBigCard task={task} taskHref={taskHref} highlight={recentlyChanged?.has(task.id)} />
               ) : density === 'card' ? (
                 <TaskCard task={task} taskHref={taskHref} highlight={recentlyChanged?.has(task.id)} />
@@ -554,7 +556,7 @@ function AssigneeColumn({
       </div>
 
       {/* Scrollable task list */}
-      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-5">
+      <div className="flex-1 overflow-y-auto px-4 pt-3 pb-8 space-y-5">
         {groups.map((group) => (
           <GroupSection key={group.key} group={group} density={density} taskHref={taskHref} recentlyChanged={recentlyChanged} />
         ))}
