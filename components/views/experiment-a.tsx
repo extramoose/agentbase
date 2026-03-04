@@ -65,6 +65,22 @@ function saveColWidth(actorId: string, w: number) {
   try { localStorage.setItem(colWidthKey(actorId), String(w)) } catch {}
 }
 
+
+// ---------------------------------------------------------------------------
+// useIsMobile
+// ---------------------------------------------------------------------------
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(false)
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 639px)')
+    setIsMobile(mq.matches)
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches)
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
+  }, [])
+  return isMobile
+}
+
 // ---------------------------------------------------------------------------
 // DragHandle
 // ---------------------------------------------------------------------------
@@ -501,6 +517,7 @@ function AssigneeColumn({
     })
   }, [actor.id])
 
+  const isMobile = useIsMobile()
   const saved = useMemo(() => loadColSettings(actor.id, { density: defaultDensity, groupBy: defaultGroupBy }), [actor.id, defaultDensity, defaultGroupBy])
   const [density, setDensityState] = useState<Density>(saved.density)
   const [groupBy, setGroupByState] = useState<GroupBy>(saved.groupBy)
@@ -520,7 +537,7 @@ function AssigneeColumn({
   )
 
   return (
-    <div className="relative flex flex-col shrink-0 border-r last:border-r-0 sm:w-auto w-[80vw] [scroll-snap-align:start] sm:[scroll-snap-align:none]" style={{ width: `${width}px` }}>
+    <div className="relative flex flex-col shrink-0 border-r last:border-r-0 sm:w-auto w-[80vw] [scroll-snap-align:start] sm:[scroll-snap-align:none]" style={isMobile ? undefined : { width: `${width}px` }}>
       <DragHandle onResize={handleResize} />
       {/* Header */}
       <div className="flex items-center gap-2 px-4 py-3 border-b shrink-0">
@@ -571,6 +588,7 @@ function AssigneeColumn({
 // ---------------------------------------------------------------------------
 
 function MantraColumn() {
+  const isMobile = useIsMobile()
   const [width, setWidth] = useState(() => {
     if (typeof window === 'undefined') return COL_DEFAULT_MANTRA
     // On mobile default to 80vw; on desktop use saved or 50%
@@ -590,7 +608,7 @@ function MantraColumn() {
   return (
     <div
       className="relative shrink-0 overflow-y-auto border-r flex flex-col w-[80vw] sm:w-auto [scroll-snap-align:start] sm:[scroll-snap-align:none]"
-      style={{ width, scrollSnapAlign: 'start' }}
+      style={isMobile ? undefined : { width }}
     >
       <DragHandle onResize={handleResize} />
       <div className="px-10 py-12 flex flex-col gap-8">
