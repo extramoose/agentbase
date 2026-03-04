@@ -598,7 +598,7 @@ export function HistoryClient({ initialEntries }: HistoryClientProps) {
 
 
       {/* Daily stats */}
-      <div className="flex items-center gap-4 text-xs text-muted-foreground">
+      <div className="flex items-center gap-4 text-xs text-muted-foreground px-4">
         <span>{formatDateLabel(selectedDate)}:</span>
         {dailyStats.created > 0 && <span><span className="font-medium text-foreground">{dailyStats.created}</span> created</span>}
         {dailyStats.completed > 0 && <span><span className="font-medium text-green-500">{dailyStats.completed}</span> completed</span>}
