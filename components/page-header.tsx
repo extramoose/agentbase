@@ -260,7 +260,7 @@ export function PageHeader({
                 )}
               </Button>
               <Dialog open={filterOpen} onOpenChange={setFilterOpen}>
-                <DialogContent className="sm:max-w-md fixed bottom-0 left-0 right-0 top-auto translate-x-0 translate-y-0 rounded-t-xl rounded-b-none max-h-[85vh] p-0 gap-0">
+                <DialogContent className="fixed inset-4 max-w-none h-auto max-h-[calc(100vh-2rem)] rounded-xl p-0 gap-0 translate-x-0 translate-y-0">
                   <DialogHeader className="px-4 pt-4 pb-2 border-b border-border">
                     <DialogTitle className="text-sm font-semibold">Filters</DialogTitle>
                   </DialogHeader>
@@ -279,7 +279,7 @@ export function PageHeader({
                   )}
                 </Button>
               </PopoverTrigger>
-              <PopoverContent align="end" className="w-80 p-0">
+              <PopoverContent align="end" className="w-72 p-0 shadow-xl">
                 {filterContent}
               </PopoverContent>
             </Popover>
@@ -364,13 +364,11 @@ function FilterPopoverContent({
   )
 
   return (
-    <div className="p-4 space-y-5 max-h-[70vh] overflow-y-auto">
+    <div className="p-5 space-y-6 max-h-[70vh] overflow-y-auto">
       {/* Assignee face pile — mobile only */}
       {workspaceMembers.length > 0 && onToggleFacePile && (
         <section>
-          <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2 block">
-            Members
-          </label>
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60 mb-2">Members</p>
           <div className="flex flex-wrap gap-2">
             {workspaceMembers.map((m) => {
               const selected = facePile.includes(m.id)
@@ -410,10 +408,10 @@ function FilterPopoverContent({
               key={opt.value}
               onClick={() => toggleStatus(opt.value)}
               className={cn(
-                'px-2.5 py-1 text-xs rounded-md border transition-colors',
+                'px-3 py-1 text-xs rounded-full border transition-all',
                 filters.status.includes(opt.value)
-                  ? 'bg-primary text-primary-foreground border-primary'
-                  : 'bg-transparent text-muted-foreground border-border hover:border-foreground/30',
+                  ? 'bg-foreground text-background border-foreground font-medium'
+                  : 'bg-transparent text-muted-foreground border-border/60 hover:border-foreground/40 hover:text-foreground',
               )}
             >
               {opt.label}
@@ -422,8 +420,7 @@ function FilterPopoverContent({
         </div>
       </section>
 
-      {/* Divider */}
-      <div className="border-t border-border" />
+
 
       {/* Priority (multi-select) */}
       <section>
@@ -436,10 +433,10 @@ function FilterPopoverContent({
               key={opt.value}
               onClick={() => togglePriority(opt.value)}
               className={cn(
-                'px-2.5 py-1 text-xs rounded-md border transition-colors',
+                'px-3 py-1 text-xs rounded-full border transition-all',
                 filters.priority.includes(opt.value)
-                  ? 'bg-primary text-primary-foreground border-primary'
-                  : 'bg-transparent text-muted-foreground border-border hover:border-foreground/30',
+                  ? 'bg-foreground text-background border-foreground font-medium'
+                  : 'bg-transparent text-muted-foreground border-border/60 hover:border-foreground/40 hover:text-foreground',
               )}
             >
               {opt.label}
@@ -448,8 +445,7 @@ function FilterPopoverContent({
         </div>
       </section>
 
-      {/* Divider */}
-      <div className="border-t border-border" />
+
 
       {/* Tags — filter only (no create) */}
       <section>
@@ -467,7 +463,7 @@ function FilterPopoverContent({
       <div className="border-t border-border pt-3">
         <button
           onClick={onClearFilters}
-          className="text-xs text-muted-foreground hover:text-foreground transition-colors w-full text-center py-1"
+          className="text-xs text-muted-foreground/60 hover:text-foreground transition-colors w-full text-center py-1.5 border-t border-border/40 mt-1"
         >
           Clear all filters
         </button>
