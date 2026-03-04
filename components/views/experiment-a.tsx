@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils'
 import { MoreHorizontal } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -158,6 +158,7 @@ interface ResolvedActor {
   id: string
   fullName: string
   initials: string
+  avatarUrl?: string | null
 }
 
 const actorNameCache = new Map<string, ResolvedActor>()
@@ -190,12 +191,12 @@ function useResolvedActors(
       const results = new Map<string, ResolvedActor>()
 
       if (humanIds.length > 0) {
-        const { data } = await supabase.from('profiles').select('id, full_name, email').in('id', humanIds)
+        const { data } = await supabase.from('profiles').select('id, full_name, email, avatar_url').in('id', humanIds)
         if (data) {
           for (const p of data) {
             const fullName = p.full_name ?? p.email?.split('@')[0] ?? 'Unknown'
             const initials = fullName.split(/\s+/).map((w: string) => w[0]).join('').slice(0, 2).toUpperCase()
-            const actor: ResolvedActor = { id: p.id, fullName, initials }
+            const actor: ResolvedActor = { id: p.id, fullName, initials, avatarUrl: p.avatar_url ?? null }
             results.set(p.id, actor)
             actorNameCache.set(p.id, actor)
           }
@@ -432,7 +433,7 @@ function GroupSection({
 
   return (
     <div>
-      <div className="flex items-center gap-2 mb-1.5">
+      <div className="sticky top-0 z-10 bg-background flex items-center gap-2 py-1.5 mb-1.5 -mx-4 px-4 border-b border-border/40">
         <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{group.label}</span>
         <span className="text-xs text-muted-foreground">{group.tasks.length}{isDone && group.tasks.length > DONE_LIMIT ? `+ (showing ${DONE_LIMIT})` : ''}</span>
       </div>
@@ -511,6 +512,7 @@ function AssigneeColumn({
       {/* Header */}
       <div className="flex items-center gap-2 px-4 py-3 border-b shrink-0">
         <Avatar className="h-7 w-7">
+          {actor.avatarUrl && <AvatarImage src={actor.avatarUrl} alt={actor.fullName} />}
           <AvatarFallback className="text-[10px]">{actor.initials}</AvatarFallback>
         </Avatar>
         <span className="text-sm font-medium truncate">{actor.fullName}</span>
