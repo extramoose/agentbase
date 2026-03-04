@@ -410,13 +410,13 @@ function TaskThinRow({ task, taskHref }: { task: Task; taskHref: (task: Task) =>
 }
 
 
-function TaskBigCard({ task, taskHref, highlight }: { task: Task; taskHref: (task: Task) => string; highlight?: boolean }) {
+function TaskBigCard({ task, taskHref, highlight, forcedStyle }: { task: Task; taskHref: (task: Task) => string; highlight?: boolean; forcedStyle?: "gray" }) {
   return (
     <Link
       href={taskHref(task)}
       className={cn(
         'flex flex-col justify-between rounded-xl border p-6 transition-colors cursor-pointer no-underline hover:brightness-95 dark:hover:brightness-110',
-        PRIORITY_CARD[task.priority],
+        forcedStyle === 'gray' ? 'border-border bg-transparent' : PRIORITY_CARD[task.priority],
         highlight && 'animate-sticky-pulse',
       )}
       style={{ height: '240px' }}
@@ -470,12 +470,10 @@ function GroupSection({
           const opacity = fadeIndex > 0 ? Math.max(0, 1 - fadeIndex / (DONE_LIMIT - DONE_FADE_START)) : 1
           return (
             <div key={task.id} style={{ opacity }}>
-              {isDone ? (
-                <TaskCard task={task} taskHref={taskHref} highlight={false} forcedStyle="gray" />
-              ) : density === 'big' ? (
-                <TaskBigCard task={task} taskHref={taskHref} highlight={recentlyChanged?.has(task.id)} />
+              {density === 'big' ? (
+                <TaskBigCard task={task} taskHref={taskHref} highlight={!isDone && (recentlyChanged?.has(task.id) ?? false)} forcedStyle={isDone ? 'gray' : undefined} />
               ) : density === 'card' ? (
-                <TaskCard task={task} taskHref={taskHref} highlight={recentlyChanged?.has(task.id)} />
+                <TaskCard task={task} taskHref={taskHref} highlight={!isDone && (recentlyChanged?.has(task.id) ?? false)} forcedStyle={isDone ? 'gray' : undefined} />
               ) : (
                 <TaskThinRow task={task} taskHref={taskHref} />
               )}
