@@ -189,7 +189,7 @@ export function PageHeader({
         {/* Left: icon + title */}
         <div className="flex items-center gap-2 shrink-0">
           {Icon && <Icon className="h-4 w-4 text-muted-foreground shrink-0" />}
-          <h1 className="text-base font-normal text-muted-foreground" aria-label={title}>
+          <h1 className="text-sm font-medium text-muted-foreground" aria-label={title}>
             {viewType !== undefined
               ? new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })
               : title}
