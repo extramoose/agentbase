@@ -117,14 +117,6 @@ const PRIORITY_ORDER: Record<Priority, number> = {
   urgent: 0, high: 1, medium: 2, low: 3, none: 4,
 }
 
-const PRIORITY_DOT: Record<Priority, string> = {
-  urgent: 'bg-red-500',
-  high: 'bg-purple-500',
-  medium: 'bg-blue-500',
-  low: 'bg-slate-400',
-  none: 'bg-muted-foreground/30',
-}
-
 // Card border + bg styles (outlined, subtle fill)
 const PRIORITY_CARD: Record<Priority, string> = {
   urgent: 'border-red-400 bg-red-500/5 dark:border-red-500/60 dark:bg-red-500/5',
@@ -132,6 +124,15 @@ const PRIORITY_CARD: Record<Priority, string> = {
   medium: 'border-blue-400 bg-blue-500/5 dark:border-blue-500/60 dark:bg-blue-500/5',
   low:    'border-slate-300 bg-slate-500/5 dark:border-slate-600 dark:bg-slate-500/5',
   none:   'border-border bg-transparent',
+}
+
+// Colored pill for ticket number in card/big mode
+const PRIORITY_PILL: Record<Priority, string> = {
+  urgent: 'text-red-600 border-red-400 bg-red-500/10 dark:text-red-400',
+  high:   'text-purple-600 border-purple-400 bg-purple-500/10 dark:text-purple-400',
+  medium: 'text-blue-600 border-blue-400 bg-blue-500/10 dark:text-blue-400',
+  low:    'text-slate-500 border-slate-300 bg-slate-500/10',
+  none:   'text-muted-foreground border-border bg-muted/50',
 }
 
 // Ticket number color in thin mode
@@ -378,13 +379,12 @@ function TaskCard({ task, taskHref, highlight, forcedStyle }: { task: Task; task
       )}
     >
       <div className="flex items-start gap-2">
-        <span className={cn('mt-1.5 h-2 w-2 rounded-full shrink-0', forcedStyle === "gray" ? "bg-muted-foreground/30" : PRIORITY_DOT[task.priority])} title={task.priority} />
         <div className="flex-1 min-w-0">
           <p className={cn("text-sm leading-snug line-clamp-2", forcedStyle === "gray" ? "font-normal text-muted-foreground" : "font-medium")}>{task.title}</p>
           <div className="mt-1.5 flex items-center gap-2 flex-wrap">
-            <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+            <span className={cn('text-[10px] font-semibold px-1.5 py-0.5 rounded-full border', forcedStyle === "gray" ? "text-muted-foreground/50 border-muted-foreground/20" : PRIORITY_PILL[task.priority])}>
               #{task.seq_id ?? task.ticket_id}
-            </Badge>
+            </span>
             {task.due_date && (
               <span className="text-[10px] text-muted-foreground">{formatDueDate(task.due_date)}</span>
             )}
@@ -422,13 +422,12 @@ function TaskBigCard({ task, taskHref, highlight, forcedStyle }: { task: Task; t
       style={{ height: '240px' }}
     >
       <div className="flex items-start gap-3">
-        <span className={cn('mt-1 h-2.5 w-2.5 rounded-full shrink-0', forcedStyle === "gray" ? "bg-muted-foreground/30" : PRIORITY_DOT[task.priority])} title={task.priority} />
         <p className={cn("text-xl leading-snug line-clamp-4", forcedStyle === "gray" ? "font-normal text-muted-foreground" : "font-medium")}>{task.title}</p>
       </div>
       <div className="flex items-center gap-3 flex-wrap">
-        <Badge variant="secondary" className="text-xs px-2 py-0.5">
+        <span className={cn('text-xs font-semibold px-2 py-0.5 rounded-full border', forcedStyle === "gray" ? "text-muted-foreground/50 border-muted-foreground/20" : PRIORITY_PILL[task.priority])}>
           #{task.seq_id ?? task.ticket_id}
-        </Badge>
+        </span>
         {task.due_date && (
           <span className="text-xs text-muted-foreground">{formatDueDate(task.due_date)}</span>
         )}
