@@ -32,8 +32,17 @@ export function TagCombobox({ selected, onChange, className, allowCreate = true 
 
   // Load all workspace tags once (aggregated from entity tables via RPC)
   useEffect(() => {
-    supabase.rpc('rpc_get_all_tags')
-      .then(({ data }) => setAllTags((data ?? []).map((t: { tag: string }) => t.tag).sort()))
+    async function load() {
+      const { data: tenantId } = await supabase.rpc('get_my_tenant_id')
+      if (!tenantId) return
+      const { data } = await supabase.rpc('rpc_get_all_tags', { p_tenant_id: tenantId })
+      // Sort by usage frequency — RPC returns { tag, count }
+      const sorted = (data ?? [])
+        .sort((a: { tag: string; count: number }, b: { tag: string; count: number }) => b.count - a.count)
+        .map((t: { tag: string }) => t.tag)
+      setAllTags(sorted)
+    }
+    load()
     // eslint-disable-next-line react-hooks/exhaustive-deps -- supabase client is stable
   }, [])
 
