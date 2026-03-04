@@ -460,7 +460,7 @@ function GroupSection({
 
   return (
     <div className={cn(isDone && "opacity-30 hover:opacity-100 transition-opacity duration-300")}>
-      <div className="sticky top-0 z-10 flex items-center gap-2 py-2.5 border-b border-border/50 px-4 mb-3" style={{ backgroundColor: 'hsl(var(--background))' }}>
+      <div className="sticky top-0 z-10 flex items-center gap-2 py-2.5 border-b border-border/50 px-4 mb-3 bg-background">
         <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{group.label}</span>
         <span className="text-xs text-muted-foreground/70">{group.tasks.length}{isDone && group.tasks.length > DONE_LIMIT ? ` (showing ${DONE_LIMIT})` : ''}</span>
       </div>
@@ -611,7 +611,7 @@ function MantraColumn() {
       <DragHandle onResize={handleResize} />
       <div className="px-10 py-12 flex flex-col gap-8">
         <span className="text-xs uppercase tracking-widest text-muted-foreground/60">Mantra</span>
-        <p className="text-3xl font-light text-muted-foreground/50 leading-[1.6]">
+        <p className="text-3xl font-light text-foreground/70 leading-[1.6]">
           Focus on what matters.<br />Ship small. Iterate fast.<br /><br />
           Every line of code is a liability — keep it lean, keep it clear, keep it moving.
         </p>
