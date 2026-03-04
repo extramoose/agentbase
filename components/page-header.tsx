@@ -179,7 +179,7 @@ export function PageHeader({
   )
 
   return (
-    <div className="mb-4 space-y-2">
+    <div className="m-4 space-y-2">
       {/* Row 1 */}
       <div className="flex items-center justify-between gap-2">
         {/* Left: title */}

@@ -658,7 +658,7 @@ main.classList.remove('p-3', 'pt-15', 'sm:p-6', 'sm:pt-6', 'p-6')
   const actorMap = useResolvedActors(allIds, assigneeTypes)
 
   return (
-    <div className="flex gap-0 overflow-x-auto border-t [scroll-snap-type:x_mandatory] sm:[scroll-snap-type:none]" style={{ height: 'calc(100vh - 120px)' }}>
+    <div className="flex gap-0 overflow-x-auto border-t [scroll-snap-type:x_mandatory] sm:[scroll-snap-type:none]" style={{ height: 'calc(100dvh - 56px)' }}>
       {/* Set 1 — Mantra */}
       <MantraColumn />
 
