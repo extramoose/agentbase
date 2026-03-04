@@ -87,6 +87,9 @@ interface PageHeaderProps {
   /** Toggle a member in/out of the face pile */
   onToggleFacePile: (id: string) => void
 
+  /** Hide face pile and force all members selected */
+  hideFacePile?: boolean
+
   /** Optional view selector (Dashboard only) */
   viewType?: ViewType
   onViewChange?: (v: ViewType) => void
@@ -112,6 +115,7 @@ export function PageHeader({
   onToggleFacePile,
   viewType,
   onViewChange,
+  hideFacePile,
   filters,
   onFiltersChange,
   hasActiveFilters,
@@ -184,7 +188,7 @@ export function PageHeader({
         {/* Right: face pile + view toggle + filter + new task */}
         <div className="flex items-center gap-2">
           {/* Face pile — hidden on mobile (moved into filter panel) */}
-          {workspaceMembers.length > 0 && (
+          {!hideFacePile && workspaceMembers.length > 0 && (
             <div className="hidden md:flex -space-x-1">
               {workspaceMembers.map((m) => {
                 const selected = facePile.includes(m.id)

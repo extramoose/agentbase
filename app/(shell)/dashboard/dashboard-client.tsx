@@ -356,7 +356,8 @@ export function DashboardClient({
   }, [])
 
   // --- Apply filters ---
-  const filteredTasks = useMemo(() => applyFilters(tasks), [tasks, applyFilters])
+  const isExperimentA = dashboardView === "experiment-a"
+  const filteredTasks = useMemo(() => isExperimentA ? tasks : applyFilters(tasks), [tasks, applyFilters, isExperimentA])
 
   const taskHref = useCallback((task: { id: string; ticket_id?: number }) => {
     const full = tasks.find((t) => t.id === task.id)
@@ -368,7 +369,8 @@ export function DashboardClient({
       <PageHeader
         title="Dashboard"
         workspaceMembers={workspaceMembers}
-        facePile={facePile}
+        hideFacePile={isExperimentA}
+        facePile={isExperimentA ? workspaceMembers.map(m => m.id) : facePile}
         onToggleFacePile={toggleFacePile}
         viewType={dashboardView}
         onViewChange={setDashboardView}
