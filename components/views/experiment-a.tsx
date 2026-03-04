@@ -459,12 +459,12 @@ function GroupSection({
   const displayTasks = isDone ? group.tasks.slice(0, DONE_LIMIT) : group.tasks
 
   return (
-    <div className={cn("overflow-hidden", isDone && "opacity-30 hover:opacity-100 transition-opacity duration-300")}>
-      <div className="sticky top-0 left-0 right-0 z-10 bg-background/95 backdrop-blur-sm flex items-center gap-2 py-2.5 mb-2 border-b border-border/50 px-4 w-full">
+    <div className={cn(isDone && "opacity-30 hover:opacity-100 transition-opacity duration-300")}>
+      <div className="sticky top-0 z-10 flex items-center gap-2 py-2.5 border-b border-border/50 px-4 mb-3" style={{ backgroundColor: 'hsl(var(--background))' }}>
         <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{group.label}</span>
         <span className="text-xs text-muted-foreground/70">{group.tasks.length}{isDone && group.tasks.length > DONE_LIMIT ? ` (showing ${DONE_LIMIT})` : ''}</span>
       </div>
-      <div className={cn('px-4', density === 'big' ? 'space-y-4' : density === 'card' ? 'space-y-2' : 'space-y-0.5')}>
+      <div className={cn('px-4 pb-5', density === 'big' ? 'space-y-4' : density === 'card' ? 'space-y-2' : 'space-y-0.5')}>
         {displayTasks.map((task, i) => {
           const fadeIndex = isDone ? i - DONE_FADE_START : -1
           const opacity = fadeIndex > 0 ? Math.max(0, 1 - fadeIndex / (DONE_LIMIT - DONE_FADE_START)) : 1
@@ -571,7 +571,7 @@ function AssigneeColumn({
       </div>
 
       {/* Scrollable task list */}
-      <div className="flex-1 overflow-y-auto pb-8 space-y-5">
+      <div className="flex-1 overflow-y-auto pb-8">
         {groups.map((group) => (
           <GroupSection key={group.key} group={group} density={density} taskHref={taskHref} recentlyChanged={recentlyChanged} />
         ))}
