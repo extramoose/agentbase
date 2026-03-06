@@ -48,21 +48,7 @@ export type PersonalBoardProps = {
 // Priority colors
 // ---------------------------------------------------------------------------
 
-const PRIORITY_COLORS: Record<Priority, string> = {
-  urgent: 'border-l-red-500',
-  high: 'border-l-orange-400',
-  medium: 'border-l-yellow-400',
-  low: 'border-l-blue-400',
-  none: 'border-l-transparent',
-}
 
-const PRIORITY_CHECKBOX_BORDER: Record<Priority, string> = {
-  urgent: 'border-red-500',
-  high: 'border-orange-400',
-  medium: 'border-yellow-400',
-  low: 'border-blue-400',
-  none: 'border-muted-foreground/30',
-}
 
 
 // ---------------------------------------------------------------------------
