@@ -480,7 +480,7 @@ function TaskListPanel({
   return (
     <div className="flex flex-col h-full min-w-0">
       {/* Tag filter row */}
-      <div className="flex items-center gap-1 px-3 py-2 border-b shrink-0 flex-wrap">
+      <div className="flex items-center gap-1 px-3 py-2 border-b shrink-0 overflow-x-auto scrollbar-none whitespace-nowrap">
         <div className="w-5 h-5 flex items-center justify-center shrink-0"><Tag className="h-3.5 w-3.5 text-muted-foreground/40" /></div>
         <div className="w-px h-5 bg-border mx-1" />
         <button
@@ -552,7 +552,7 @@ function TaskListPanel({
       </div>
 
       {/* Time filter row */}
-      <div className="flex items-center gap-1 px-3 py-2 border-b shrink-0">
+      <div className="flex items-center gap-1 px-3 py-2 border-b shrink-0 overflow-x-auto scrollbar-none whitespace-nowrap">
         <div className="w-5 h-5 flex items-center justify-center shrink-0"><Calendar className="h-3.5 w-3.5 text-muted-foreground/40" /></div>
         {timeOptions.map((opt) => {
           if (opt.hideUnless === false) return null
