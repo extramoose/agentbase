@@ -73,13 +73,6 @@ const PRIORITY_CHECKBOX_BORDER: Record<Priority, string> = {
   none: 'border-muted-foreground/30',
 }
 
-const PRIORITY_CHECKBOX_BG: Record<Priority, string> = {
-  urgent: 'bg-red-500',
-  high: 'bg-orange-400',
-  medium: 'bg-yellow-400',
-  low: 'bg-blue-400',
-  none: 'bg-primary',
-}
 
 // ---------------------------------------------------------------------------
 // Time filter
