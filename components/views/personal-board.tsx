@@ -482,21 +482,7 @@ function TaskListPanel({
       {/* Tag filter row */}
       <div className="flex items-center gap-1 px-3 py-2 border-b shrink-0 flex-wrap">
         <div className="w-5 h-5 flex items-center justify-center shrink-0"><Tag className="h-3.5 w-3.5 text-muted-foreground/40" /></div>
-        <button
-          onClick={() => {
-            setShowEverything(false)
-            setActiveTags([])
-            saveActiveTags([])
-          }}
-          className={cn(
-            'px-2.5 py-1 text-xs rounded-full transition-all',
-            !showEverything && activeTags.length === 0
-              ? 'bg-foreground text-background font-medium'
-              : 'text-muted-foreground hover:text-foreground hover:bg-accent',
-          )}
-        >
-          My Board
-        </button>
+        <div className="w-px h-5 bg-border mx-1" />
         <button
           onClick={() => {
             setShowEverything(true)
@@ -512,32 +498,57 @@ function TaskListPanel({
         >
           Everything
         </button>
-        <div className="w-px h-5 bg-border mx-1.5" />
-        {visibleTags.length > 0 && (
-          <>
-            {visibleTags.map((tag) => (
-              <button
-                key={tag}
-                onClick={() => {
-                  toggleActiveTag(tag)
-                }}
-                className={cn(
-                  'px-2.5 py-1 text-xs rounded-full transition-all',
-                  activeTags.includes(tag)
-                    ? 'bg-foreground text-background font-medium ring-1 ring-foreground/20'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-accent',
-                )}
-              >
-                {tag}
-              </button>
-            ))}
-          </>
+        <button
+          onClick={() => {
+            setShowEverything(false)
+            setActiveTags([])
+            saveActiveTags([])
+          }}
+          className={cn(
+            'px-2.5 py-1 text-xs rounded-full transition-all',
+            !showEverything
+              ? 'bg-foreground text-background font-medium'
+              : 'text-muted-foreground hover:text-foreground hover:bg-accent',
+          )}
+        >
+          My Board
+        </button>
+        <div className="w-px h-5 bg-border mx-1" />
+        <button
+          onClick={() => {
+            setActiveTags([])
+            saveActiveTags([])
+          }}
+          className={cn(
+            'px-2.5 py-1 text-xs rounded-full transition-all',
+            activeTags.length === 0
+              ? 'bg-foreground text-background font-medium'
+              : 'text-muted-foreground hover:text-foreground hover:bg-accent',
+          )}
+        >
+          All
+        </button>
+        {(showEverything ? allTags : visibleTags).map((tag) => (
+          <button
+            key={tag}
+            onClick={() => toggleActiveTag(tag)}
+            className={cn(
+              'px-2.5 py-1 text-xs rounded-full transition-all',
+              activeTags.includes(tag)
+                ? 'bg-foreground text-background font-medium ring-1 ring-foreground/20'
+                : 'text-muted-foreground hover:text-foreground hover:bg-accent',
+            )}
+          >
+            {tag}
+          </button>
+        ))}
+        {!showEverything && (
+          <TagSelector
+            allTags={allTags}
+            visibleTags={visibleTags}
+            onToggleVisible={toggleVisibleTag}
+          />
         )}
-        <TagSelector
-          allTags={allTags}
-          visibleTags={visibleTags}
-          onToggleVisible={toggleVisibleTag}
-        />
       </div>
 
       {/* Time filter row */}
