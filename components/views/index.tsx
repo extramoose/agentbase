@@ -33,6 +33,6 @@ export function ViewRenderer({ view, tasks, taskHref, recentlyChanged, workspace
     case 'experiment-c':
       return <ExperimentC tasks={tasks} taskHref={taskHref} recentlyChanged={recentlyChanged} />
     case 'personal-board':
-      return <PersonalBoard />
+      return <PersonalBoard tasks={tasks} taskHref={taskHref} recentlyChanged={recentlyChanged} />
   }
 }
