@@ -768,7 +768,7 @@ function TaskListPanel({
 
         {/* Active tasks */}
         {activeTasks.map((task) => (
-          <TaskListItem key={task.id} task={task} taskHref={taskHref} showTags={activeTags.length === 0} showDueDate={timeFilter === 'all'} />
+          <TaskListItem key={task.id} task={task} taskHref={taskHref} showTags={activeTags.length === 0} showDueDate={true} />
         ))}
 
         {/* Done tasks - white at 15%, group hover 40%, individual hover 80% */}
