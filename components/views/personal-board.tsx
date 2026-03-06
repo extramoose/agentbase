@@ -171,7 +171,8 @@ const TldrawCanvas = dynamic(
       }, [store, loaded])
 
       return (
-        <div className="w-full h-full relative z-0 isolate" style={{ backgroundImage: "radial-gradient(circle, rgba(255,255,255,0.04) 1px, transparent 1px)", backgroundSize: "20px 20px" }}>
+        <div className="w-full h-full relative z-0 isolate" style={{ backgroundImage: "radial-gradient(circle, rgba(255,255,255,0.06) 1px, transparent 1px)", backgroundSize: "20px 20px" }}>
+          <style>{\`.tl-background { background: transparent !important; }\`}</style>
           <Tldraw store={store} user={user} />
         </div>
       )
