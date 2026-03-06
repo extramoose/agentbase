@@ -352,7 +352,7 @@ function TaskListItem({
         }}
       >
         <div
-          className="w-5 h-5 rounded border-2 shrink-0 flex items-center justify-center transition-colors border-white/20"
+          className="w-5 h-5 rounded border shrink-0 flex items-center justify-center transition-all border-white/15 hover:border-2 hover:border-white/40"
         >
           {isDone && (
             <svg className="w-3 h-3 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
@@ -615,7 +615,7 @@ function TaskListPanel({
   return (
     <div className="flex flex-col h-full min-w-0">
       {/* Tag filter row */}
-      <div className="flex items-center gap-1 px-3 py-2 border-b shrink-0 overflow-x-auto scrollbar-none whitespace-nowrap">
+      <div className="flex items-center gap-1 px-4 py-2 border-b shrink-0 overflow-x-auto scrollbar-none whitespace-nowrap">
         <div className="w-5 h-5 flex items-center justify-center shrink-0"><Tag className="h-3.5 w-3.5 text-muted-foreground/40" /></div>
         <div className="w-px h-5 bg-border mx-1" />
         <button
@@ -687,7 +687,7 @@ function TaskListPanel({
       </div>
 
       {/* Time filter row */}
-      <div className="flex items-center gap-1 px-3 py-2 border-b shrink-0 overflow-x-auto scrollbar-none whitespace-nowrap">
+      <div className="flex items-center gap-1 px-4 py-2 border-b shrink-0 overflow-x-auto scrollbar-none whitespace-nowrap">
         <div className="w-5 h-5 flex items-center justify-center shrink-0"><Calendar className="h-3.5 w-3.5 text-muted-foreground/40" /></div>
         {timeOptions.map((opt) => {
           if (opt.hideUnless === false) return null
