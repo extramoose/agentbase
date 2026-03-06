@@ -298,10 +298,14 @@ function TaskListItem({
   task,
   taskHref,
   isDone: isDoneProp,
+  showTags,
+  showDueDate,
 }: {
   task: Task
   taskHref: (task: Task) => string
   isDone?: boolean
+  showTags?: boolean
+  showDueDate?: boolean
 }) {
   const isDone = isDoneProp ?? STATUS_DONE.includes(task.status)
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null)
@@ -406,6 +410,25 @@ function TaskListItem({
         >
           {task.title}
         </span>
+        {/* Tags */}
+        {showTags && !isDone && (task.tags ?? []).length > 0 && (
+          <div className="flex items-center gap-1 ml-auto shrink-0">
+            {(task.tags ?? []).map((tag) => (
+              <span
+                key={tag}
+                className="px-1.5 py-0.5 text-[10px] rounded border border-white/10 text-white/25 hover:text-white/80 hover:border-white/30 transition-all"
+              >
+                {tag}
+              </span>
+            ))}
+          </div>
+        )}
+        {/* Due date */}
+        {showDueDate && !isDone && task.due_date && (
+          <span className="ml-auto shrink-0 text-xs text-white/20 hover:text-white transition-colors tabular-nums">
+            {new Date(task.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+          </span>
+        )}
       </Link>
       {ctxMenu && (
         <div
@@ -745,7 +768,7 @@ function TaskListPanel({
 
         {/* Active tasks */}
         {activeTasks.map((task) => (
-          <TaskListItem key={task.id} task={task} taskHref={taskHref} />
+          <TaskListItem key={task.id} task={task} taskHref={taskHref} showTags={activeTags.length === 0} showDueDate={timeFilter === 'all'} />
         ))}
 
         {/* Done tasks - white at 15%, group hover 40%, individual hover 80% */}
@@ -756,7 +779,7 @@ function TaskListPanel({
                 key={task.id}
                 className="opacity-[0.15] group-hover/done:opacity-40 hover:!opacity-80 transition-opacity duration-200"
               >
-                <TaskListItem task={task} taskHref={taskHref} isDone />
+                <TaskListItem task={task} taskHref={taskHref} isDone showTags={false} showDueDate={false} />
               </div>
             ))}
           </div>
