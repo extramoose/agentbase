@@ -676,7 +676,7 @@ function TaskListPanel({
             saveActiveTags([])
           }}
           className={cn(
-            'px-2.5 py-1 text-xs rounded-full transition-all',
+            'px-2.5 h-7 text-xs rounded-full transition-all inline-flex items-center',
             showEverything
               ? 'bg-foreground text-background font-medium'
               : 'bg-white/5 text-muted-foreground hover:text-foreground hover:bg-white/10',
@@ -691,7 +691,7 @@ function TaskListPanel({
             saveActiveTags([])
           }}
           className={cn(
-            'px-2.5 py-1 text-xs rounded-full transition-all',
+            'px-2.5 h-7 text-xs rounded-full transition-all inline-flex items-center',
             !showEverything
               ? 'bg-foreground text-background font-medium'
               : 'bg-white/5 text-muted-foreground hover:text-foreground hover:bg-white/10',
@@ -706,7 +706,7 @@ function TaskListPanel({
             saveActiveTags([])
           }}
           className={cn(
-            'px-2.5 py-1 text-xs rounded-full transition-all',
+            'px-2.5 h-7 text-xs rounded-full transition-all inline-flex items-center',
             activeTags.length === 0
               ? 'bg-foreground text-background font-medium'
               : 'text-muted-foreground hover:text-foreground hover:bg-accent',
@@ -719,7 +719,7 @@ function TaskListPanel({
             key={tag}
             onClick={() => toggleActiveTag(tag)}
             className={cn(
-              'px-2.5 py-1 text-xs rounded-full transition-all',
+              'px-2.5 h-7 text-xs rounded-full transition-all inline-flex items-center',
               activeTags.includes(tag)
                 ? 'bg-foreground text-background font-medium ring-1 ring-foreground/20'
                 : 'text-muted-foreground hover:text-foreground hover:bg-accent',
@@ -748,7 +748,7 @@ function TaskListPanel({
               key={opt.value}
               onClick={() => setTimeFilter(opt.value)}
               className={cn(
-                'px-2.5 py-1 text-xs rounded-full transition-all',
+                'px-2.5 h-7 text-xs rounded-full transition-all inline-flex items-center',
                 timeFilter === opt.value
                   ? 'bg-foreground text-background font-medium'
                   : 'text-muted-foreground hover:text-foreground hover:bg-accent',
