@@ -362,7 +362,7 @@ function TaskListItem({
       <Link
         href={taskHref(task)}
         className={cn(
-          'flex items-center gap-3 px-4 py-3.5 transition-all cursor-pointer no-underline border-b border-border/40',
+          'group/row flex items-center gap-3 px-4 py-3.5 transition-all cursor-pointer no-underline border-b border-border/40',
           isDone ? '' : 'hover:bg-accent/40',
           updating && 'opacity-50',
         )}
@@ -410,24 +410,24 @@ function TaskListItem({
         >
           {task.title}
         </span>
-        {/* Tags */}
+        {/* Due date - inline after title */}
+        {showDueDate && !isDone && task.due_date && (
+          <span className="shrink-0 text-xs text-white/20 group-hover/row:text-white transition-colors tabular-nums">
+            {new Date(task.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+          </span>
+        )}
+        {/* Tags - right aligned */}
         {showTags && !isDone && (task.tags ?? []).length > 0 && (
           <div className="flex items-center gap-1 ml-auto shrink-0">
             {(task.tags ?? []).map((tag) => (
               <span
                 key={tag}
-                className="px-1.5 py-0.5 text-[10px] rounded border border-white/10 text-white/25 hover:text-white/80 hover:border-white/30 transition-all"
+                className="px-2 py-0.5 text-[10px] rounded-full border border-white/10 text-white/25 group-hover/row:text-white/80 group-hover/row:border-white/30 transition-all"
               >
                 {tag}
               </span>
             ))}
           </div>
-        )}
-        {/* Due date */}
-        {showDueDate && !isDone && task.due_date && (
-          <span className="ml-auto shrink-0 text-xs text-white/20 hover:text-white transition-colors tabular-nums">
-            {new Date(task.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-          </span>
         )}
       </Link>
       {ctxMenu && (
