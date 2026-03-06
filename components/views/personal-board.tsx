@@ -1,24 +1,14 @@
 'use client'
 
+import 'tldraw/tldraw.css'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import {
   MoreHorizontal,
-  Plus,
   Check,
 } from 'lucide-react'
-import {
-  DndContext,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-  type DragStartEvent,
-  DragOverlay,
-  useDraggable,
-} from '@dnd-kit/core'
-import { CSS } from '@dnd-kit/utilities'
+import dynamic from 'next/dynamic'
 import {
   Popover,
   PopoverContent,
@@ -116,105 +106,56 @@ function matchesTimeFilter(task: Task, filter: TimeFilter): boolean {
 // ---------------------------------------------------------------------------
 // Sticky note types & constants
 // ---------------------------------------------------------------------------
+// Tldraw Canvas (lazy loaded - needs browser APIs)
+// ---------------------------------------------------------------------------
 
-type StickyNote = {
-  id: string
-  x: number
-  y: number
-  width: number
-  height: number
-  content: string
-  color: string
-  locked?: boolean
-}
+const TLDRAW_STORAGE_KEY = 'ab:personal-board-v2:tldraw'
 
-const STICKY_COLORS = [
-  '#fef9c3',
-  '#fce7f3',
-  '#dbeafe',
-  '#dcfce7',
-  '#ede9fe',
-]
+const TldrawCanvas = dynamic(
+  () => import('tldraw').then((mod) => {
+    const { Tldraw, createTLStore, defaultShapeUtils } = mod
 
-const GRID_SIZE = 20
-const CANVAS_WIDTH = 3000
-const CANVAS_HEIGHT = 2000
-const NOTE_WIDTH = 200
-const NOTE_HEIGHT = 150
-const PB_STORAGE_KEY = 'ab:personal-board-v2:stickies'
+    function Canvas() {
+      const [store] = useState(() => {
+        const s = createTLStore({ shapeUtils: defaultShapeUtils })
+        // Load persisted state
+        if (typeof window !== 'undefined') {
+          try {
+            const raw = localStorage.getItem(TLDRAW_STORAGE_KEY)
+            if (raw) {
+              const snapshot = JSON.parse(raw)
+              s.loadSnapshot(snapshot)
+            }
+          } catch { /* ignore */ }
+        }
+        return s
+      })
+
+      // Persist on changes
+      useEffect(() => {
+        const unsub = store.listen(() => {
+          try {
+            const snapshot = store.getSnapshot()
+            localStorage.setItem(TLDRAW_STORAGE_KEY, JSON.stringify(snapshot))
+          } catch { /* ignore */ }
+        }, { scope: 'document', source: 'user' })
+        return unsub
+      }, [store])
+
+      return (
+        <div className="w-full h-full">
+          <Tldraw store={store} />
+        </div>
+      )
+    }
+
+    return Canvas
+  }),
+  { ssr: false, loading: () => <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">Loading canvas...</div> },
+)
+
 const PB_VISIBLE_TAGS_KEY = 'ab:personal-board-v2:visible-tags'
 const PB_ACTIVE_TAGS_KEY = 'ab:personal-board-v2:active-tags'
-const DEBOUNCE_MS = 500
-
-// ---------------------------------------------------------------------------
-// Snap & collision helpers
-// ---------------------------------------------------------------------------
-
-function snapToGrid(value: number): number {
-  return Math.round(value / GRID_SIZE) * GRID_SIZE
-}
-
-function clampToCanvas(x: number, y: number, w: number, h: number): { x: number; y: number } {
-  return {
-    x: Math.max(0, Math.min(CANVAS_WIDTH - w, x)),
-    y: Math.max(0, Math.min(CANVAS_HEIGHT - h, y)),
-  }
-}
-
-function rectsOverlap(
-  a: { x: number; y: number; width: number; height: number },
-  b: { x: number; y: number; width: number; height: number },
-): boolean {
-  return a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y
-}
-
-function nudgeToFreeSpot(
-  note: StickyNote,
-  others: StickyNote[],
-  maxIterations = 50,
-): { x: number; y: number } {
-  const rect = { x: note.x, y: note.y, width: note.width, height: note.height }
-  let iteration = 0
-
-  while (iteration < maxIterations) {
-    const overlapping = others.find(
-      (o) => o.id !== note.id && rectsOverlap(rect, o),
-    )
-    if (!overlapping) break
-    rect.x += GRID_SIZE
-    if (rect.x + note.width > CANVAS_WIDTH) {
-      rect.x = 0
-      rect.y += GRID_SIZE
-    }
-    if (rect.y + note.height > CANVAS_HEIGHT) {
-      rect.y = 0
-    }
-    iteration++
-  }
-
-  return clampToCanvas(rect.x, rect.y, note.width, note.height)
-}
-
-// ---------------------------------------------------------------------------
-// localStorage helpers
-// ---------------------------------------------------------------------------
-
-function loadStickies(): StickyNote[] {
-  if (typeof window === 'undefined') return []
-  try {
-    const raw = localStorage.getItem(PB_STORAGE_KEY)
-    if (!raw) return []
-    return JSON.parse(raw) as StickyNote[]
-  } catch {
-    return []
-  }
-}
-
-function saveStickies(notes: StickyNote[]) {
-  try {
-    localStorage.setItem(PB_STORAGE_KEY, JSON.stringify(notes))
-  } catch { /* ignore */ }
-}
 
 function loadVisibleTags(): string[] {
   if (typeof window === 'undefined') return []
@@ -248,369 +189,6 @@ function saveActiveTags(tags: string[]) {
   try {
     localStorage.setItem(PB_ACTIVE_TAGS_KEY, JSON.stringify(tags))
   } catch { /* ignore */ }
-}
-
-// ---------------------------------------------------------------------------
-// Draggable sticky note
-// ---------------------------------------------------------------------------
-
-function DraggableStickyNote({
-  note,
-  onDelete,
-  onContentChange,
-  onRecolor,
-  onToggleLock,
-  onResize,
-  isDragging,
-}: {
-  note: StickyNote
-  onDelete: (id: string) => void
-  onContentChange: (id: string, content: string) => void
-  onRecolor: (id: string, color: string) => void
-  onToggleLock: (id: string) => void
-  onResize: (id: string, width: number, height: number) => void
-  isDragging?: boolean
-}) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-  } = useDraggable({ id: note.id, disabled: note.locked })
-  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null)
-  const [, setResizing] = useState(false)
-  const resizeRef = useRef<{ startX: number; startY: number; startW: number; startH: number } | null>(null)
-
-  const style: React.CSSProperties = {
-    position: 'absolute',
-    left: note.x,
-    top: note.y,
-    width: note.width,
-    height: note.height,
-    transform: CSS.Translate.toString(transform),
-    transition: isDragging ? undefined : 'box-shadow 0.2s',
-    zIndex: isDragging || ctxMenu ? 999 : 1,
-    opacity: isDragging ? 0.5 : 1,
-  }
-
-  const handleContextMenu = useCallback((e: React.MouseEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setCtxMenu({ x: e.nativeEvent.offsetX, y: e.nativeEvent.offsetY })
-  }, [])
-
-  // Close context menu on click outside
-  useEffect(() => {
-    if (!ctxMenu) return
-    const close = () => setCtxMenu(null)
-    window.addEventListener('click', close)
-    return () => window.removeEventListener('click', close)
-  }, [ctxMenu])
-
-  const handleResizeStart = useCallback((e: React.MouseEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setResizing(true)
-    resizeRef.current = { startX: e.clientX, startY: e.clientY, startW: note.width, startH: note.height }
-    const onMove = (ev: MouseEvent) => {
-      if (!resizeRef.current) return
-      const w = Math.max(120, resizeRef.current.startW + (ev.clientX - resizeRef.current.startX))
-      const h = Math.max(80, resizeRef.current.startH + (ev.clientY - resizeRef.current.startY))
-      onResize(note.id, w, h)
-    }
-    const onUp = () => {
-      setResizing(false)
-      resizeRef.current = null
-      window.removeEventListener('mousemove', onMove)
-      window.removeEventListener('mouseup', onUp)
-    }
-    window.addEventListener('mousemove', onMove)
-    window.addEventListener('mouseup', onUp)
-  }, [note.id, note.width, note.height, onResize])
-
-  return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className={cn(
-        'group rounded-lg shadow-md border border-black/10 flex flex-col select-none',
-        note.locked ? 'cursor-default' : 'cursor-grab active:cursor-grabbing',
-        isDragging && 'shadow-xl',
-      )}
-      onContextMenu={handleContextMenu}
-      {...(note.locked ? {} : { ...attributes, ...listeners })}
-    >
-      {/* Lock indicator */}
-      {note.locked && (
-        <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-black/20 flex items-center justify-center text-[8px]">
-          🔒
-        </div>
-      )}
-      <div
-        className="flex-1 px-3 py-2 text-sm text-black/80 leading-snug overflow-hidden outline-none rounded-lg"
-        style={{ backgroundColor: note.color }}
-        contentEditable={!note.locked}
-        suppressContentEditableWarning
-        onPointerDown={(e) => e.stopPropagation()}
-        onBlur={(e) => {
-          onContentChange(note.id, e.currentTarget.textContent ?? '')
-        }}
-        dangerouslySetInnerHTML={{ __html: note.content }}
-      />
-      {/* Resize handle */}
-      {!note.locked && (
-        <div
-          className="absolute bottom-0 right-0 w-4 h-4 cursor-se-resize opacity-0 group-hover:opacity-100 transition-opacity"
-          onMouseDown={handleResizeStart}
-          onPointerDown={(e) => e.stopPropagation()}
-        >
-          <svg className="w-4 h-4 text-black/20" viewBox="0 0 16 16" fill="currentColor">
-            <path d="M14 14H12V12H14V14ZM14 10H12V8H14V10ZM10 14H8V12H10V14Z" />
-          </svg>
-        </div>
-      )}
-      {/* Context menu */}
-      {ctxMenu && (
-        <div
-          className="absolute bg-popover border border-border rounded-lg shadow-xl py-1 z-[1000] min-w-[140px]"
-          style={{ left: ctxMenu.x, top: ctxMenu.y }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <button
-            className="w-full px-3 py-1.5 text-sm text-left hover:bg-accent transition-colors"
-            onClick={() => { onToggleLock(note.id); setCtxMenu(null) }}
-          >
-            {note.locked ? 'Unlock' : 'Lock'}
-          </button>
-          <div className="px-3 py-1.5">
-            <div className="text-xs text-muted-foreground mb-1">Color</div>
-            <div className="flex gap-1">
-              {STICKY_COLORS.map((c) => (
-                <button
-                  key={c}
-                  onClick={() => { onRecolor(note.id, c); setCtxMenu(null) }}
-                  className={cn(
-                    'w-5 h-5 rounded-full border-2 transition-transform hover:scale-110',
-                    c === note.color ? 'border-black/40 scale-110' : 'border-transparent',
-                  )}
-                  style={{ backgroundColor: c }}
-                />
-              ))}
-            </div>
-          </div>
-          <div className="border-t border-border my-1" />
-          <button
-            className="w-full px-3 py-1.5 text-sm text-left text-red-500 hover:bg-accent transition-colors"
-            onClick={() => { onDelete(note.id); setCtxMenu(null) }}
-          >
-            Delete
-          </button>
-        </div>
-      )}
-    </div>
-  )
-}
-
-function StickyOverlay({ note }: { note: StickyNote }) {
-  return (
-    <div
-      style={{
-        width: note.width,
-        height: note.height,
-        backgroundColor: note.color,
-      }}
-      className="rounded-lg shadow-xl border border-black/10 flex flex-col"
-    >
-      <div className="flex-1 px-3 py-2 text-sm text-black/80 leading-snug overflow-hidden">
-        {note.content}
-      </div>
-    </div>
-  )
-}
-
-// ---------------------------------------------------------------------------
-// Sticky Canvas
-// ---------------------------------------------------------------------------
-
-function StickyCanvas() {
-  const [notes, setNotes] = useState<StickyNote[]>([])
-  const [activeId, setActiveId] = useState<string | null>(null)
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const colorIndexRef = useRef(0)
-
-  useEffect(() => {
-    setNotes(loadStickies())
-  }, [])
-
-  const debouncedSave = useCallback((updated: StickyNote[]) => {
-    if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
-    saveTimerRef.current = setTimeout(() => saveStickies(updated), DEBOUNCE_MS)
-  }, [])
-
-  const updateNotes = useCallback(
-    (updater: (prev: StickyNote[]) => StickyNote[]) => {
-      setNotes((prev) => {
-        const next = updater(prev)
-        debouncedSave(next)
-        return next
-      })
-    },
-    [debouncedSave],
-  )
-
-  const createNote = useCallback(
-    (x: number, y: number) => {
-      const snapped = clampToCanvas(snapToGrid(x), snapToGrid(y), NOTE_WIDTH, NOTE_HEIGHT)
-      const color = STICKY_COLORS[colorIndexRef.current % STICKY_COLORS.length]
-      colorIndexRef.current++
-      const newNote: StickyNote = {
-        id: `sticky-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-        x: snapped.x,
-        y: snapped.y,
-        width: NOTE_WIDTH,
-        height: NOTE_HEIGHT,
-        content: '',
-        color,
-      }
-      updateNotes((prev) => {
-        const pos = nudgeToFreeSpot(newNote, prev)
-        return [...prev, { ...newNote, x: pos.x, y: pos.y }]
-      })
-    },
-    [updateNotes],
-  )
-
-  const deleteNote = useCallback(
-    (id: string) => updateNotes((prev) => prev.filter((n) => n.id !== id)),
-    [updateNotes],
-  )
-
-  const changeContent = useCallback(
-    (id: string, content: string) =>
-      updateNotes((prev) => prev.map((n) => (n.id === id ? { ...n, content } : n))),
-    [updateNotes],
-  )
-
-  const recolorNote = useCallback(
-    (id: string, color: string) =>
-      updateNotes((prev) => prev.map((n) => (n.id === id ? { ...n, color } : n))),
-    [updateNotes],
-  )
-
-  const toggleLockNote = useCallback(
-    (id: string) =>
-      updateNotes((prev) => prev.map((n) => (n.id === id ? { ...n, locked: !n.locked } : n))),
-    [updateNotes],
-  )
-
-  const resizeNote = useCallback(
-    (id: string, width: number, height: number) =>
-      updateNotes((prev) => prev.map((n) => (n.id === id ? { ...n, width, height } : n))),
-    [updateNotes],
-  )
-
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-  )
-
-  const handleDragStart = useCallback((event: DragStartEvent) => {
-    setActiveId(String(event.active.id))
-  }, [])
-
-  const handleDragEnd = useCallback(
-    (event: DragEndEvent) => {
-      setActiveId(null)
-      const { active, delta } = event
-      if (!delta) return
-
-      updateNotes((prev) => {
-        const idx = prev.findIndex((n) => n.id === String(active.id))
-        if (idx === -1) return prev
-        const note = prev[idx]
-        const rawX = note.x + delta.x
-        const rawY = note.y + delta.y
-        const snappedX = snapToGrid(rawX)
-        const snappedY = snapToGrid(rawY)
-        const clamped = clampToCanvas(snappedX, snappedY, note.width, note.height)
-        const moved = { ...note, x: clamped.x, y: clamped.y }
-        const others = prev.filter((_, i) => i !== idx)
-        const final = nudgeToFreeSpot(moved, others)
-        const next = [...prev]
-        next[idx] = { ...moved, x: final.x, y: final.y }
-        return next
-      })
-    },
-    [updateNotes],
-  )
-
-  const activeNote = activeId ? notes.find((n) => n.id === activeId) : null
-
-  const handleCanvasDoubleClick = useCallback(
-    (e: React.MouseEvent<HTMLDivElement>) => {
-      if ((e.target as HTMLElement).closest('[data-sticky-note]')) return
-      const rect = e.currentTarget.getBoundingClientRect()
-      const scrollLeft = e.currentTarget.scrollLeft
-      const scrollTop = e.currentTarget.scrollTop
-      const x = e.clientX - rect.left + scrollLeft
-      const y = e.clientY - rect.top + scrollTop
-      createNote(x, y)
-    },
-    [createNote],
-  )
-
-  return (
-    <div className="relative flex-1 flex flex-col h-full min-w-0">
-      <div className="flex items-center gap-2 px-3 py-2 border-b shrink-0 bg-background">
-        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Notes</span>
-        <button
-          onClick={() => createNote(100, 100)}
-          className="ml-auto flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded hover:bg-accent"
-        >
-          <Plus className="h-3.5 w-3.5" />
-          Add note
-        </button>
-      </div>
-
-      <div
-        className="flex-1 overflow-auto"
-        onDoubleClick={handleCanvasDoubleClick}
-      >
-        <DndContext
-          sensors={sensors}
-          onDragStart={handleDragStart}
-          onDragEnd={handleDragEnd}
-        >
-          <div
-            className="relative"
-            style={{
-              width: CANVAS_WIDTH,
-              height: CANVAS_HEIGHT,
-              backgroundImage:
-                'radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px)',
-              backgroundSize: `${GRID_SIZE}px ${GRID_SIZE}px`,
-            }}
-          >
-            {notes.map((note) => (
-              <DraggableStickyNote
-                key={note.id}
-                note={note}
-                onDelete={deleteNote}
-                onContentChange={changeContent}
-                onRecolor={recolorNote}
-                onToggleLock={toggleLockNote}
-                onResize={resizeNote}
-                isDragging={note.id === activeId}
-              />
-            ))}
-          </div>
-
-          <DragOverlay dropAnimation={null}>
-            {activeNote ? <StickyOverlay note={activeNote} /> : null}
-          </DragOverlay>
-        </DndContext>
-      </div>
-    </div>
-  )
 }
 
 // ---------------------------------------------------------------------------
@@ -1053,7 +631,7 @@ export function PersonalBoard({ tasks, taskHref, recentlyChanged: _recentlyChang
 
       <PanelDivider onResize={handleResize} />
 
-      <StickyCanvas />
+      <TldrawCanvas />
     </div>
   )
 }
