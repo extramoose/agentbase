@@ -411,13 +411,19 @@ function TaskListPanel({
   const { activeTasks, doneTasks } = useMemo(() => {
     let filtered = tasks
 
-    // Tag filter - everything shows all, my board scopes to visible tags
-    if (!showEverything && visibleTags.length > 0) {
-      const filterSet = activeTags.length > 0 ? activeTags : visibleTags
+    // Tag filter
+    if (activeTags.length > 0) {
+      // Focus mode - filter to selected tags (works in both modes)
       filtered = filtered.filter((t) =>
-        ((t.tags ?? []).some((tag) => filterSet.includes(tag))),
+        ((t.tags ?? []).some((tag) => activeTags.includes(tag))),
+      )
+    } else if (!showEverything && visibleTags.length > 0) {
+      // My Board mode with no focus - scope to visible tags
+      filtered = filtered.filter((t) =>
+        ((t.tags ?? []).some((tag) => visibleTags.includes(tag))),
       )
     }
+    // Everything mode with no focus - no tag filter
 
     // Time filter
     filtered = filtered.filter((t) => matchesTimeFilter(t, timeFilter))
@@ -475,7 +481,7 @@ function TaskListPanel({
     <div className="flex flex-col h-full min-w-0">
       {/* Tag filter row */}
       <div className="flex items-center gap-1 px-3 py-2 border-b shrink-0 flex-wrap">
-        <Tag className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0 mr-1" />
+        <div className="w-5 h-5 flex items-center justify-center shrink-0"><Tag className="h-3.5 w-3.5 text-muted-foreground/40" /></div>
         <button
           onClick={() => {
             setShowEverything(false)
@@ -506,14 +512,13 @@ function TaskListPanel({
         >
           Everything
         </button>
-        {!showEverything && visibleTags.length > 0 && (
+        <div className="w-px h-5 bg-border mx-1.5" />
+        {visibleTags.length > 0 && (
           <>
-            <div className="w-px h-4 bg-border/40 mx-1" />
             {visibleTags.map((tag) => (
               <button
                 key={tag}
                 onClick={() => {
-                  setShowEverything(false)
                   toggleActiveTag(tag)
                 }}
                 className={cn(
@@ -528,18 +533,16 @@ function TaskListPanel({
             ))}
           </>
         )}
-        {!showEverything && (
-          <TagSelector
-            allTags={allTags}
-            visibleTags={visibleTags}
-            onToggleVisible={toggleVisibleTag}
-          />
-        )}
+        <TagSelector
+          allTags={allTags}
+          visibleTags={visibleTags}
+          onToggleVisible={toggleVisibleTag}
+        />
       </div>
 
       {/* Time filter row */}
       <div className="flex items-center gap-1 px-3 py-2 border-b shrink-0">
-        <Calendar className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0 mr-1" />
+        <div className="w-5 h-5 flex items-center justify-center shrink-0"><Calendar className="h-3.5 w-3.5 text-muted-foreground/40" /></div>
         {timeOptions.map((opt) => {
           if (opt.hideUnless === false) return null
           return (
