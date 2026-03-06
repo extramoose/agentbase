@@ -288,7 +288,8 @@ function TagSelector({
 // Task list item
 // ---------------------------------------------------------------------------
 
-const STATUS_DONE: Status[] = ['done', 'cancelled']
+const STATUS_DONE: Status[] = ['done']
+const STATUS_HIDDEN: Status[] = ['cancelled']
 const PRIORITY_ORDER: Priority[] = ['urgent', 'high', 'medium', 'low', 'none']
 
 function TaskListItem({
@@ -423,6 +424,7 @@ function TaskListPanel({
     const done: Task[] = []
 
     for (const task of filtered) {
+      if (STATUS_HIDDEN.includes(task.status)) continue
       if (STATUS_DONE.includes(task.status)) {
         done.push(task)
       } else {
@@ -544,26 +546,17 @@ function TaskListPanel({
           <TaskListItem key={task.id} task={task} taskHref={taskHref} />
         ))}
 
-        {/* Done tasks - very faded, group hover brings up, individual hover full */}
+        {/* Done tasks - white at 15%, group hover 40%, individual hover 80% */}
         {doneTasks.length > 0 && (
-          <div className="mt-2 group/done [&:hover_.done-item]:opacity-40">
-            {doneTasks.map((task, i) => {
-              let baseOpacity = 0.1
-              const fadeStart = doneTasks.length - 10
-              if (i >= fadeStart) {
-                const fadeIndex = i - fadeStart
-                baseOpacity = 0.1 * (1 - fadeIndex / 10)
-              }
-              return (
-                <div
-                  key={task.id}
-                  className="done-item hover:!opacity-100 transition-opacity duration-200"
-                  style={{ opacity: baseOpacity }}
-                >
-                  <TaskListItem task={task} taskHref={taskHref} isDone />
-                </div>
-              )
-            })}
+          <div className="mt-2 group/done">
+            {doneTasks.map((task) => (
+              <div
+                key={task.id}
+                className="opacity-[0.15] group-hover/done:opacity-40 hover:!opacity-80 transition-opacity duration-200"
+              >
+                <TaskListItem task={task} taskHref={taskHref} isDone />
+              </div>
+            ))}
           </div>
         )}
       </div>
