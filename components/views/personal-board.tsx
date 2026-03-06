@@ -183,7 +183,7 @@ const TldrawCanvas = dynamic(
       }, [store, loaded])
 
       return (
-        <div className="w-full h-full">
+        <div className="w-full h-full" style={{ backgroundImage: "radial-gradient(circle, rgba(255,255,255,0.04) 1px, transparent 1px)", backgroundSize: "20px 20px" }}>
           <Tldraw store={store} user={user} />
         </div>
       )
@@ -320,19 +320,14 @@ function TaskListItem({
     <Link
       href={taskHref(task)}
       className={cn(
-        'flex items-center gap-3 px-4 py-3.5 transition-all cursor-pointer no-underline border-b border-border/40 border-l-2',
+        'flex items-center gap-3 px-4 py-3.5 transition-all cursor-pointer no-underline border-b border-border/40',
         isDone
-          ? 'border-l-transparent'
-          : cn(PRIORITY_COLORS[task.priority], 'hover:bg-accent/40'),
+          ? ''
+          : 'hover:bg-accent/40',
       )}
     >
       <div
-        className={cn(
-          'w-5 h-5 rounded border-2 shrink-0 flex items-center justify-center transition-colors',
-          isDone
-            ? 'border-white/20 bg-white/5'
-            : PRIORITY_CHECKBOX_BORDER[task.priority],
-        )}
+        className="w-5 h-5 rounded border-2 shrink-0 flex items-center justify-center transition-colors border-white/20"
       >
         {isDone && (
           <svg className="w-3 h-3 text-white/20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
@@ -340,6 +335,14 @@ function TaskListItem({
           </svg>
         )}
       </div>
+      {!isDone && (task.priority === 'urgent' || task.priority === 'high') && (
+        <div
+          className={cn(
+            'w-2 h-2 rounded-full shrink-0',
+            task.priority === 'urgent' ? 'bg-red-500' : 'bg-yellow-400',
+          )}
+        />
+      )}
       <span
         className={cn(
           'text-sm leading-snug truncate',
