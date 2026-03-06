@@ -6,6 +6,8 @@ import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import {
   MoreHorizontal,
+  Tag,
+  Calendar,
   Check,
 } from 'lucide-react'
 import dynamic from 'next/dynamic'
@@ -357,6 +359,7 @@ function TaskListPanel({
 }) {
   const [visibleTags, setVisibleTags] = useState<string[]>([])
   const [activeTags, setActiveTags] = useState<string[]>([])
+  const [showEverything, setShowEverything] = useState(false)
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('all')
 
   // Load from localStorage
@@ -408,8 +411,8 @@ function TaskListPanel({
   const { activeTasks, doneTasks } = useMemo(() => {
     let filtered = tasks
 
-    // Tag filter - "All" means all visible tags, not everything
-    if (visibleTags.length > 0) {
+    // Tag filter - everything shows all, my board scopes to visible tags
+    if (!showEverything && visibleTags.length > 0) {
       const filterSet = activeTags.length > 0 ? activeTags : visibleTags
       filtered = filtered.filter((t) =>
         ((t.tags ?? []).some((tag) => filterSet.includes(tag))),
@@ -448,7 +451,7 @@ function TaskListPanel({
     done.splice(20)
 
     return { activeTasks: active, doneTasks: done }
-  }, [tasks, activeTags, visibleTags, timeFilter])
+  }, [tasks, activeTags, visibleTags, showEverything, timeFilter])
 
   // Check if any overdue tasks exist (across all tasks, not just filtered)
   const hasOverdue = useMemo(() => {
@@ -470,37 +473,53 @@ function TaskListPanel({
 
   return (
     <div className="flex flex-col h-full min-w-0">
-      {/* Tag pills - visible tags can be toggled on/off, ... menu controls which show */}
+      {/* Tag filter row */}
       <div className="flex items-center gap-1 px-3 py-2 border-b shrink-0 flex-wrap">
-        <TagSelector
-          allTags={allTags}
-          visibleTags={visibleTags}
-          onToggleVisible={toggleVisibleTag}
-        />
-        {visibleTags.length > 0 && (
+        <Tag className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0 mr-1" />
+        <button
+          onClick={() => {
+            setShowEverything(false)
+            setActiveTags([])
+            saveActiveTags([])
+          }}
+          className={cn(
+            'px-2.5 py-1 text-xs rounded-full transition-all',
+            !showEverything && activeTags.length === 0
+              ? 'bg-foreground text-background font-medium'
+              : 'text-muted-foreground hover:text-foreground hover:bg-accent',
+          )}
+        >
+          My Board
+        </button>
+        <button
+          onClick={() => {
+            setShowEverything(true)
+            setActiveTags([])
+            saveActiveTags([])
+          }}
+          className={cn(
+            'px-2.5 py-1 text-xs rounded-full transition-all',
+            showEverything
+              ? 'bg-foreground text-background font-medium'
+              : 'text-muted-foreground hover:text-foreground hover:bg-accent',
+          )}
+        >
+          Everything
+        </button>
+        {!showEverything && visibleTags.length > 0 && (
           <>
-            <button
-              onClick={() => {
-                setActiveTags([])
-                saveActiveTags([])
-              }}
-              className={cn(
-                'px-2.5 py-1 text-xs rounded-full transition-all',
-                activeTags.length === 0
-                  ? 'bg-foreground text-background font-medium'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-accent',
-              )}
-            >
-              All
-            </button>
+            <div className="w-px h-4 bg-border/40 mx-1" />
             {visibleTags.map((tag) => (
               <button
                 key={tag}
-                onClick={() => toggleActiveTag(tag)}
+                onClick={() => {
+                  setShowEverything(false)
+                  toggleActiveTag(tag)
+                }}
                 className={cn(
                   'px-2.5 py-1 text-xs rounded-full transition-all',
                   activeTags.includes(tag)
-                    ? 'bg-foreground text-background font-medium'
+                    ? 'bg-foreground text-background font-medium ring-1 ring-foreground/20'
                     : 'text-muted-foreground hover:text-foreground hover:bg-accent',
                 )}
               >
@@ -509,13 +528,18 @@ function TaskListPanel({
             ))}
           </>
         )}
-        {visibleTags.length === 0 && (
-          <span className="text-xs text-muted-foreground/50">Use ... to add tags</span>
+        {!showEverything && (
+          <TagSelector
+            allTags={allTags}
+            visibleTags={visibleTags}
+            onToggleVisible={toggleVisibleTag}
+          />
         )}
       </div>
 
-      {/* Time filter */}
+      {/* Time filter row */}
       <div className="flex items-center gap-1 px-3 py-2 border-b shrink-0">
+        <Calendar className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0 mr-1" />
         {timeOptions.map((opt) => {
           if (opt.hideUnless === false) return null
           return (
