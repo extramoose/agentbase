@@ -695,10 +695,11 @@ function TaskListPanel({
   const { activeTasks, doneTasks } = useMemo(() => {
     let filtered = tasks
 
-    // Tag filter (if any active)
-    if (activeTags.length > 0) {
+    // Tag filter - "All" means all visible tags, not everything
+    if (visibleTags.length > 0) {
+      const filterSet = activeTags.length > 0 ? activeTags : visibleTags
       filtered = filtered.filter((t) =>
-        ((t.tags ?? []).some((tag) => activeTags.includes(tag))),
+        ((t.tags ?? []).some((tag) => filterSet.includes(tag))),
       )
     }
 
@@ -726,7 +727,7 @@ function TaskListPanel({
     done.splice(20)
 
     return { activeTasks: active, doneTasks: done }
-  }, [tasks, activeTags, timeFilter])
+  }, [tasks, activeTags, visibleTags, timeFilter])
 
   // Check if any overdue tasks exist (across all tasks, not just filtered)
   const hasOverdue = useMemo(() => {
