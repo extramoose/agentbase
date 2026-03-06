@@ -306,6 +306,23 @@ function TaskListItem({
   const isDone = isDoneProp ?? STATUS_DONE.includes(task.status)
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null)
   const [updating, setUpdating] = useState(false)
+  const [justCompleted, setJustCompleted] = useState(false)
+
+  const handleCheck = useCallback(async (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (isDone || updating) return
+    setJustCompleted(true)
+    try {
+      await fetch('/api/commands/update-task', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: task.id, fields: { status: 'done' } }),
+      })
+    } catch { /* ignore */ }
+    // Keep showing for 15 seconds before realtime removes it
+    setTimeout(() => setJustCompleted(false), 15000)
+  }, [isDone, updating, task.id])
 
   useEffect(() => {
     if (!ctxMenu) return
@@ -352,12 +369,23 @@ function TaskListItem({
         }}
       >
         <div
-          className="w-5 h-5 rounded border shrink-0 flex items-center justify-center transition-all border-white/15 hover:border-2 hover:border-white/40"
+          onClick={handleCheck}
+          className={cn(
+            'w-5 h-5 rounded shrink-0 flex items-center justify-center transition-all cursor-pointer',
+            (isDone || justCompleted)
+              ? 'border-2 border-green-400/60 bg-green-400/10'
+              : task.status === 'in_progress'
+                ? 'border-2 border-white/40'
+                : 'border border-white/15 hover:border-2 hover:border-white/40',
+          )}
         >
-          {isDone && (
-            <svg className="w-3 h-3 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+          {(isDone || justCompleted) && (
+            <svg className="w-3 h-3 text-green-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="20 6 9 17 4 12" />
             </svg>
+          )}
+          {!isDone && !justCompleted && task.status === 'in_progress' && (
+            <div className="w-1.5 h-1.5 rounded-full bg-white/60" />
           )}
         </div>
         {!isDone && (task.priority === 'urgent' || task.priority === 'high') && (
@@ -628,7 +656,7 @@ function TaskListPanel({
             'px-2.5 py-1 text-xs rounded-full transition-all',
             showEverything
               ? 'bg-foreground text-background font-medium'
-              : 'text-muted-foreground hover:text-foreground hover:bg-accent',
+              : 'bg-white/5 text-muted-foreground hover:text-foreground hover:bg-white/10',
           )}
         >
           Everything
@@ -643,7 +671,7 @@ function TaskListPanel({
             'px-2.5 py-1 text-xs rounded-full transition-all',
             !showEverything
               ? 'bg-foreground text-background font-medium'
-              : 'text-muted-foreground hover:text-foreground hover:bg-accent',
+              : 'bg-white/5 text-muted-foreground hover:text-foreground hover:bg-white/10',
           )}
         >
           My Board
@@ -689,6 +717,7 @@ function TaskListPanel({
       {/* Time filter row */}
       <div className="flex items-center gap-1 px-4 py-2 border-b shrink-0 overflow-x-auto scrollbar-none whitespace-nowrap">
         <div className="w-5 h-5 flex items-center justify-center shrink-0"><Calendar className="h-3.5 w-3.5 text-muted-foreground/40" /></div>
+        <div className="w-px h-5 bg-border mx-1" />
         {timeOptions.map((opt) => {
           if (opt.hideUnless === false) return null
           return (
