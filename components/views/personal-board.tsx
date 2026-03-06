@@ -77,7 +77,7 @@ const PRIORITY_DOT: Record<Priority, string> = {
 // Time filter
 // ---------------------------------------------------------------------------
 
-type TimeFilter = 'all' | 'today' | 'tomorrow' | 'this-week'
+type TimeFilter = 'all' | 'overdue' | 'today' | 'tomorrow' | 'this-week'
 
 function getStartOfDay(date: Date): Date {
   const d = new Date(date)
@@ -93,6 +93,9 @@ function matchesTimeFilter(task: Task, filter: TimeFilter): boolean {
   const today = getStartOfDay(now)
   const due = getStartOfDay(new Date(task.due_date))
 
+  if (filter === 'overdue') {
+    return due.getTime() < today.getTime()
+  }
   if (filter === 'today') {
     return due.getTime() === today.getTime()
   }
@@ -572,23 +575,26 @@ function TaskListItem({
     <Link
       href={taskHref(task)}
       className={cn(
-        'flex items-center gap-3 px-4 py-2.5 hover:bg-accent/40 transition-all cursor-pointer no-underline border-b border-border/40 border-l-2',
-        PRIORITY_COLORS[task.priority],
-        isDone && 'hover:opacity-80',
+        'flex items-center gap-3 px-4 py-2.5 transition-all cursor-pointer no-underline border-b border-border/40 border-l-2',
+        isDone
+          ? 'border-l-transparent'
+          : cn(PRIORITY_COLORS[task.priority], 'hover:bg-accent/40'),
       )}
       style={opacity !== undefined ? { opacity } : undefined}
     >
-      <div
-        className={cn(
-          'w-2 h-2 rounded-full shrink-0',
-          isDone ? 'bg-muted-foreground/20' : PRIORITY_DOT[task.priority],
-        )}
-      />
+      {!isDone && (
+        <div
+          className={cn(
+            'w-2 h-2 rounded-full shrink-0',
+            PRIORITY_DOT[task.priority],
+          )}
+        />
+      )}
       <span
         className={cn(
           'text-sm leading-snug truncate',
           isDone
-            ? 'line-through text-muted-foreground/40'
+            ? 'line-through text-muted-foreground/30'
             : 'font-medium',
         )}
       >
@@ -675,8 +681,19 @@ function TaskListPanel({
     return { activeTasks: active, doneTasks: done }
   }, [tasks, enabledTags, timeFilter])
 
-  const timeOptions: { value: TimeFilter; label: string }[] = [
+  // Check if any overdue tasks exist (across all tasks, not just filtered)
+  const hasOverdue = useMemo(() => {
+    const today = getStartOfDay(new Date())
+    return tasks.some((t) => {
+      if (STATUS_DONE.includes(t.status)) return false
+      if (!t.due_date) return false
+      return getStartOfDay(new Date(t.due_date)).getTime() < today.getTime()
+    })
+  }, [tasks])
+
+  const timeOptions: { value: TimeFilter; label: string; hideUnless?: boolean }[] = [
     { value: 'all', label: 'All' },
+    { value: 'overdue', label: 'Overdue', hideUnless: hasOverdue },
     { value: 'today', label: 'Today' },
     { value: 'tomorrow', label: 'Tomorrow' },
     { value: 'this-week', label: 'This Week' },
@@ -684,44 +701,66 @@ function TaskListPanel({
 
   return (
     <div className="flex flex-col h-full min-w-0">
-      {/* Tag pills + menu */}
-      <div className="flex items-center gap-1.5 px-3 py-2 border-b shrink-0 flex-wrap">
+      {/* Tag pills */}
+      <div className="flex items-center gap-1 px-3 py-2 border-b shrink-0 flex-wrap">
         <TagSelector
           allTags={allTags}
           enabledTags={enabledTags}
           onToggle={toggleTag}
         />
-        {enabledTags.map((tag) => (
-          <button
-            key={tag}
-            onClick={() => toggleTag(tag)}
-            className="flex items-center gap-1 px-2 py-0.5 text-xs rounded-full bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition-colors"
-          >
-            {tag}
-            <X className="h-3 w-3" />
-          </button>
-        ))}
-        {enabledTags.length === 0 && (
-          <span className="text-xs text-muted-foreground/50">No tag filters</span>
+        {allTags.length > 0 && (
+          <>
+            <button
+              onClick={() => {
+                setEnabledTags([])
+                saveEnabledTags([])
+              }}
+              className={cn(
+                'px-2.5 py-1 text-xs rounded-full transition-all',
+                enabledTags.length === 0
+                  ? 'bg-foreground text-background font-medium'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-accent',
+              )}
+            >
+              All
+            </button>
+            {allTags.map((tag) => (
+              <button
+                key={tag}
+                onClick={() => toggleTag(tag)}
+                className={cn(
+                  'px-2.5 py-1 text-xs rounded-full transition-all',
+                  enabledTags.includes(tag)
+                    ? 'bg-foreground text-background font-medium'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-accent',
+                )}
+              >
+                {tag}
+              </button>
+            ))}
+          </>
         )}
       </div>
 
       {/* Time filter */}
       <div className="flex items-center gap-1 px-3 py-2 border-b shrink-0">
-        {timeOptions.map((opt) => (
-          <button
-            key={opt.value}
-            onClick={() => setTimeFilter(opt.value)}
-            className={cn(
-              'px-2.5 py-1 text-xs rounded-full transition-all',
-              timeFilter === opt.value
-                ? 'bg-foreground text-background font-medium'
-                : 'text-muted-foreground hover:text-foreground hover:bg-accent',
-            )}
-          >
-            {opt.label}
-          </button>
-        ))}
+        {timeOptions.map((opt) => {
+          if (opt.hideUnless === false) return null
+          return (
+            <button
+              key={opt.value}
+              onClick={() => setTimeFilter(opt.value)}
+              className={cn(
+                'px-2.5 py-1 text-xs rounded-full transition-all',
+                timeFilter === opt.value
+                  ? 'bg-foreground text-background font-medium'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-accent',
+              )}
+            >
+              {opt.label}
+            </button>
+          )
+        })}
       </div>
 
       {/* Task list */}
@@ -747,7 +786,7 @@ function TaskListPanel({
                 opacity = 0.15 * (1 - fadeIndex / 10)
               }
               return (
-                <div key={task.id} className="hover:!opacity-60 transition-opacity">
+                <div key={task.id} className="hover:!opacity-100 transition-opacity">
                   <TaskListItem task={task} taskHref={taskHref} opacity={opacity} />
                 </div>
               )
