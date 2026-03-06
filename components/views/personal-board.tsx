@@ -304,45 +304,180 @@ function TaskListItem({
   isDone?: boolean
 }) {
   const isDone = isDoneProp ?? STATUS_DONE.includes(task.status)
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null)
+  const [updating, setUpdating] = useState(false)
+
+  useEffect(() => {
+    if (!ctxMenu) return
+    const close = () => setCtxMenu(null)
+    window.addEventListener('click', close)
+    return () => window.removeEventListener('click', close)
+  }, [ctxMenu])
+
+  const quickUpdate = useCallback(async (fields: Record<string, unknown>) => {
+    setUpdating(true)
+    setCtxMenu(null)
+    try {
+      await fetch('/api/commands/update-task', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: task.id, fields }),
+      })
+    } catch { /* ignore */ }
+    setUpdating(false)
+  }, [task.id])
+
+  const today = new Date()
+  const tomorrow = new Date(today)
+  tomorrow.setDate(tomorrow.getDate() + 1)
+  const formatDate = (d: Date) => d.toISOString().split('T')[0]
+
+  const isOverdue = task.due_date && new Date(task.due_date) < new Date(new Date().toDateString())
+  const isUrgent = task.priority === 'urgent'
+  const isHigh = task.priority === 'high'
 
   return (
-    <Link
-      href={taskHref(task)}
-      className={cn(
-        'flex items-center gap-3 px-4 py-3.5 transition-all cursor-pointer no-underline border-b border-border/40',
-        isDone
-          ? ''
-          : 'hover:bg-accent/40',
-      )}
-    >
-      <div
-        className="w-5 h-5 rounded border-2 shrink-0 flex items-center justify-center transition-colors border-white/20"
-      >
-        {isDone && (
-          <svg className="w-3 h-3 text-white/20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="20 6 9 17 4 12" />
-          </svg>
-        )}
-      </div>
-      {!isDone && (task.priority === 'urgent' || task.priority === 'high') && (
-        <div
-          className={cn(
-            'w-2 h-2 rounded-full shrink-0',
-            task.priority === 'urgent' ? 'bg-red-500' : 'bg-yellow-400',
-          )}
-        />
-      )}
-      <span
+    <div className="relative">
+      <Link
+        href={taskHref(task)}
         className={cn(
-          'text-sm leading-snug truncate',
-          isDone
-            ? 'line-through text-white/20'
-            : 'font-medium',
+          'flex items-center gap-3 px-4 py-3.5 transition-all cursor-pointer no-underline border-b border-border/40',
+          isDone ? '' : 'hover:bg-accent/40',
+          updating && 'opacity-50',
         )}
+        onContextMenu={(e) => {
+          if (isDone) return
+          e.preventDefault()
+          setCtxMenu({ x: e.clientX, y: e.clientY })
+        }}
       >
-        {task.title}
-      </span>
-    </Link>
+        <div
+          className="w-5 h-5 rounded border-2 shrink-0 flex items-center justify-center transition-colors border-white/20"
+        >
+          {isDone && (
+            <svg className="w-3 h-3 text-white/20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+          )}
+        </div>
+        {!isDone && (task.priority === 'urgent' || task.priority === 'high') && (
+          <div
+            className={cn(
+              'w-2 h-2 rounded-full shrink-0',
+              task.priority === 'urgent' ? 'bg-red-500' : 'bg-yellow-400',
+            )}
+          />
+        )}
+        <span
+          className={cn(
+            'text-sm leading-snug truncate',
+            isDone
+              ? 'line-through text-white/20'
+              : 'font-medium',
+          )}
+        >
+          {task.title}
+        </span>
+      </Link>
+      {ctxMenu && (
+        <div
+          className="fixed bg-popover border border-border rounded-lg shadow-xl py-1 z-[100] min-w-[160px]"
+          style={{ left: ctxMenu.x, top: ctxMenu.y }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Complete */}
+          <button
+            className="w-full px-3 py-1.5 text-sm text-left hover:bg-accent transition-colors flex items-center gap-2"
+            onClick={() => quickUpdate({ status: 'done' })}
+          >
+            <span className="text-green-400">✓</span> Mark Done
+          </button>
+
+          {/* Priority section */}
+          {!isUrgent && (
+            <button
+              className="w-full px-3 py-1.5 text-sm text-left hover:bg-accent transition-colors flex items-center gap-2"
+              onClick={() => quickUpdate({ priority: 'urgent' })}
+            >
+              <span className="text-red-400">●</span> Urgent
+            </button>
+          )}
+          {!isHigh && !isUrgent && (
+            <button
+              className="w-full px-3 py-1.5 text-sm text-left hover:bg-accent transition-colors flex items-center gap-2"
+              onClick={() => quickUpdate({ priority: 'high' })}
+            >
+              <span className="text-yellow-400">●</span> High Priority
+            </button>
+          )}
+          {(isUrgent || isHigh) && (
+            <button
+              className="w-full px-3 py-1.5 text-sm text-left hover:bg-accent transition-colors flex items-center gap-2"
+              onClick={() => quickUpdate({ priority: 'medium' })}
+            >
+              <span className="text-muted-foreground">↓</span> Lower Priority
+            </button>
+          )}
+
+          <div className="border-t border-border my-1" />
+
+          {/* Due date */}
+          <button
+            className="w-full px-3 py-1.5 text-sm text-left hover:bg-accent transition-colors flex items-center gap-2"
+            onClick={() => quickUpdate({ due_date: formatDate(today) })}
+          >
+            <span className="text-blue-400">◇</span> Due Today
+          </button>
+          <button
+            className="w-full px-3 py-1.5 text-sm text-left hover:bg-accent transition-colors flex items-center gap-2"
+            onClick={() => quickUpdate({ due_date: formatDate(tomorrow) })}
+          >
+            <span className="text-muted-foreground">◇</span> Due Tomorrow
+          </button>
+          {task.due_date && (
+            <button
+              className="w-full px-3 py-1.5 text-sm text-left hover:bg-accent transition-colors flex items-center gap-2"
+              onClick={() => quickUpdate({ due_date: null })}
+            >
+              <span className="text-muted-foreground">✕</span> Clear Due Date
+            </button>
+          )}
+
+          {/* Contextual */}
+          {isOverdue && (
+            <>
+              <div className="border-t border-border my-1" />
+              <button
+                className="w-full px-3 py-1.5 text-sm text-left hover:bg-accent transition-colors flex items-center gap-2 text-red-400"
+                onClick={() => quickUpdate({ due_date: formatDate(today), priority: 'urgent' })}
+              >
+                🔥 Overdue → Urgent + Today
+              </button>
+            </>
+          )}
+
+          <div className="border-t border-border my-1" />
+
+          {/* Status */}
+          {task.status !== 'blocked' && (
+            <button
+              className="w-full px-3 py-1.5 text-sm text-left hover:bg-accent transition-colors flex items-center gap-2"
+              onClick={() => quickUpdate({ status: 'blocked' })}
+            >
+              <span className="text-orange-400">⊘</span> Blocked
+            </button>
+          )}
+          {task.status !== 'in_progress' && (
+            <button
+              className="w-full px-3 py-1.5 text-sm text-left hover:bg-accent transition-colors flex items-center gap-2"
+              onClick={() => quickUpdate({ status: 'in_progress' })}
+            >
+              <span className="text-blue-400">▶</span> In Progress
+            </button>
+          )}
+        </div>
+      )}
+    </div>
   )
 }
 
