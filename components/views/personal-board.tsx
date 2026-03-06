@@ -621,7 +621,7 @@ function TaskListPanel({
   const allTags = useMemo(() => {
     const tagSet = new Set<string>()
     for (const task of tasks) {
-      for (const tag of task.tags) {
+      for (const tag of (task.tags ?? [])) {
         tagSet.add(tag)
       }
     }
@@ -645,7 +645,7 @@ function TaskListPanel({
     // Tag filter (if any enabled)
     if (enabledTags.length > 0) {
       filtered = filtered.filter((t) =>
-        t.tags.some((tag) => enabledTags.includes(tag)),
+        ((t.tags ?? []).some((tag) => enabledTags.includes(tag))),
       )
     }
 
