@@ -44,6 +44,7 @@ type Task = {
   tags: string[]
   assignee_id: string | null
   assignee_type: string | null
+  updated_at?: string | null
 }
 
 export type PersonalBoardProps = {
@@ -689,13 +690,13 @@ const PRIORITY_ORDER: Priority[] = ['urgent', 'high', 'medium', 'low', 'none']
 function TaskListItem({
   task,
   taskHref,
-  opacity,
+  isDone: isDoneProp,
 }: {
   task: Task
   taskHref: (task: Task) => string
-  opacity?: number
+  isDone?: boolean
 }) {
-  const isDone = STATUS_DONE.includes(task.status)
+  const isDone = isDoneProp ?? STATUS_DONE.includes(task.status)
 
   return (
     <Link
@@ -706,18 +707,17 @@ function TaskListItem({
           ? 'border-l-transparent'
           : cn(PRIORITY_COLORS[task.priority], 'hover:bg-accent/40'),
       )}
-      style={opacity !== undefined ? { opacity } : undefined}
     >
       <div
         className={cn(
           'w-5 h-5 rounded border-2 shrink-0 flex items-center justify-center transition-colors',
           isDone
-            ? 'bg-muted-foreground/20 border-muted-foreground/20'
+            ? 'border-white/20 bg-white/5'
             : PRIORITY_CHECKBOX_BORDER[task.priority],
         )}
       >
         {isDone && (
-          <svg className="w-3 h-3 text-muted-foreground/40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+          <svg className="w-3 h-3 text-white/20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="20 6 9 17 4 12" />
           </svg>
         )}
@@ -726,7 +726,7 @@ function TaskListItem({
         className={cn(
           'text-sm leading-snug truncate',
           isDone
-            ? 'line-through text-muted-foreground/30'
+            ? 'line-through text-white/20'
             : 'font-medium',
         )}
       >
@@ -826,6 +826,13 @@ function TaskListPanel({
     // Sort active by priority
     active.sort((a, b) => {
       return PRIORITY_ORDER.indexOf(a.priority) - PRIORITY_ORDER.indexOf(b.priority)
+    })
+
+    // Sort done by most recently updated first
+    done.sort((a, b) => {
+      const aTime = a.updated_at ? new Date(a.updated_at).getTime() : 0
+      const bTime = b.updated_at ? new Date(b.updated_at).getTime() : 0
+      return bTime - aTime
     })
 
     // Limit done to 20
@@ -930,20 +937,23 @@ function TaskListPanel({
           <TaskListItem key={task.id} task={task} taskHref={taskHref} />
         ))}
 
-        {/* Done tasks - faded, last 10 fade to 0 */}
+        {/* Done tasks - very faded, group hover brings up, individual hover full */}
         {doneTasks.length > 0 && (
-          <div className="mt-2">
+          <div className="mt-2 group/done [&:hover_.done-item]:opacity-40">
             {doneTasks.map((task, i) => {
-              let opacity = 0.15
-              // Last 10 fade from 0.15 to 0
+              let baseOpacity = 0.1
               const fadeStart = doneTasks.length - 10
               if (i >= fadeStart) {
                 const fadeIndex = i - fadeStart
-                opacity = 0.15 * (1 - fadeIndex / 10)
+                baseOpacity = 0.1 * (1 - fadeIndex / 10)
               }
               return (
-                <div key={task.id} className="hover:!opacity-100 transition-opacity">
-                  <TaskListItem task={task} taskHref={taskHref} opacity={opacity} />
+                <div
+                  key={task.id}
+                  className="done-item hover:!opacity-100 transition-opacity duration-200"
+                  style={{ opacity: baseOpacity }}
+                >
+                  <TaskListItem task={task} taskHref={taskHref} isDone />
                 </div>
               )
             })}
