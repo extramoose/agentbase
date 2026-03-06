@@ -9,6 +9,7 @@ import {
   Check,
 } from 'lucide-react'
 import dynamic from 'next/dynamic'
+import { createClient } from '@/lib/supabase/client'
 import {
   Popover,
   PopoverContent,
@@ -110,41 +111,80 @@ function matchesTimeFilter(task: Task, filter: TimeFilter): boolean {
 // ---------------------------------------------------------------------------
 
 const TLDRAW_STORAGE_KEY = 'ab:personal-board-v2:tldraw'
+const SAVE_DEBOUNCE_MS = 2000
 
 const TldrawCanvas = dynamic(
   () => import('tldraw').then((mod) => {
-    const { Tldraw, createTLStore, defaultShapeUtils } = mod
+    const { Tldraw, createTLStore, defaultShapeUtils, useTldrawUser } = mod
 
     function Canvas() {
-      const [store] = useState(() => {
-        const s = createTLStore({ shapeUtils: defaultShapeUtils })
-        // Load persisted state
-        if (typeof window !== 'undefined') {
-          try {
-            const raw = localStorage.getItem(TLDRAW_STORAGE_KEY)
-            if (raw) {
-              const snapshot = JSON.parse(raw)
-              s.loadSnapshot(snapshot)
-            }
-          } catch { /* ignore */ }
-        }
-        return s
+      const [store] = useState(() => createTLStore({ shapeUtils: defaultShapeUtils }))
+      const [loaded, setLoaded] = useState(false)
+
+      // Force dark mode — AgentBase is dark-only
+      const user = useTldrawUser({
+        userPreferences: { id: 'ab-user', colorScheme: 'dark' },
       })
 
-      // Persist on changes
+      // Load snapshot from Supabase on mount, fallback to localStorage
       useEffect(() => {
-        const unsub = store.listen(() => {
+        let cancelled = false
+        async function load() {
           try {
-            const snapshot = store.getSnapshot()
-            localStorage.setItem(TLDRAW_STORAGE_KEY, JSON.stringify(snapshot))
-          } catch { /* ignore */ }
-        }, { scope: 'document', source: 'user' })
-        return unsub
+            const supabase = createClient()
+            const { data } = await supabase.rpc('rpc_load_tldraw_snapshot')
+            if (!cancelled && data) {
+              store.loadSnapshot(data)
+              setLoaded(true)
+              return
+            }
+          } catch { /* Supabase unavailable, fall through */ }
+
+          // Fallback: migrate from localStorage
+          if (!cancelled && typeof window !== 'undefined') {
+            try {
+              const raw = localStorage.getItem(TLDRAW_STORAGE_KEY)
+              if (raw) {
+                store.loadSnapshot(JSON.parse(raw))
+              }
+            } catch { /* ignore */ }
+          }
+          if (!cancelled) setLoaded(true)
+        }
+        load()
+        return () => { cancelled = true }
       }, [store])
+
+      // Persist to Supabase on changes (debounced)
+      useEffect(() => {
+        if (!loaded) return
+        let timer: ReturnType<typeof setTimeout> | null = null
+        const unsub = store.listen(() => {
+          if (timer) clearTimeout(timer)
+          timer = setTimeout(() => {
+            try {
+              const snapshot = store.getSnapshot()
+              const supabase = createClient()
+              supabase.rpc('rpc_upsert_tldraw_snapshot', {
+                p_snapshot: snapshot,
+              }).then(() => {
+                // Also keep localStorage as offline fallback
+                try {
+                  localStorage.setItem(TLDRAW_STORAGE_KEY, JSON.stringify(snapshot))
+                } catch { /* ignore */ }
+              })
+            } catch { /* ignore */ }
+          }, SAVE_DEBOUNCE_MS)
+        }, { scope: 'document', source: 'user' })
+        return () => {
+          unsub()
+          if (timer) clearTimeout(timer)
+        }
+      }, [store, loaded])
 
       return (
         <div className="w-full h-full">
-          <Tldraw store={store} />
+          <Tldraw store={store} user={user} />
         </div>
       )
     }
