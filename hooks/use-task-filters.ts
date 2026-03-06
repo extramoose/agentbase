@@ -10,7 +10,7 @@ import { createClient } from '@/lib/supabase/client'
 export type Priority = 'urgent' | 'high' | 'medium' | 'low' | 'none'
 export type Status = 'backlog' | 'todo' | 'in_progress' | 'blocked' | 'done' | 'cancelled'
 export type TaskType = 'bug' | 'improvement' | 'feature'
-export type DashboardView = 'sticky-timeframe' | 'sticky-status' | 'experiment-a' | 'experiment-b'
+export type DashboardView = 'sticky-timeframe' | 'sticky-status' | 'experiment-a' | 'experiment-b' | 'experiment-c'
 
 export type WorkspaceMember = {
   id: string

@@ -5,8 +5,9 @@ import { StatusView } from './status-view'
 import { ExperimentA } from './experiment-a'
 import type { WorkspaceMember } from '@/hooks/use-task-filters'
 import { ExperimentB } from './experiment-b'
+import { ExperimentC } from './experiment-c'
 
-export type ViewType = 'sticky-timeframe' | 'sticky-status' | 'experiment-a' | 'experiment-b'
+export type ViewType = 'sticky-timeframe' | 'sticky-status' | 'experiment-a' | 'experiment-b' | 'experiment-c'
 
 type Task = Parameters<typeof TimeframeView>[0]['tasks'][number]
 
@@ -28,5 +29,7 @@ export function ViewRenderer({ view, tasks, taskHref, recentlyChanged, workspace
       return <ExperimentA tasks={tasks} taskHref={taskHref} recentlyChanged={recentlyChanged} workspaceMembers={workspaceMembers} />
     case 'experiment-b':
       return <ExperimentB />
+    case 'experiment-c':
+      return <ExperimentC tasks={tasks} taskHref={taskHref} recentlyChanged={recentlyChanged} />
   }
 }

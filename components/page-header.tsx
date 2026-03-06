@@ -240,6 +240,7 @@ export function PageHeader({
                 <SelectItem value="sticky-status">Sticky - Status</SelectItem>
                 <SelectItem value="experiment-a">Experiment A</SelectItem>
                 <SelectItem value="experiment-b">Experiment B</SelectItem>
+                <SelectItem value="experiment-c">Personal Board</SelectItem>
               </SelectContent>
             </Select>
           )}
