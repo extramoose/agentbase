@@ -6,7 +6,6 @@ import { cn } from '@/lib/utils'
 import {
   MoreHorizontal,
   Plus,
-  X,
   Check,
 } from 'lucide-react'
 import {
@@ -17,9 +16,9 @@ import {
   type DragEndEvent,
   type DragStartEvent,
   DragOverlay,
+  useDraggable,
 } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
-import { useSortable, SortableContext, rectSortingStrategy } from '@dnd-kit/sortable'
 import {
   Popover,
   PopoverContent,
@@ -125,6 +124,7 @@ type StickyNote = {
   height: number
   content: string
   color: string
+  locked?: boolean
 }
 
 const STICKY_COLORS = [
@@ -257,11 +257,17 @@ function DraggableStickyNote({
   note,
   onDelete,
   onContentChange,
+  onRecolor,
+  onToggleLock,
+  onResize,
   isDragging,
 }: {
   note: StickyNote
   onDelete: (id: string) => void
   onContentChange: (id: string, content: string) => void
+  onRecolor: (id: string, color: string) => void
+  onToggleLock: (id: string) => void
+  onResize: (id: string, width: number, height: number) => void
   isDragging?: boolean
 }) {
   const {
@@ -269,7 +275,10 @@ function DraggableStickyNote({
     listeners,
     setNodeRef,
     transform,
-  } = useSortable({ id: note.id })
+  } = useDraggable({ id: note.id, disabled: note.locked })
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null)
+  const [, setResizing] = useState(false)
+  const resizeRef = useRef<{ startX: number; startY: number; startW: number; startH: number } | null>(null)
 
   const style: React.CSSProperties = {
     position: 'absolute',
@@ -279,40 +288,67 @@ function DraggableStickyNote({
     height: note.height,
     transform: CSS.Translate.toString(transform),
     transition: isDragging ? undefined : 'box-shadow 0.2s',
-    zIndex: isDragging ? 999 : 1,
+    zIndex: isDragging || ctxMenu ? 999 : 1,
     opacity: isDragging ? 0.5 : 1,
   }
+
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setCtxMenu({ x: e.nativeEvent.offsetX, y: e.nativeEvent.offsetY })
+  }, [])
+
+  // Close context menu on click outside
+  useEffect(() => {
+    if (!ctxMenu) return
+    const close = () => setCtxMenu(null)
+    window.addEventListener('click', close)
+    return () => window.removeEventListener('click', close)
+  }, [ctxMenu])
+
+  const handleResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setResizing(true)
+    resizeRef.current = { startX: e.clientX, startY: e.clientY, startW: note.width, startH: note.height }
+    const onMove = (ev: MouseEvent) => {
+      if (!resizeRef.current) return
+      const w = Math.max(120, resizeRef.current.startW + (ev.clientX - resizeRef.current.startX))
+      const h = Math.max(80, resizeRef.current.startH + (ev.clientY - resizeRef.current.startY))
+      onResize(note.id, w, h)
+    }
+    const onUp = () => {
+      setResizing(false)
+      resizeRef.current = null
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+  }, [note.id, note.width, note.height, onResize])
 
   return (
     <div
       ref={setNodeRef}
       style={style}
       className={cn(
-        'group rounded-lg shadow-md border border-black/10 flex flex-col cursor-grab active:cursor-grabbing select-none',
+        'group rounded-lg shadow-md border border-black/10 flex flex-col select-none',
+        note.locked ? 'cursor-default' : 'cursor-grab active:cursor-grabbing',
         isDragging && 'shadow-xl',
       )}
-      {...attributes}
-      {...listeners}
+      onContextMenu={handleContextMenu}
+      {...(note.locked ? {} : { ...attributes, ...listeners })}
     >
+      {/* Lock indicator */}
+      {note.locked && (
+        <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-black/20 flex items-center justify-center text-[8px]">
+          🔒
+        </div>
+      )}
       <div
-        className="flex items-center justify-end px-1.5 pt-1 shrink-0"
+        className="flex-1 px-3 py-2 text-sm text-black/80 leading-snug overflow-hidden outline-none rounded-lg"
         style={{ backgroundColor: note.color }}
-      >
-        <button
-          className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-black/10"
-          onClick={(e) => {
-            e.stopPropagation()
-            onDelete(note.id)
-          }}
-          onPointerDown={(e) => e.stopPropagation()}
-        >
-          <X className="h-3 w-3 text-black/50" />
-        </button>
-      </div>
-      <div
-        className="flex-1 px-3 pb-2 text-sm text-black/80 leading-snug overflow-hidden outline-none"
-        style={{ backgroundColor: note.color }}
-        contentEditable
+        contentEditable={!note.locked}
         suppressContentEditableWarning
         onPointerDown={(e) => e.stopPropagation()}
         onBlur={(e) => {
@@ -320,6 +356,56 @@ function DraggableStickyNote({
         }}
         dangerouslySetInnerHTML={{ __html: note.content }}
       />
+      {/* Resize handle */}
+      {!note.locked && (
+        <div
+          className="absolute bottom-0 right-0 w-4 h-4 cursor-se-resize opacity-0 group-hover:opacity-100 transition-opacity"
+          onMouseDown={handleResizeStart}
+          onPointerDown={(e) => e.stopPropagation()}
+        >
+          <svg className="w-4 h-4 text-black/20" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M14 14H12V12H14V14ZM14 10H12V8H14V10ZM10 14H8V12H10V14Z" />
+          </svg>
+        </div>
+      )}
+      {/* Context menu */}
+      {ctxMenu && (
+        <div
+          className="absolute bg-popover border border-border rounded-lg shadow-xl py-1 z-[1000] min-w-[140px]"
+          style={{ left: ctxMenu.x, top: ctxMenu.y }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            className="w-full px-3 py-1.5 text-sm text-left hover:bg-accent transition-colors"
+            onClick={() => { onToggleLock(note.id); setCtxMenu(null) }}
+          >
+            {note.locked ? 'Unlock' : 'Lock'}
+          </button>
+          <div className="px-3 py-1.5">
+            <div className="text-xs text-muted-foreground mb-1">Color</div>
+            <div className="flex gap-1">
+              {STICKY_COLORS.map((c) => (
+                <button
+                  key={c}
+                  onClick={() => { onRecolor(note.id, c); setCtxMenu(null) }}
+                  className={cn(
+                    'w-5 h-5 rounded-full border-2 transition-transform hover:scale-110',
+                    c === note.color ? 'border-black/40 scale-110' : 'border-transparent',
+                  )}
+                  style={{ backgroundColor: c }}
+                />
+              ))}
+            </div>
+          </div>
+          <div className="border-t border-border my-1" />
+          <button
+            className="w-full px-3 py-1.5 text-sm text-left text-red-500 hover:bg-accent transition-colors"
+            onClick={() => { onDelete(note.id); setCtxMenu(null) }}
+          >
+            Delete
+          </button>
+        </div>
+      )}
     </div>
   )
 }
@@ -404,6 +490,24 @@ function StickyCanvas() {
     [updateNotes],
   )
 
+  const recolorNote = useCallback(
+    (id: string, color: string) =>
+      updateNotes((prev) => prev.map((n) => (n.id === id ? { ...n, color } : n))),
+    [updateNotes],
+  )
+
+  const toggleLockNote = useCallback(
+    (id: string) =>
+      updateNotes((prev) => prev.map((n) => (n.id === id ? { ...n, locked: !n.locked } : n))),
+    [updateNotes],
+  )
+
+  const resizeNote = useCallback(
+    (id: string, width: number, height: number) =>
+      updateNotes((prev) => prev.map((n) => (n.id === id ? { ...n, width, height } : n))),
+    [updateNotes],
+  )
+
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
   )
@@ -475,28 +579,29 @@ function StickyCanvas() {
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
         >
-          <SortableContext items={notes.map((n) => n.id)} strategy={rectSortingStrategy}>
-            <div
-              className="relative"
-              style={{
-                width: CANVAS_WIDTH,
-                height: CANVAS_HEIGHT,
-                backgroundImage:
-                  'radial-gradient(circle, rgba(0,0,0,0.05) 1px, transparent 1px)',
-                backgroundSize: `${GRID_SIZE}px ${GRID_SIZE}px`,
-              }}
-            >
-              {notes.map((note) => (
-                <DraggableStickyNote
-                  key={note.id}
-                  note={note}
-                  onDelete={deleteNote}
-                  onContentChange={changeContent}
-                  isDragging={note.id === activeId}
-                />
-              ))}
-            </div>
-          </SortableContext>
+          <div
+            className="relative"
+            style={{
+              width: CANVAS_WIDTH,
+              height: CANVAS_HEIGHT,
+              backgroundImage:
+                'radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px)',
+              backgroundSize: `${GRID_SIZE}px ${GRID_SIZE}px`,
+            }}
+          >
+            {notes.map((note) => (
+              <DraggableStickyNote
+                key={note.id}
+                note={note}
+                onDelete={deleteNote}
+                onContentChange={changeContent}
+                onRecolor={recolorNote}
+                onToggleLock={toggleLockNote}
+                onResize={resizeNote}
+                isDragging={note.id === activeId}
+              />
+            ))}
+          </div>
 
           <DragOverlay dropAnimation={null}>
             {activeNote ? <StickyOverlay note={activeNote} /> : null}
