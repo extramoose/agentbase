@@ -19,7 +19,7 @@ import {
   DragOverlay,
 } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
-import { useSortable } from '@dnd-kit/sortable'
+import { useSortable, SortableContext, rectSortingStrategy } from '@dnd-kit/sortable'
 import {
   Popover,
   PopoverContent,
@@ -140,7 +140,8 @@ const CANVAS_HEIGHT = 2000
 const NOTE_WIDTH = 200
 const NOTE_HEIGHT = 150
 const PB_STORAGE_KEY = 'ab:personal-board-v2:stickies'
-const PB_TAGS_KEY = 'ab:personal-board-v2:enabled-tags'
+const PB_VISIBLE_TAGS_KEY = 'ab:personal-board-v2:visible-tags'
+const PB_ACTIVE_TAGS_KEY = 'ab:personal-board-v2:active-tags'
 const DEBOUNCE_MS = 500
 
 // ---------------------------------------------------------------------------
@@ -213,10 +214,10 @@ function saveStickies(notes: StickyNote[]) {
   } catch { /* ignore */ }
 }
 
-function loadEnabledTags(): string[] {
+function loadVisibleTags(): string[] {
   if (typeof window === 'undefined') return []
   try {
-    const raw = localStorage.getItem(PB_TAGS_KEY)
+    const raw = localStorage.getItem(PB_VISIBLE_TAGS_KEY)
     if (!raw) return []
     return JSON.parse(raw) as string[]
   } catch {
@@ -224,9 +225,26 @@ function loadEnabledTags(): string[] {
   }
 }
 
-function saveEnabledTags(tags: string[]) {
+function saveVisibleTags(tags: string[]) {
   try {
-    localStorage.setItem(PB_TAGS_KEY, JSON.stringify(tags))
+    localStorage.setItem(PB_VISIBLE_TAGS_KEY, JSON.stringify(tags))
+  } catch { /* ignore */ }
+}
+
+function loadActiveTags(): string[] {
+  if (typeof window === 'undefined') return []
+  try {
+    const raw = localStorage.getItem(PB_ACTIVE_TAGS_KEY)
+    if (!raw) return []
+    return JSON.parse(raw) as string[]
+  } catch {
+    return []
+  }
+}
+
+function saveActiveTags(tags: string[]) {
+  try {
+    localStorage.setItem(PB_ACTIVE_TAGS_KEY, JSON.stringify(tags))
   } catch { /* ignore */ }
 }
 
@@ -456,26 +474,28 @@ function StickyCanvas() {
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
         >
-          <div
-            className="relative"
-            style={{
-              width: CANVAS_WIDTH,
-              height: CANVAS_HEIGHT,
-              backgroundImage:
-                'radial-gradient(circle, rgba(0,0,0,0.05) 1px, transparent 1px)',
-              backgroundSize: `${GRID_SIZE}px ${GRID_SIZE}px`,
-            }}
-          >
-            {notes.map((note) => (
-              <DraggableStickyNote
-                key={note.id}
-                note={note}
-                onDelete={deleteNote}
-                onContentChange={changeContent}
-                isDragging={note.id === activeId}
-              />
-            ))}
-          </div>
+          <SortableContext items={notes.map((n) => n.id)} strategy={rectSortingStrategy}>
+            <div
+              className="relative"
+              style={{
+                width: CANVAS_WIDTH,
+                height: CANVAS_HEIGHT,
+                backgroundImage:
+                  'radial-gradient(circle, rgba(0,0,0,0.05) 1px, transparent 1px)',
+                backgroundSize: `${GRID_SIZE}px ${GRID_SIZE}px`,
+              }}
+            >
+              {notes.map((note) => (
+                <DraggableStickyNote
+                  key={note.id}
+                  note={note}
+                  onDelete={deleteNote}
+                  onContentChange={changeContent}
+                  isDragging={note.id === activeId}
+                />
+              ))}
+            </div>
+          </SortableContext>
 
           <DragOverlay dropAnimation={null}>
             {activeNote ? <StickyOverlay note={activeNote} /> : null}
@@ -492,12 +512,12 @@ function StickyCanvas() {
 
 function TagSelector({
   allTags,
-  enabledTags,
-  onToggle,
+  visibleTags,
+  onToggleVisible,
 }: {
   allTags: string[]
-  enabledTags: string[]
-  onToggle: (tag: string) => void
+  visibleTags: string[]
+  onToggleVisible: (tag: string) => void
 }) {
   const [search, setSearch] = useState('')
   const filtered = allTags.filter((t) =>
@@ -515,7 +535,7 @@ function TagSelector({
         <div className="p-2 border-b">
           <input
             type="text"
-            placeholder="Filter tags..."
+            placeholder="Show/hide tags..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full text-sm bg-transparent outline-none placeholder:text-muted-foreground/50"
@@ -526,22 +546,22 @@ function TagSelector({
             <div className="px-3 py-2 text-xs text-muted-foreground">No tags</div>
           )}
           {filtered.map((tag) => {
-            const enabled = enabledTags.includes(tag)
+            const visible = visibleTags.includes(tag)
             return (
               <button
                 key={tag}
-                onClick={() => onToggle(tag)}
+                onClick={() => onToggleVisible(tag)}
                 className="flex items-center gap-2 w-full px-3 py-1.5 text-sm text-left hover:bg-accent transition-colors"
               >
                 <div
                   className={cn(
                     'h-4 w-4 rounded border flex items-center justify-center shrink-0 transition-colors',
-                    enabled
+                    visible
                       ? 'bg-primary border-primary'
                       : 'border-muted-foreground/30',
                   )}
                 >
-                  {enabled && <Check className="h-3 w-3 text-primary-foreground" />}
+                  {visible && <Check className="h-3 w-3 text-primary-foreground" />}
                 </div>
                 <span className="truncate">{tag}</span>
               </button>
@@ -615,12 +635,14 @@ function TaskListPanel({
   tasks: Task[]
   taskHref: (task: Task) => string
 }) {
-  const [enabledTags, setEnabledTags] = useState<string[]>([])
+  const [visibleTags, setVisibleTags] = useState<string[]>([])
+  const [activeTags, setActiveTags] = useState<string[]>([])
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('all')
 
-  // Load enabled tags from localStorage
+  // Load from localStorage
   useEffect(() => {
-    setEnabledTags(loadEnabledTags())
+    setVisibleTags(loadVisibleTags())
+    setActiveTags(loadActiveTags())
   }, [])
 
   // Get all unique tags
@@ -634,12 +656,30 @@ function TaskListPanel({
     return Array.from(tagSet).sort()
   }, [tasks])
 
-  const toggleTag = useCallback((tag: string) => {
-    setEnabledTags((prev) => {
+  const toggleVisibleTag = useCallback((tag: string) => {
+    setVisibleTags((prev) => {
       const next = prev.includes(tag)
         ? prev.filter((t) => t !== tag)
         : [...prev, tag]
-      saveEnabledTags(next)
+      saveVisibleTags(next)
+      // Also remove from active if hiding
+      if (prev.includes(tag)) {
+        setActiveTags((ap) => {
+          const an = ap.filter((t) => t !== tag)
+          saveActiveTags(an)
+          return an
+        })
+      }
+      return next
+    })
+  }, [])
+
+  const toggleActiveTag = useCallback((tag: string) => {
+    setActiveTags((prev) => {
+      const next = prev.includes(tag)
+        ? prev.filter((t) => t !== tag)
+        : [...prev, tag]
+      saveActiveTags(next)
       return next
     })
   }, [])
@@ -648,10 +688,10 @@ function TaskListPanel({
   const { activeTasks, doneTasks } = useMemo(() => {
     let filtered = tasks
 
-    // Tag filter (if any enabled)
-    if (enabledTags.length > 0) {
+    // Tag filter (if any active)
+    if (activeTags.length > 0) {
       filtered = filtered.filter((t) =>
-        ((t.tags ?? []).some((tag) => enabledTags.includes(tag))),
+        ((t.tags ?? []).some((tag) => activeTags.includes(tag))),
       )
     }
 
@@ -679,7 +719,7 @@ function TaskListPanel({
     done.splice(20)
 
     return { activeTasks: active, doneTasks: done }
-  }, [tasks, enabledTags, timeFilter])
+  }, [tasks, activeTags, timeFilter])
 
   // Check if any overdue tasks exist (across all tasks, not just filtered)
   const hasOverdue = useMemo(() => {
@@ -701,36 +741,36 @@ function TaskListPanel({
 
   return (
     <div className="flex flex-col h-full min-w-0">
-      {/* Tag pills */}
+      {/* Tag pills - visible tags can be toggled on/off, ... menu controls which show */}
       <div className="flex items-center gap-1 px-3 py-2 border-b shrink-0 flex-wrap">
         <TagSelector
           allTags={allTags}
-          enabledTags={enabledTags}
-          onToggle={toggleTag}
+          visibleTags={visibleTags}
+          onToggleVisible={toggleVisibleTag}
         />
-        {allTags.length > 0 && (
+        {visibleTags.length > 0 && (
           <>
             <button
               onClick={() => {
-                setEnabledTags([])
-                saveEnabledTags([])
+                setActiveTags([])
+                saveActiveTags([])
               }}
               className={cn(
                 'px-2.5 py-1 text-xs rounded-full transition-all',
-                enabledTags.length === 0
+                activeTags.length === 0
                   ? 'bg-foreground text-background font-medium'
                   : 'text-muted-foreground hover:text-foreground hover:bg-accent',
               )}
             >
               All
             </button>
-            {allTags.map((tag) => (
+            {visibleTags.map((tag) => (
               <button
                 key={tag}
-                onClick={() => toggleTag(tag)}
+                onClick={() => toggleActiveTag(tag)}
                 className={cn(
                   'px-2.5 py-1 text-xs rounded-full transition-all',
-                  enabledTags.includes(tag)
+                  activeTags.includes(tag)
                     ? 'bg-foreground text-background font-medium'
                     : 'text-muted-foreground hover:text-foreground hover:bg-accent',
                 )}
@@ -739,6 +779,9 @@ function TaskListPanel({
               </button>
             ))}
           </>
+        )}
+        {visibleTags.length === 0 && (
+          <span className="text-xs text-muted-foreground/50">Use ... to add tags</span>
         )}
       </div>
 
