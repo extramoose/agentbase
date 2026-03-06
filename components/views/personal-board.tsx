@@ -65,12 +65,20 @@ const PRIORITY_COLORS: Record<Priority, string> = {
   none: 'border-l-transparent',
 }
 
-const PRIORITY_DOT: Record<Priority, string> = {
+const PRIORITY_CHECKBOX_BORDER: Record<Priority, string> = {
+  urgent: 'border-red-500',
+  high: 'border-orange-400',
+  medium: 'border-yellow-400',
+  low: 'border-blue-400',
+  none: 'border-muted-foreground/30',
+}
+
+const PRIORITY_CHECKBOX_BG: Record<Priority, string> = {
   urgent: 'bg-red-500',
   high: 'bg-orange-400',
   medium: 'bg-yellow-400',
   low: 'bg-blue-400',
-  none: 'bg-muted-foreground/20',
+  none: 'bg-primary',
 }
 
 // ---------------------------------------------------------------------------
@@ -595,21 +603,27 @@ function TaskListItem({
     <Link
       href={taskHref(task)}
       className={cn(
-        'flex items-center gap-3 px-4 py-2.5 transition-all cursor-pointer no-underline border-b border-border/40 border-l-2',
+        'flex items-center gap-3 px-4 py-3.5 transition-all cursor-pointer no-underline border-b border-border/40 border-l-2',
         isDone
           ? 'border-l-transparent'
           : cn(PRIORITY_COLORS[task.priority], 'hover:bg-accent/40'),
       )}
       style={opacity !== undefined ? { opacity } : undefined}
     >
-      {!isDone && (
-        <div
-          className={cn(
-            'w-2 h-2 rounded-full shrink-0',
-            PRIORITY_DOT[task.priority],
-          )}
-        />
-      )}
+      <div
+        className={cn(
+          'w-5 h-5 rounded border-2 shrink-0 flex items-center justify-center transition-colors',
+          isDone
+            ? 'bg-muted-foreground/20 border-muted-foreground/20'
+            : PRIORITY_CHECKBOX_BORDER[task.priority],
+        )}
+      >
+        {isDone && (
+          <svg className="w-3 h-3 text-muted-foreground/40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+        )}
+      </div>
       <span
         className={cn(
           'text-sm leading-snug truncate',
